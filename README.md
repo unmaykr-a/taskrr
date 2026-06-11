@@ -13,6 +13,17 @@ The whole app is one ~12 MB binary with the web UI and SQLite database baked
 in. It idles at a few megabytes of memory and effectively zero CPU, so it runs
 happily in the corner of a Raspberry Pi or any small box you already have.
 
+## Live demo
+
+**[Try Taskrr in your browser →](https://unmaykr-a.github.io/taskrr/)**
+
+The demo is the real UI with no backend: it runs against an in-browser mock of
+the API, seeded with sample tasks and history, and saves everything to your
+browser's local storage. There's no account and no server — every visitor gets
+their own private sandbox, and the in-app "Reset demo" button clears it. (The
+admin area, single sign-on, backups and reminder delivery need a real server, so
+they're not part of the demo.)
+
 ## Quick start
 
 All you need is Docker and the compose file — no cloning, no building:

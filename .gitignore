@@ -12,6 +12,9 @@
 /internal/web/dist/*
 !/internal/web/dist/.gitkeep
 
+# Static demo build output (deployed to GitHub Pages, never committed)
+/web/dist-demo/
+
 # Node
 node_modules/
 
