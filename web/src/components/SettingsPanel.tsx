@@ -36,7 +36,7 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
           so this frees the whole width for content). Desktop: a vertical side nav. */}
       <nav
         ref={navRef}
-        className="relative flex shrink-0 gap-1 overflow-x-auto border-b pb-2 sm:sticky sm:top-0 sm:w-32 sm:flex-col sm:self-start sm:overflow-visible sm:border-b-0 sm:pb-0"
+        className="relative flex shrink-0 gap-1 overflow-x-auto border-b pb-2 sm:sticky sm:top-0 sm:w-36 sm:flex-col sm:self-start sm:overflow-visible sm:border-b-0 sm:pb-0"
       >
         {/* The active background is a bubble that slides between nav items
             (works in both the phone row and desktop column orientation). */}

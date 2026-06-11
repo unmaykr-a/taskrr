@@ -3,6 +3,7 @@ import { Github, Info, RotateCcw, X } from "lucide-react";
 
 import { DEMO } from "@/lib/demo";
 import { DEMO_KEYS } from "@/lib/api.demo";
+import { clearStoredPreferences } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
@@ -23,14 +24,20 @@ export function DemoBanner() {
     } catch {
       // storage unavailable — nothing to clear
     }
+    // Also wipe the theme and UI preferences (taskrr-* keys), so reset really
+    // means "back to the first visit" — not just the seed tasks.
+    clearStoredPreferences();
     window.location.reload();
   };
 
   return (
     <div
+      // Bottom-centre: clear of the sidebar's account/settings corner and the
+      // calendar/activity column. slide-in-from-left-1/2 keeps the enter
+      // keyframe's x at -50% so the rise doesn't fight the centering.
       className={cn(
-        "fixed bottom-4 left-4 z-[60] max-w-[calc(100vw-2rem)] rounded-xl border bg-card/95 p-3 shadow-2xl backdrop-blur",
-        "animate-in fade-in-0 slide-in-from-bottom-2 duration-300",
+        "fixed bottom-4 left-1/2 z-[60] max-w-[calc(100vw-2rem)] -translate-x-1/2 rounded-xl border bg-card/95 p-3 shadow-2xl backdrop-blur",
+        "animate-in fade-in-0 slide-in-from-left-1/2 slide-in-from-bottom-2 duration-300",
       )}
     >
       <div className="flex items-start gap-2.5">

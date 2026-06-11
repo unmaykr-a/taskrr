@@ -36,12 +36,51 @@ export function daysSince(iso: string | null): number | null {
   return (Date.now() - new Date(iso).getTime()) / 86_400_000;
 }
 
-/** formatDateTime renders an absolute, locale-aware date and time. */
-export function formatDateTime(iso: string): string {
-  return new Date(iso).toLocaleString(undefined, {
-    dateStyle: "medium",
-    timeStyle: "short",
+// --- absolute date/time formatting -------------------------------------------
+// The Preferences "Time & date" section can override the system defaults; the
+// PrefsProvider pushes its choices in here so every caller picks the format up
+// automatically.
+
+export type DateOrder = "auto" | "dmy" | "mdy" | "ymd";
+
+let dateOrder: DateOrder = "auto";
+let hour12Override: boolean | undefined; // undefined = follow the locale
+
+/** setTimeFormat applies the user's date/clock preferences (see PrefsProvider). */
+export function setTimeFormat(opts: { dateOrder: DateOrder; hour12?: boolean }) {
+  dateOrder = opts.dateOrder;
+  hour12Override = opts.hour12;
+}
+
+const pad2 = (n: number) => String(n).padStart(2, "0");
+
+/** formatTime renders just the clock time, honouring the 12/24h preference. */
+export function formatTime(d: Date): string {
+  return d.toLocaleTimeString(undefined, {
+    hour: "2-digit",
+    minute: "2-digit",
+    ...(hour12Override !== undefined ? { hour12: hour12Override } : {}),
   });
+}
+
+/** formatDate renders just the date, honouring the date-order preference. */
+export function formatDate(d: Date): string {
+  switch (dateOrder) {
+    case "dmy":
+      return d.toLocaleDateString("en-GB", { day: "numeric", month: "short", year: "numeric" });
+    case "mdy":
+      return d.toLocaleDateString("en-US", { month: "short", day: "numeric", year: "numeric" });
+    case "ymd":
+      return `${d.getFullYear()}-${pad2(d.getMonth() + 1)}-${pad2(d.getDate())}`;
+    default:
+      return d.toLocaleDateString(undefined, { dateStyle: "medium" });
+  }
+}
+
+/** formatDateTime renders an absolute date and time per the user's preferences. */
+export function formatDateTime(iso: string): string {
+  const d = new Date(iso);
+  return `${formatDate(d)}, ${formatTime(d)}`;
 }
 
 /**
