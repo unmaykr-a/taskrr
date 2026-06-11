@@ -16,9 +16,9 @@ import (
 	"unicode"
 	"unicode/utf8"
 
-	"github.com/andri1305/taskrr/internal/auth"
-	"github.com/andri1305/taskrr/internal/logbuf"
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/auth"
+	"github.com/unmaykr-a/taskrr/internal/logbuf"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 const sessionCookie = "taskrr_session"

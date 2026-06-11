@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // authed returns a request with the given user injected into the context, as the

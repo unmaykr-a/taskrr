@@ -12,7 +12,7 @@ import (
 	"time"
 	"unicode/utf8"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // hexColor matches the "#rrggbb" form the colour inputs produce. We validate so

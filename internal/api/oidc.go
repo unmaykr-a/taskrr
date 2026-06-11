@@ -15,7 +15,7 @@ import (
 	"github.com/coreos/go-oidc/v3/oidc"
 	"golang.org/x/oauth2"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // OIDC settings keys (admin-editable; seeded from env at bootstrap).

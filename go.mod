@@ -1,4 +1,4 @@
-module github.com/andri1305/taskrr
+module github.com/unmaykr-a/taskrr
 
 go 1.25.0
 

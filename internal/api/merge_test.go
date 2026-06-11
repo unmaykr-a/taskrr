@@ -8,7 +8,7 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // mergeCall invokes the merge handler as the given admin and returns the recorder.

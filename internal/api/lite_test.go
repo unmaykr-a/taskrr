@@ -8,7 +8,7 @@ import (
 	"strings"
 	"testing"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 func TestLiteModeDisablesMultiUser(t *testing.T) {
