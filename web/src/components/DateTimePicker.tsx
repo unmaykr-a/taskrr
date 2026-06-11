@@ -3,10 +3,9 @@ import { useState } from "react";
 import { usePrefs } from "@/lib/prefs";
 import { ClockPicker } from "@/components/ClockPicker";
 
-// A date + analog-clock time picker that we fully control, so:
-//   - the time is chosen from a familiar clock face (not fiddly dropdowns), and
-//   - the user can flip between 12- and 24-hour display (defaulting to their
-//     locale), which the native <input type="time"> doesn't allow.
+// A date + analog-clock time picker that we fully control, so the time is
+// chosen from a familiar clock face (not fiddly dropdowns). 12- vs 24-hour
+// display follows the Preferences -> Time & date setting (system by default).
 //
 // `value` is a Date (local time); `onChange` reports a new Date. Seconds are
 // zeroed so logged times are clean.
@@ -26,7 +25,7 @@ export function DateTimePicker({
   onChange: (next: Date) => void;
   max?: Date;
 }) {
-  const { prefs, setPrefs } = usePrefs();
+  const { prefs } = usePrefs();
   const hour12 = prefs.hour12;
   const [showClock, setShowClock] = useState(false);
 
@@ -73,14 +72,6 @@ export function DateTimePicker({
           aria-expanded={showClock}
         >
           {timeLabel}
-        </button>
-        <button
-          type="button"
-          onClick={() => setPrefs({ hour12: !hour12 })}
-          className="ml-auto rounded-md border border-input px-2 py-1 text-xs text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
-          title="Switch between 12- and 24-hour time"
-        >
-          {hour12 ? "12h" : "24h"}
         </button>
       </div>
 

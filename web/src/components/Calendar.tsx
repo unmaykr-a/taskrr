@@ -3,7 +3,7 @@ import { useQuery } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { api, type Activity, type Task } from "@/lib/api";
-import { formatDue } from "@/lib/time";
+import { formatDue, formatTime } from "@/lib/time";
 import { nextDue } from "@/lib/staleness";
 import { usePrefs } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
@@ -400,10 +400,7 @@ export function Calendar({
                 <div className="flex items-center gap-2">
                   <span className="font-medium">{a.taskName}</span>
                   <span className="text-muted-foreground">
-                    {new Date(a.completedAt).toLocaleTimeString(undefined, {
-                      hour: "2-digit",
-                      minute: "2-digit",
-                    })}
+                    {formatTime(new Date(a.completedAt))}
                   </span>
                 </div>
                 {a.note && (

@@ -17,13 +17,23 @@ import {
 } from "react";
 
 import { installSmoothWheel } from "@/lib/smoothScroll";
+import { setTimeFormat } from "@/lib/time";
 
 export type ColorPickerStyle = "wheel" | "native";
 export type AddButtonPosition = "top" | "bottom";
 export type CardSize = "comfortable" | "compact";
+export type ClockChoice = "auto" | "12" | "24";
+export type DateOrder = "auto" | "dmy" | "mdy" | "ymd";
 
 export interface Prefs {
-  /** 12- vs 24-hour time display. */
+  /** Clock display: follow the device's system setting, or force 12/24-hour.
+   *  "auto" is what gets stored, so the same account follows each device's
+   *  own convention instead of freezing whichever locale saved first. */
+  clock: ClockChoice;
+  /** Date display for absolute timestamps: system, day-first, month-first, ISO. */
+  dateFormat: DateOrder;
+  /** Resolved 12- vs 24-hour flag, derived from `clock` by the provider each
+   *  render — components read this; only `clock` is the stored setting. */
   hour12: boolean;
   /** Default colours for the two ends of the task staleness gradient. */
   taskColorFresh: string;
@@ -97,7 +107,9 @@ export function localeHour12(): boolean {
 
 function defaults(): Prefs {
   return {
-    hour12: localeHour12(),
+    clock: "auto",
+    dateFormat: "auto",
+    hour12: localeHour12(), // derived; recomputed from `clock` by the provider
     taskColorFresh: "#22c55e", // emerald
     taskColorOverdue: "#ef4444", // red
     noRoutineFadeDays: 7,
@@ -131,12 +143,18 @@ function load(): Prefs {
     if (raw) return { ...base, ...(JSON.parse(raw) as Partial<Prefs>) };
     // Migrate the old standalone 12/24h key if present.
     const legacy = localStorage.getItem(LEGACY_HOUR12);
-    if (legacy === "12") return { ...base, hour12: true };
-    if (legacy === "24") return { ...base, hour12: false };
+    if (legacy === "12") return { ...base, clock: "12" };
+    if (legacy === "24") return { ...base, clock: "24" };
   } catch {
     // ignore and use defaults
   }
   return base;
+}
+
+/** Resolve the stored clock choice into the 12/24 flag components consume. */
+function resolveHour12(clock: ClockChoice): boolean {
+  if (clock === "auto") return localeHour12();
+  return clock === "12";
 }
 
 const Ctx = createContext<{ prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void } | null>(null);
@@ -167,7 +185,14 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
   }, [prefs.smoothScroll]);
 
   const setPrefs = useCallback((p: Partial<Prefs>) => setState((cur) => ({ ...cur, ...p })), []);
-  const value = useMemo(() => ({ prefs, setPrefs }), [prefs, setPrefs]);
+  const value = useMemo(() => {
+    const hour12 = resolveHour12(prefs.clock);
+    // Push the format choices into the pure time helpers *during* render, so
+    // formatDateTime/formatTime read the new format on the same pass the
+    // consumers re-render (an effect would lag one frame behind).
+    setTimeFormat({ dateOrder: prefs.dateFormat, hour12: prefs.clock === "auto" ? undefined : hour12 });
+    return { prefs: { ...prefs, hour12 }, setPrefs };
+  }, [prefs, setPrefs]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

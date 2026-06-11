@@ -1,9 +1,12 @@
 import {
   type AddButtonPosition,
   type CardSize,
+  type ClockChoice,
   type ColorPickerStyle,
+  type DateOrder,
   usePrefs,
 } from "@/lib/prefs";
+import { Segmented } from "@/components/ui/Segmented";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { Label } from "@/components/ui/label";
 
@@ -17,20 +20,37 @@ export function PreferencesSection() {
 
   return (
     <div className="space-y-5">
-      {/* Clock */}
+      {/* Time & date */}
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Time</h3>
+        <h3 className="text-sm font-semibold">Time &amp; date</h3>
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Clock</Label>
-          <select
-            className={SELECT}
-            value={prefs.hour12 ? "12" : "24"}
-            onChange={(e) => setPrefs({ hour12: e.target.value === "12" })}
-          >
-            <option value="12" className="bg-background">12-hour (AM/PM)</option>
-            <option value="24" className="bg-background">24-hour</option>
-          </select>
+          <Segmented
+            value={prefs.clock}
+            onChange={(v: ClockChoice) => setPrefs({ clock: v })}
+            options={[
+              { value: "auto", label: "Auto", title: "Follow this device's system setting" },
+              { value: "12", label: "12-hour" },
+              { value: "24", label: "24-hour" },
+            ]}
+          />
         </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Date format</Label>
+          <Segmented
+            value={prefs.dateFormat}
+            onChange={(v: DateOrder) => setPrefs({ dateFormat: v })}
+            options={[
+              { value: "auto", label: "Auto", title: "Follow this device's system setting" },
+              { value: "dmy", label: "13 Jun" },
+              { value: "mdy", label: "Jun 13" },
+              { value: "ymd", label: "2026-06-13" },
+            ]}
+          />
+        </div>
+        <p className="text-[11px] text-muted-foreground">
+          Auto follows each device's own system settings.
+        </p>
       </section>
 
       {/* Task staleness colours + gradient */}

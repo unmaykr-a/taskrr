@@ -1,24 +1,3 @@
-# Taskrr — a self-hosted tracker for when you last did things.
-#
-# This file is all you need to run it:
-#
-#   mkdir taskrr && cd taskrr
-#   curl -LO https://raw.githubusercontent.com/unmaykr-a/taskrr/main/docker-compose.yml
-#   mkdir data
-#   docker compose up -d
-#
-# Then open http://localhost:8787 and sign in as "admin" — you'll be asked to
-# set a password on the first sign-in.
-#
-# Your data is the plain ./data folder next to this file; backing up or moving
-# the instance is copying that folder. (Create it yourself, as above — if
-# Docker creates it, it's owned by root and the app can't write to it.) The
-# container writes as uid/gid 1000 by default; if `id -u` says otherwise, set
-# TASKRR_UID / TASKRR_GID.
-#
-# Optional: put settings in a .env file next to this one (see .env.example in
-# the repo) to preset the admin password, configure OIDC, enable lite mode, etc.
-
 services:
   taskrr:
     image: ghcr.io/unmaykr-a/taskrr:latest
@@ -35,7 +14,6 @@ services:
       TASKRR_DB_PATH: "/data/taskrr.db"
     volumes:
       - ./data:/data
-    # The image is distroless (no shell), so the binary probes itself.
     healthcheck:
       test: ["CMD", "/taskrr", "-health"]
       interval: 60s
