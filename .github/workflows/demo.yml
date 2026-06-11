@@ -1,0 +1,59 @@
+name: Demo (GitHub Pages)
+
+# Builds the static, server-less demo (VITE_DEMO=1) and publishes it to GitHub
+# Pages at https://<owner>.github.io/taskrr/. The demo swaps the API layer for
+# an in-browser mock (see web/src/lib/api.demo.ts), so there is no backend to
+# run and every visitor gets their own localStorage sandbox.
+#
+# Pages must be enabled for the repo (Settings -> Pages -> Source: GitHub
+# Actions). Run manually from the Actions tab (workflow_dispatch) to preview, or
+# let a push to main publish automatically.
+
+on:
+  push:
+    branches: [main]
+  workflow_dispatch:
+
+permissions:
+  contents: read
+  pages: write
+  id-token: write
+
+# Allow one concurrent deployment; let an in-progress run finish.
+concurrency:
+  group: pages
+  cancel-in-progress: false
+
+jobs:
+  build:
+    name: Build demo bundle
+    runs-on: ubuntu-latest
+    defaults:
+      run:
+        working-directory: web
+    steps:
+      - uses: actions/checkout@v4
+      - uses: actions/setup-node@v4
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - run: npm ci
+      - run: npm run build:demo
+        env:
+          VITE_DEMO: "1"
+      - uses: actions/upload-pages-artifact@v3
+        with:
+          # Path is relative to the workspace root (not the job's working-directory).
+          path: web/dist-demo
+
+  deploy:
+    name: Deploy to Pages
+    needs: build
+    runs-on: ubuntu-latest
+    environment:
+      name: github-pages
+      url: ${{ steps.deployment.outputs.page_url }}
+    steps:
+      - id: deployment
+        uses: actions/deploy-pages@v4

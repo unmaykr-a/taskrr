@@ -1,11 +1,12 @@
 {
   "name": "taskrr-web",
   "private": true,
-  "version": "1.0.0",
+  "version": "1.1.0",
   "type": "module",
   "scripts": {
     "dev": "vite",
     "build": "vite build && node -e \"require('fs').writeFileSync('../internal/web/dist/.gitkeep','')\"",
+    "build:demo": "vite build",
     "preview": "vite preview",
     "typecheck": "tsc --noEmit",
     "test": "vitest run",

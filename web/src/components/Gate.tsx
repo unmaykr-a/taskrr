@@ -4,6 +4,7 @@ import App from "@/App";
 import { useAuth } from "@/components/AuthProvider";
 import { AuthPage } from "@/components/AuthPage";
 import { Background } from "@/components/Background";
+import { DemoBanner } from "@/components/DemoBanner";
 
 /**
  * Gate decides what to render based on auth state: a brief splash while we check
@@ -25,6 +26,7 @@ export function Gate() {
       ) : (
         <AuthPage />
       )}
+      <DemoBanner />
     </>
   );
 }

@@ -7,6 +7,8 @@
 // place.
 
 import type { Theme } from "./theme";
+import { DEMO } from "./demo";
+import { demoApi } from "./api.demo";
 
 export interface Task {
   id: number;
@@ -188,7 +190,7 @@ async function request<T>(url: string, options?: RequestInit): Promise<T> {
   return (await res.json()) as T;
 }
 
-export const api = {
+const httpApi = {
   listTasks: () => request<Task[]>("/api/tasks"),
 
   createTask: (input: TaskInput) =>
@@ -406,3 +408,13 @@ export const api = {
     return res.json();
   },
 };
+
+/**
+ * The shape every consumer talks to. The real client (`httpApi`) and the demo's
+ * in-browser mock (`demoApi`) both implement it, so swapping transport happens
+ * only here. `DEMO` is a compile-time literal, so a normal build inlines
+ * `httpApi` and tree-shakes the demo module out entirely.
+ */
+export type Api = typeof httpApi;
+
+export const api: Api = DEMO ? demoApi : httpApi;
