@@ -6,7 +6,7 @@ import (
 	"net/http"
 	"strings"
 
-	"github.com/andri1305/taskrr/internal/web"
+	"github.com/unmaykr-a/taskrr/internal/web"
 )
 
 // placeholderHTML is shown when the frontend has not been built yet (e.g. when

@@ -10,8 +10,8 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andri1305/taskrr/internal/auth"
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/auth"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // signIn creates a real session for u and returns the cookie a browser would

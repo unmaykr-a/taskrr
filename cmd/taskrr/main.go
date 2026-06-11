@@ -16,12 +16,12 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andri1305/taskrr/internal/api"
-	"github.com/andri1305/taskrr/internal/auth"
-	"github.com/andri1305/taskrr/internal/config"
-	"github.com/andri1305/taskrr/internal/logbuf"
-	"github.com/andri1305/taskrr/internal/reminder"
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/api"
+	"github.com/unmaykr-a/taskrr/internal/auth"
+	"github.com/unmaykr-a/taskrr/internal/config"
+	"github.com/unmaykr-a/taskrr/internal/logbuf"
+	"github.com/unmaykr-a/taskrr/internal/reminder"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 func main() {

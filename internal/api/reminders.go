@@ -5,8 +5,8 @@ import (
 	"net/url"
 	"strings"
 
-	"github.com/andri1305/taskrr/internal/reminder"
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/reminder"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // maxLeadSeconds caps how far ahead of a due time a reminder may fire (90 days).

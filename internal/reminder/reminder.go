@@ -28,7 +28,7 @@ import (
 	"syscall"
 	"time"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // Store is the slice of the data layer the reminder loop needs.

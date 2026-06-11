@@ -7,8 +7,8 @@ import (
 	"net/http/httptest"
 	"testing"
 
-	"github.com/andri1305/taskrr/internal/logbuf"
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/logbuf"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 func TestHandleListLogs(t *testing.T) {

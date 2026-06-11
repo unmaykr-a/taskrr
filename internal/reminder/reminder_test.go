@@ -9,7 +9,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // testService allows loopback so Tick logic can be exercised against an httptest

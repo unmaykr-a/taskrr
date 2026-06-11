@@ -19,7 +19,7 @@ All you need is Docker and the compose file — no cloning, no building:
 
 ```bash
 mkdir taskrr && cd taskrr
-curl -LO https://raw.githubusercontent.com/andri1305/taskrr/main/docker-compose.yml
+curl -LO https://raw.githubusercontent.com/unmaykr-a/taskrr/main/docker-compose.yml
 mkdir data
 docker compose up -d
 ```
@@ -86,7 +86,7 @@ beyond your own LAN: set `TASKRR_COOKIE_SECURE=true` there.
 Needs Go 1.25+ and Node 22+:
 
 ```bash
-git clone https://github.com/andri1305/taskrr.git
+git clone https://github.com/unmaykr-a/taskrr.git
 cd taskrr
 make build           # frontend + backend -> bin/taskrr
 ./bin/taskrr         # serves on :8787, data in ./data

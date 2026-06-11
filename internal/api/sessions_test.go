@@ -8,7 +8,7 @@ import (
 	"testing"
 	"time"
 
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 func TestHandleTerminateSessions(t *testing.T) {

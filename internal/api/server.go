@@ -11,8 +11,8 @@ import (
 	"sync/atomic"
 	"time"
 
-	"github.com/andri1305/taskrr/internal/logbuf"
-	"github.com/andri1305/taskrr/internal/store"
+	"github.com/unmaykr-a/taskrr/internal/logbuf"
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // TaskStore is the per-user task/completion surface the HTTP layer needs. Every
