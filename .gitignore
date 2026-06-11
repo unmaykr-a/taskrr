@@ -1,0 +1,22 @@
+# Compiled backend binary
+/bin/
+/taskrr
+
+# Local data folder (bind-mounted to /data in Docker) and SQLite files
+/data/
+*.db
+*.db-shm
+*.db-wal
+
+# Embedded frontend build output (produced at build time)
+/internal/web/dist/*
+!/internal/web/dist/.gitkeep
+
+# Node
+node_modules/
+
+# Editor / OS noise
+.DS_Store
+*.log
+.idea/
+.vscode/

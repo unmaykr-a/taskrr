@@ -1,0 +1,36 @@
+#!/usr/bin/env bash
+#
+# Taskrr pre-commit hook — blocks a commit if the fast checks fail, so broken
+# code never lands in history. Enable it once with:
+#
+#     make install-hooks      # (runs: git config core.hooksPath .githooks)
+#
+# It mirrors the cheap half of CI: Go vet + tests, and the frontend typecheck +
+# unit tests. The heavier full build and Docker image are left to CI to keep
+# commits fast. Set SKIP_HOOK=1 to bypass in an emergency (not recommended).
+set -euo pipefail
+
+if [[ "${SKIP_HOOK:-0}" == "1" ]]; then
+  echo "pre-commit: skipped (SKIP_HOOK=1)"
+  exit 0
+fi
+
+repo_root="$(git rev-parse --show-toplevel)"
+cd "$repo_root"
+
+echo "pre-commit: go vet ./..."
+go vet ./...
+
+echo "pre-commit: go test ./..."
+go test ./...
+
+if [[ -d web/node_modules ]]; then
+  echo "pre-commit: frontend typecheck"
+  (cd web && npm run --silent typecheck)
+  echo "pre-commit: frontend tests"
+  (cd web && npm run --silent test)
+else
+  echo "pre-commit: web/node_modules missing — skipping frontend checks (run 'cd web && npm install')"
+fi
+
+echo "pre-commit: all checks passed"

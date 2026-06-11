@@ -1,0 +1,12 @@
+.git
+.github
+bin
+**/node_modules
+*.db
+*.db-shm
+*.db-wal
+internal/web/dist
+web/dist
+README.md
+CLAUDE.md
+*.log
