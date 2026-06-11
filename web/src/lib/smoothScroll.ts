@@ -1,0 +1,101 @@
+// smoothScroll — eased mouse-wheel scrolling, no dependencies.
+//
+// Why scrolling can feel rough even on a 300 Hz screen: a classic mouse wheel
+// delivers discrete ~100 px jumps, and the browser applies each one in a single
+// frame — the refresh rate never gets a chance to matter. This module
+// intercepts those discrete wheel ticks and plays them out via
+// requestAnimationFrame with a time-based exponential ease, so the scroll
+// position is interpolated at whatever rate the display refreshes.
+//
+// Deliberately conservative about what it hijacks:
+//   - touchpads and touchscreens keep native scrolling (their small,
+//     high-frequency pixel deltas and momentum already feel right — and feel
+//     worse when re-eased), detected via the delta-size heuristic below;
+//   - ctrl+wheel (zoom) and shift/horizontal scrolling pass through;
+//   - anything that already called preventDefault passes through.
+
+/** Time constant of the ease (ms): position closes ~63% of the gap per tau. */
+const TAU = 90;
+/** Pixels per "line" for browsers that report wheel deltas in lines (Firefox). */
+const LINE_PX = 16;
+/** Pixel deltas below this are treated as touchpad input and left native. */
+const TOUCHPAD_MAX_PX = 40;
+
+type ScrollState = { target: number };
+
+/** Walk up from `from` to the nearest element that can actually scroll further
+ *  in the wheel's direction, falling back to the document scroller. */
+function scrollableAncestor(from: Element | null, deltaY: number): HTMLElement | null {
+  const canTake = (el: HTMLElement) =>
+    deltaY > 0 ? el.scrollTop + el.clientHeight < el.scrollHeight - 1 : el.scrollTop > 0;
+  for (let n = from; n; n = n.parentElement) {
+    if (!(n instanceof HTMLElement)) continue;
+    const oy = getComputedStyle(n).overflowY;
+    if ((oy === "auto" || oy === "scroll") && n.scrollHeight > n.clientHeight + 1 && canTake(n)) {
+      return n;
+    }
+  }
+  const root = document.scrollingElement;
+  if (
+    root instanceof HTMLElement &&
+    root.scrollHeight > root.clientHeight + 1 &&
+    canTake(root)
+  ) {
+    return root;
+  }
+  return null;
+}
+
+/** Install the wheel smoother. Returns an uninstall function. */
+export function installSmoothWheel(): () => void {
+  const states = new Map<HTMLElement, ScrollState>();
+  let raf = 0;
+  let last = 0;
+
+  const tick = (now: number) => {
+    raf = 0;
+    const dt = Math.min(64, now - last); // clamp dt so a hidden tab doesn't warp
+    last = now;
+    const k = 1 - Math.exp(-dt / TAU);
+    let active = false;
+    states.forEach((s, el) => {
+      const diff = s.target - el.scrollTop;
+      if (Math.abs(diff) < 0.5) {
+        el.scrollTop = s.target;
+        states.delete(el);
+        return;
+      }
+      el.scrollTop += diff * k;
+      active = true;
+    });
+    if (active) raf = requestAnimationFrame(tick);
+  };
+
+  const onWheel = (e: WheelEvent) => {
+    if (e.defaultPrevented || e.ctrlKey || e.shiftKey) return;
+    if (Math.abs(e.deltaX) > Math.abs(e.deltaY)) return; // horizontal intent
+    const px = e.deltaMode === 1 ? e.deltaY * LINE_PX : e.deltaY;
+    // Small pixel deltas = touchpad; let the browser's native feel handle it.
+    if (e.deltaMode === 0 && Math.abs(px) < TOUCHPAD_MAX_PX) return;
+
+    const el = scrollableAncestor(e.target as Element, px);
+    if (!el) return;
+    e.preventDefault();
+
+    const s = states.get(el) ?? { target: el.scrollTop };
+    const max = el.scrollHeight - el.clientHeight;
+    s.target = Math.max(0, Math.min(max, s.target + px));
+    states.set(el, s);
+    if (!raf) {
+      last = performance.now();
+      raf = requestAnimationFrame(tick);
+    }
+  };
+
+  window.addEventListener("wheel", onWheel, { passive: false });
+  return () => {
+    window.removeEventListener("wheel", onWheel);
+    if (raf) cancelAnimationFrame(raf);
+    states.clear();
+  };
+}

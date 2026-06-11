@@ -1,0 +1,138 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+@layer base {
+  :root {
+    /* Light theme. Accent is a rose/red to echo the clean, modern aesthetic. */
+    --background: 0 0% 100%;
+    --foreground: 240 10% 3.9%;
+    --card: 0 0% 100%;
+    --card-foreground: 240 10% 3.9%;
+    --primary: 347 77% 50%;
+    --primary-foreground: 0 0% 100%;
+    --secondary: 240 4.8% 95.9%;
+    --secondary-foreground: 240 5.9% 10%;
+    --muted: 240 4.8% 95.9%;
+    --muted-foreground: 240 3.8% 46.1%;
+    --accent: 240 4.8% 95.9%;
+    --accent-foreground: 240 5.9% 10%;
+    --destructive: 0 72% 51%;
+    --destructive-foreground: 0 0% 100%;
+    --border: 240 5.9% 90%;
+    --input: 240 5.9% 90%;
+    --ring: 347 77% 50%;
+    --radius: 0.7rem;
+  }
+
+  .dark {
+    /* Dark theme — near-black with a warm salmon accent (the default look). */
+    --background: 240 6% 5%;
+    --foreground: 0 0% 96%;
+    --card: 240 6% 8%;
+    --card-foreground: 0 0% 96%;
+    --primary: 350 80% 72%;
+    --primary-foreground: 350 40% 10%;
+    --secondary: 240 4% 14%;
+    --secondary-foreground: 0 0% 96%;
+    --muted: 240 4% 14%;
+    --muted-foreground: 240 5% 62%;
+    --accent: 240 4% 15%;
+    --accent-foreground: 0 0% 96%;
+    --destructive: 0 62% 50%;
+    --destructive-foreground: 0 0% 98%;
+    --border: 240 4% 15%;
+    --input: 240 4% 17%;
+    --ring: 350 80% 72%;
+  }
+}
+
+@layer base {
+  * {
+    @apply border-border;
+  }
+
+  body {
+    @apply bg-background text-foreground;
+    /* The active theme sets --font-app (monospace or sans). All fonts are
+       system fonts, so there's no web-font download at runtime. The animated
+       background is now rendered by the <Background /> canvas, driven by the
+       theme, rather than a static CSS starfield. */
+    font-family: var(
+      --font-app,
+      ui-monospace,
+      "JetBrains Mono",
+      "SFMono-Regular",
+      Menlo,
+      Consolas,
+      "Liberation Mono",
+      monospace
+    );
+    -webkit-font-smoothing: antialiased;
+  }
+
+  /* "Disable animations" preference: collapse all CSS animation/transition. The
+     canvas background pauses separately (see Background.tsx / lib/prefs). */
+  .no-animations *,
+  .no-animations *::before,
+  .no-animations *::after {
+    animation-duration: 0.001ms !important;
+    animation-iteration-count: 1 !important;
+    transition-duration: 0.001ms !important;
+  }
+
+  /* Honour the OS-level reduced-motion setting the same way (the canvas
+     background already checks it; this covers every CSS transition too). */
+  @media (prefers-reduced-motion: reduce) {
+    *,
+    *::before,
+    *::after {
+      animation-duration: 0.001ms !important;
+      animation-iteration-count: 1 !important;
+      transition-duration: 0.001ms !important;
+    }
+  }
+}
+
+/* Frosted glass: when the theme enables it (`.frosted` on <html>), the main
+   surfaces become translucent with a backdrop blur so the animated background
+   shows through. The `.frosted .bg-*` selectors out-specify the plain Tailwind
+   utilities; the alpha uses the same `--token` HSL triplets the theme sets.
+   NOTE: popovers (e.g. the colour picker, `bg-popover`) are deliberately left
+   solid — a translucent picker is hard to read. */
+.frosted .bg-card {
+  background-color: hsl(var(--card) / 0.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+.frosted .bg-sidebar {
+  background-color: hsl(var(--sidebar) / 0.62);
+  backdrop-filter: blur(10px);
+  -webkit-backdrop-filter: blur(10px);
+}
+
+/* Granular animation switches (Preferences → Animations). Each sets a class on
+   <html>; the cases that are pure CSS are handled here, the rest read the pref
+   in their component. */
+/* Action feedback off: buttons stop scaling down on press (the primitive uses
+   `active:scale-[var(--press-scale,0.97)]`). */
+.no-anim-feedback {
+  --press-scale: 1;
+}
+/* Windows & dialogs off: the Radix dialog's open/close enter+exit animations
+   collapse (floating windows read the pref directly). */
+.no-anim-windows [data-state="open"],
+.no-anim-windows [data-state="closed"] {
+  animation-duration: 0.001ms !important;
+}
+
+/* While a window is being dragged/resized: disable the transform transition so
+   the window tracks the cursor 1:1 (the easing transition otherwise makes it
+   trail behind by ~200ms — the main cause of "drag lag"), and promote it to its
+   own compositor layer so moving it is a pure GPU op. The frosted blur can stay
+   on because the background animation pauses during a drag (see Background.tsx),
+   so the blur samples a static backdrop and stays cheap. */
+.win-busy {
+  transition: none !important;
+  will-change: transform;
+}
