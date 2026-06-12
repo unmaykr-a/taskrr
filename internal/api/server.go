@@ -11,6 +11,7 @@ import (
 	"sync/atomic"
 	"time"
 
+	"github.com/unmaykr-a/taskrr/internal/auth"
 	"github.com/unmaykr-a/taskrr/internal/logbuf"
 	"github.com/unmaykr-a/taskrr/internal/store"
 )
@@ -107,6 +108,9 @@ type Options struct {
 	// X-Forwarded-For. Disable when the server is exposed directly, so those
 	// headers can't be spoofed to dodge the per-IP rate limiter.
 	TrustProxyHeaders bool
+	// Secrets encrypts at-rest secrets (the OIDC client secret). A nil/no-op
+	// cipher keeps the legacy plaintext behaviour.
+	Secrets *auth.SecretCipher
 }
 
 // Server holds the dependencies shared by all HTTP handlers.
@@ -114,6 +118,7 @@ type Server struct {
 	store        Store
 	opts         Options
 	oidc         *oidcManager
+	secrets      *auth.SecretCipher
 	loginLimiter *rateLimiter // per-username attempts
 	ipLimiter    *rateLimiter // per-source-IP attempts (blunts password-spraying)
 	restoring    atomic.Bool  // true while a restore is staged + restart pending
@@ -124,10 +129,15 @@ func NewServer(st Store, opts Options) *Server {
 	if opts.SessionTTL <= 0 {
 		opts.SessionTTL = 30 * 24 * time.Hour
 	}
+	secrets := opts.Secrets
+	if secrets == nil {
+		secrets, _ = auth.NewSecretCipher("") // no-op cipher
+	}
 	return &Server{
-		store: st,
-		opts:  opts,
-		oidc:  &oidcManager{},
+		store:   st,
+		opts:    opts,
+		oidc:    &oidcManager{},
+		secrets: secrets,
 		// Throttle password attempts per account AND per source IP, so neither a
 		// focused account attack nor a password-spray across many usernames runs
 		// unbounded.
@@ -226,9 +236,12 @@ const contentSecurityPolicy = "default-src 'self'; " +
 	"form-action 'self'; " +
 	"frame-ancestors 'none'"
 
-// secureHeaders adds low-risk hardening headers to every response. When the
-// instance is configured for HTTPS (CookieSecure), it also sends HSTS — a
-// belt-and-braces in case the TLS proxy doesn't set it.
+// secureHeaders adds low-risk hardening headers to every response. HSTS is sent
+// when the connection is served over HTTPS — either directly (CookieSecure), or
+// via a trusted TLS-terminating proxy that reports X-Forwarded-Proto: https
+// (the common Cloudflare/Caddy/nginx setup, where the app's own socket is plain
+// HTTP). Browsers ignore HSTS received over plain HTTP, so this only takes
+// effect on the encrypted leg.
 func (s *Server) secureHeaders(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
 		h := w.Header()
@@ -236,7 +249,9 @@ func (s *Server) secureHeaders(next http.Handler) http.Handler {
 		h.Set("X-Frame-Options", "DENY")
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
-		if s.opts.CookieSecure {
+		https := s.opts.CookieSecure ||
+			(s.opts.TrustProxyHeaders && r.Header.Get("X-Forwarded-Proto") == "https")
+		if https {
 			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}
 		next.ServeHTTP(w, r)
