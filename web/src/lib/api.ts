@@ -78,6 +78,8 @@ export function isClaimChallenge(r: LoginResult): r is ClaimChallenge {
 export interface AuthConfig {
   localRegistration: boolean;
   oidc: boolean;
+  /** SSO is the only way in (the primary admin keeps a password fallback). */
+  oidcOnly: boolean;
   /** Local sign-ups need admin approval before they can sign in. */
   requiresApproval: boolean;
   /** Single-person instance: registration + adding accounts are disabled. */
@@ -140,6 +142,7 @@ export interface AdminSettings {
   oidc_redirect_url: string;
   oidc_admin_group: string;
   oidc_link_username: boolean;
+  oidc_only: boolean;
   oidc_client_secret_set: boolean;
   oidc_enabled: boolean;
 }
@@ -154,6 +157,7 @@ export type SettingsPatch = Partial<{
   oidc_redirect_url: string;
   oidc_admin_group: string;
   oidc_link_username: boolean;
+  oidc_only: boolean;
 }>;
 
 /** Fields a user can set when creating or editing a task. */
@@ -341,7 +345,7 @@ const httpApi = {
     }),
 
   /** Destructive: wipe all tasks and/or all non-admin users + their data. */
-  adminWipe: (opts: { tasks?: boolean; users?: boolean }) =>
+  adminWipe: (opts: { tasks?: boolean; users?: boolean; everything?: boolean }) =>
     request<{ ok: boolean; deletedUsers: number }>("/api/admin/wipe", {
       method: "POST",
       body: JSON.stringify({ ...opts, confirm: "WIPE" }),

@@ -31,6 +31,10 @@ const (
 	// matching username at the provider take over the local account; the safe
 	// path is the user-driven link in Settings → Account (or an admin merge).
 	keyOIDCLinkUsername = "oidc_link_username"
+	// keyOIDCOnly (default off): hide local sign-in and require SSO. The
+	// protected bootstrap admin can still sign in with a password, as the
+	// break-glass path when the provider is down.
+	keyOIDCOnly = "oidc_only"
 )
 
 const (

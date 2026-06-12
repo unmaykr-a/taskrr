@@ -54,6 +54,7 @@ type AuthStore interface {
 	DeleteUser(ctx context.Context, id int64) error
 	MergeUsers(ctx context.Context, sourceID, targetID int64, moveData bool, newUsername string) error
 	WipeAllTasks(ctx context.Context) error
+	WipeEverything(ctx context.Context, keepUserID int64) error
 	DeleteTasksByOwner(ctx context.Context, ownerID int64) (int64, error)
 	DeleteNonAdminUsers(ctx context.Context) (int64, error)
 	Backup(ctx context.Context) (string, error)

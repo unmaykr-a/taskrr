@@ -10,8 +10,16 @@ counts up from there. Give a task a routine ("every 2 weeks") and it shades
 from green to red as the next one comes due.
 
 The whole app is one ~12 MB binary with the web UI and SQLite database baked
-in. It idles at a few megabytes of memory and effectively zero CPU, so it runs
-happily in the corner of a Raspberry Pi or any small box you already have.
+in. It idles at ~12 MB of memory and under half a percent of one CPU core, so
+it runs happily in the corner of a Raspberry Pi or any small box you already
+have.
+
+![Tasks with staleness colours, the month calendar, and the activity chart](docs/screenshots/overview.png)
+
+The whole interface is themeable — colours, light/dark, fonts, animated
+backgrounds, frosted glass — from a floating settings window:
+
+![The theme customiser](docs/screenshots/theme.png)
 
 ## Live demo
 
@@ -59,7 +67,7 @@ documents every option.
 - Filters with live counts: all, due soon, overdue, never done, archived —
   and bulk actions (log / archive / delete several at once).
 - Multiple users with per-user data, local password login, and optional OIDC
-  single sign-on (tested with Authentik), including group-to-admin-role
+  single sign-on (tested with Authentik and Pocket ID), including group-to-admin-role
   mapping. A lite mode turns the multi-user surface off for solo use.
 - An admin area in the UI: user management, registration controls with an
   approval queue, active sessions, live server logs, backups with one-click

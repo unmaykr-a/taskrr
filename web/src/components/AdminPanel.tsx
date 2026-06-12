@@ -3,6 +3,7 @@ import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { Trash2, UserPlus, X } from "lucide-react";
 
 import { api, type SettingsPatch, type User } from "@/lib/api";
+import { clearStoredPreferences } from "@/lib/prefs";
 import { timeSince } from "@/lib/time";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
@@ -29,7 +30,7 @@ export function AdminPanel() {
       <OIDCSettings />
       <hr className="border-border/60" />
       <PendingUsers />
-      <Users lite={lite} />
+      {!lite && <Users />}
       <hr className="border-border/60" />
       <SessionsSection />
       <hr className="border-border/60" />
@@ -437,14 +438,21 @@ function AdvancedSettings() {
   const queryClient = useQueryClient();
   const [msg, setMsg] = useState<string | null>(null);
   const wipe = useMutation({
-    mutationFn: (opts: { tasks?: boolean; users?: boolean }) => api.adminWipe(opts),
+    mutationFn: (opts: { tasks?: boolean; users?: boolean; everything?: boolean }) => api.adminWipe(opts),
     onSuccess: (res, vars) => {
+      if (vars.everything) {
+        // The server forgot everything (settings, prefs, themes) — drop the
+        // browser's copies too and start clean, like a first visit.
+        clearStoredPreferences();
+        window.location.reload();
+        return;
+      }
       queryClient.invalidateQueries();
       setMsg(vars.users ? `Done — removed ${res.deletedUsers} user(s) and their data.` : "Done — all tasks wiped.");
     },
     onError: (e) => setMsg((e as Error).message),
   });
-  const confirmWipe = (opts: { tasks?: boolean; users?: boolean }, label: string) => {
+  const confirmWipe = (opts: { tasks?: boolean; users?: boolean; everything?: boolean }, label: string) => {
     if (window.confirm(`This permanently deletes ${label}.\n\nThis cannot be undone. Continue?`)) {
       setMsg(null);
       wipe.mutate(opts);
@@ -486,7 +494,12 @@ function AdvancedSettings() {
             size="sm"
             className={danger}
             disabled={wipe.isPending}
-            onClick={() => confirmWipe({ tasks: true, users: true }, "EVERYTHING — all tasks and all non-admin users")}
+            onClick={() =>
+              confirmWipe(
+                { everything: true },
+                "EVERYTHING — every other account, all tasks and history, all settings (including OIDC), preferences and reminders. Only your admin username and password are kept",
+              )
+            }
           >
             Wipe everything
           </Button>
@@ -656,13 +669,14 @@ function OIDCSettings() {
   );
 
   return (
-    <section className="space-y-2">
-      <div className="flex items-center justify-between">
-        <h3 className="text-sm font-semibold">OIDC (Authentik)</h3>
-        <span className={data?.oidc_enabled ? "text-xs text-emerald-400" : "text-xs text-muted-foreground"}>
+    <details className="rounded-lg border">
+      <summary className="flex cursor-pointer select-none items-center justify-between px-3 py-2 text-sm font-semibold">
+        Single sign-on (OIDC)
+        <span className={data?.oidc_enabled ? "text-xs font-normal text-emerald-400" : "text-xs font-normal text-muted-foreground"}>
           {data?.oidc_enabled ? "enabled" : "not configured"}
         </span>
-      </div>
+      </summary>
+      <div className="space-y-2 border-t p-3">
       {field("oidc_issuer", "Issuer URL", "https://auth.example.com/application/o/taskrr/")}
       <div className="grid grid-cols-2 gap-2">
         {field("oidc_client_id", "Client ID")}
@@ -680,7 +694,7 @@ function OIDCSettings() {
       {field("oidc_redirect_url", "Redirect URL (optional)", "auto-detected from this site")}
       <p className="text-[11px] text-muted-foreground">
         Leave blank to auto-detect (<code>https://&lt;this-site&gt;/api/auth/oidc/callback</code>). Whatever
-        you use must be listed in the provider's Redirect URIs in Authentik.
+        you use must be listed in the provider's allowed redirect URIs.
       </p>
       {field("oidc_admin_group", "Admin group (optional)", "taskrr-admins")}
       <label className="flex items-center justify-between gap-2 text-sm">
@@ -698,17 +712,35 @@ function OIDCSettings() {
           onChange={(e) => save.mutate({ oidc_link_username: e.target.checked })}
         />
       </label>
+      {data?.oidc_enabled && (
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            SSO sign-in only
+            <span className="block text-xs">
+              Hides local sign-in; everyone uses single sign-on. The primary admin can
+              still sign in with its password, so a provider outage can't lock you out.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={data?.oidc_only ?? false}
+            onChange={(e) => save.mutate({ oidc_only: e.target.checked })}
+          />
+        </label>
+      )}
       <div className="flex justify-end">
         <Button size="sm" disabled={save.isPending} onClick={() => save.mutate(undefined)}>
           {save.isPending ? "Saving…" : "Save OIDC"}
         </Button>
       </div>
       {save.isError && <p className="text-xs text-destructive">{(save.error as Error).message}</p>}
-    </section>
+      </div>
+    </details>
   );
 }
 
-function Users({ lite = false }: { lite?: boolean }) {
+function Users() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: api.listUsers });
@@ -743,7 +775,7 @@ function Users({ lite = false }: { lite?: boolean }) {
   };
 
   return (
-    <details className="rounded-lg border" open>
+    <details className="rounded-lg border">
       <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">
         Users
         {users && users.length > 0 && (
@@ -751,8 +783,6 @@ function Users({ lite = false }: { lite?: boolean }) {
         )}
       </summary>
       <div className="space-y-3 border-t p-3">
-      {/* Adding accounts is hidden in lite mode (single-person instance). */}
-      {!lite && (
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -788,7 +818,6 @@ function Users({ lite = false }: { lite?: boolean }) {
         </div>
         {create.isError && <p className="text-xs text-destructive">{(create.error as Error).message}</p>}
       </form>
-      )}
 
       <div className="space-y-1.5">
         {users?.map((u) => {

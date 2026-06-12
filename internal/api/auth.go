@@ -168,14 +168,24 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	if raw, ok, _ := s.store.GetSetting(ctx, keyDefaultTheme); ok && raw != "" {
 		defaultTheme = json.RawMessage(raw)
 	}
+	oidcUp := s.oidcEnabled(ctx)
+	oidcOnly := oidcUp && s.boolSetting(ctx, keyOIDCOnly, false)
 	writeJSON(w, http.StatusOK, map[string]any{
-		// Lite mode forces self-registration off regardless of the stored setting.
-		"localRegistration": !s.opts.Lite && s.boolSetting(ctx, keyRegLocal, false),
-		"oidc":              s.oidcEnabled(ctx),
+		// Lite mode and OIDC-only both force self-registration off.
+		"localRegistration": !s.opts.Lite && !oidcOnly && s.boolSetting(ctx, keyRegLocal, false),
+		"oidc":              oidcUp,
+		"oidcOnly":          oidcOnly,
 		"requiresApproval":  s.boolSetting(ctx, keyRegApproval, false),
 		"lite":              s.opts.Lite,
 		"defaultTheme":      defaultTheme,
 	})
+}
+
+// oidcOnlyActive reports whether local sign-in is disabled in favour of SSO.
+// Only active while OIDC is actually configured, so flipping the toggle before
+// (or after) SSO works can never lock everyone out.
+func (s *Server) oidcOnlyActive(ctx context.Context) bool {
+	return s.boolSetting(ctx, keyOIDCOnly, false) && s.oidcEnabled(ctx)
 }
 
 func (s *Server) handleMe(w http.ResponseWriter, r *http.Request) {
@@ -226,6 +236,14 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	u, err := s.store.GetUserByUsername(r.Context(), username)
+	// OIDC-only mode: local sign-in is reserved for the protected bootstrap admin
+	// (the break-glass path if the provider is down). Everyone else gets the same
+	// answer regardless of credentials, so accounts aren't enumerable through it.
+	if s.oidcOnlyActive(r.Context()) && !(err == nil && s.opts.ProtectedUserID != 0 && u.ID == s.opts.ProtectedUserID) {
+		auth.DummyVerify(req.Password)
+		writeError(w, http.StatusForbidden, "local sign-in is disabled — use single sign-on")
+		return
+	}
 	// An account an admin created but no one has set a password for yet (and that
 	// isn't OIDC-only) is "unclaimed": tell the client to switch to set-password.
 	if err == nil && u.PasswordHash == nil && u.OIDCSubject == nil {
@@ -271,6 +289,10 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 	if !s.authThrottle(w, r, username) {
 		return
 	}
+	if s.oidcOnlyActive(r.Context()) {
+		writeError(w, http.StatusForbidden, "local sign-in is disabled — use single sign-on")
+		return
+	}
 	u, err := s.store.GetUserByUsername(r.Context(), username)
 	if err != nil || u.PasswordHash != nil || u.OIDCSubject != nil {
 		writeError(w, http.StatusConflict, "this account is already set up — sign in instead")
@@ -313,8 +335,9 @@ func (s *Server) handleRegister(w http.ResponseWriter, r *http.Request) {
 	if s.restoreInProgress(w) {
 		return
 	}
-	// Lite mode hard-disables self-registration regardless of the stored setting.
-	if s.opts.Lite || !s.boolSetting(r.Context(), keyRegLocal, false) {
+	// Lite mode and OIDC-only hard-disable self-registration regardless of the
+	// stored setting.
+	if s.opts.Lite || s.oidcOnlyActive(r.Context()) || !s.boolSetting(r.Context(), keyRegLocal, false) {
 		writeError(w, http.StatusForbidden, "registration is disabled")
 		return
 	}
@@ -1031,15 +1054,20 @@ func (s *Server) handleAdminDeleteUser(w http.ResponseWriter, r *http.Request) {
 // wipeRequest selects what to destroy. `confirm` must equal "WIPE" so an
 // accidental/forged request can't trigger it.
 type wipeRequest struct {
-	Tasks   bool   `json:"tasks"`   // delete all tasks + completions (all users)
-	Users   bool   `json:"users"`   // delete all non-admin users + their data
-	Confirm string `json:"confirm"` // must be "WIPE"
+	Tasks bool `json:"tasks"` // delete all tasks + completions (all users)
+	Users bool `json:"users"` // delete all non-admin users + their data
+	// Everything resets the whole instance: every other account, all tasks,
+	// all settings (OIDC, registration, default theme), preferences and
+	// reminders — keeping only the acting admin's username and password.
+	Everything bool   `json:"everything"`
+	Confirm    string `json:"confirm"` // must be "WIPE"
 }
 
 // handleAdminWipe performs destructive, instance-wide deletions. Admin-only and
 // gated on an explicit confirmation string.
 func (s *Server) handleAdminWipe(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
+	admin, ok := s.requireAdmin(w, r)
+	if !ok {
 		return
 	}
 	var req wipeRequest
@@ -1051,6 +1079,14 @@ func (s *Server) handleAdminWipe(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	ctx := r.Context()
+	if req.Everything {
+		if err := s.store.WipeEverything(ctx, admin.ID); err != nil {
+			writeError(w, http.StatusInternalServerError, "could not wipe the instance")
+			return
+		}
+		writeJSON(w, http.StatusOK, map[string]any{"ok": true, "everything": true})
+		return
+	}
 	var deletedUsers int64
 	if req.Users {
 		n, err := s.store.DeleteNonAdminUsers(ctx)
@@ -1236,6 +1272,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyOIDCRedirectURL:  get(keyOIDCRedirectURL),
 		keyOIDCAdminGroup:   get(keyOIDCAdminGroup),
 		keyOIDCLinkUsername: s.boolSetting(ctx, keyOIDCLinkUsername, false),
+		keyOIDCOnly:         s.boolSetting(ctx, keyOIDCOnly, false),
 		"oidc_client_secret_set": get(keyOIDCClientSecret) != "", // never return the secret
 		"oidc_enabled":           s.oidcEnabled(ctx),
 	})
@@ -1253,6 +1290,7 @@ type settingsPatch struct {
 	OIDCRedirectURL  *string `json:"oidc_redirect_url"`
 	OIDCAdminGroup   *string `json:"oidc_admin_group"`
 	OIDCLinkUsername *bool   `json:"oidc_link_username"`
+	OIDCOnly         *bool   `json:"oidc_only"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -1299,6 +1337,9 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.OIDCLinkUsername != nil && !set(keyOIDCLinkUsername, boolStr(*req.OIDCLinkUsername)) {
+		return
+	}
+	if req.OIDCOnly != nil && !set(keyOIDCOnly, boolStr(*req.OIDCOnly)) {
 		return
 	}
 	// Only overwrite the secret when a new, non-empty one is provided. Encrypt it
