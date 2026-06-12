@@ -1301,9 +1301,16 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	if req.OIDCLinkUsername != nil && !set(keyOIDCLinkUsername, boolStr(*req.OIDCLinkUsername)) {
 		return
 	}
-	// Only overwrite the secret when a new, non-empty one is provided.
+	// Only overwrite the secret when a new, non-empty one is provided. Encrypt it
+	// at rest when TASKRR_SECRET_KEY is set (a no-op otherwise), so it isn't
+	// stored — or backed up — in plaintext.
 	if req.OIDCClientSecret != nil && strings.TrimSpace(*req.OIDCClientSecret) != "" {
-		if !set(keyOIDCClientSecret, strings.TrimSpace(*req.OIDCClientSecret)) {
+		enc, err := s.secrets.Encrypt(strings.TrimSpace(*req.OIDCClientSecret))
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "could not encrypt the client secret")
+			return
+		}
+		if !set(keyOIDCClientSecret, enc) {
 			return
 		}
 	}

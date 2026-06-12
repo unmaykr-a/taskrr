@@ -85,6 +85,7 @@ working examples. The short version:
 | `TASKRR_SESSION_TTL` | `720h` | Session length; sessions slide while in use |
 | `TASKRR_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
 | `TASKRR_TRUST_PROXY_HEADERS` | `true` | Read the client IP from proxy headers; set `false` if Taskrr is exposed directly |
+| `TASKRR_SECRET_KEY` | — | Encrypt the OIDC client secret at rest, so it isn't stored — or backed up — in plaintext |
 | `TASKRR_LITE` | `false` | Single-person mode: disables registration and extra accounts |
 | `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop checks for due tasks |
 | `TASKRR_OIDC_*` | — | Issuer, client id/secret, redirect URL — also editable later in the admin UI |

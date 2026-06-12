@@ -67,10 +67,19 @@ func (s *Server) oidcSettings(ctx context.Context) oidcSettings {
 		v, _, _ := s.store.GetSetting(ctx, k)
 		return v
 	}
+	// The client secret is stored encrypted when TASKRR_SECRET_KEY is set; decrypt
+	// it for use. (Decrypt passes legacy plaintext through unchanged.) A failure
+	// means the key was changed/removed — log it and treat OIDC as unconfigured
+	// rather than handing a bad secret to the provider.
+	secret, err := s.secrets.Decrypt(get(keyOIDCClientSecret))
+	if err != nil {
+		log.Printf("oidc: could not decrypt the stored client secret (check TASKRR_SECRET_KEY): %v", err)
+		secret = ""
+	}
 	return oidcSettings{
 		issuer:       get(keyOIDCIssuer),
 		clientID:     get(keyOIDCClientID),
-		clientSecret: get(keyOIDCClientSecret),
+		clientSecret: secret,
 		redirectURL:  get(keyOIDCRedirectURL),
 		adminGroup:   get(keyOIDCAdminGroup),
 	}

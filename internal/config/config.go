@@ -43,6 +43,10 @@ type Config struct {
 	// server is reachable directly, or anyone can spoof those headers to bypass
 	// the per-IP limiter.
 	TrustProxyHeaders bool
+	// SecretKey, when set, encrypts at-rest secrets (the OIDC client secret) so
+	// they aren't stored in plaintext in the database or in downloadable backups.
+	// The key stays in the environment, never in the DB/backup.
+	SecretKey string
 
 	// ReminderInterval is how often the background loop checks for due tasks to
 	// send reminder webhooks (Phase 4).
@@ -78,6 +82,7 @@ func Load() Config {
 		SessionTTL:        envDuration("TASKRR_SESSION_TTL", 30*24*time.Hour),
 		CookieSecure:      envBool("TASKRR_COOKIE_SECURE", false),
 		TrustProxyHeaders: envBool("TASKRR_TRUST_PROXY_HEADERS", true),
+		SecretKey:         env("TASKRR_SECRET_KEY", ""),
 		ReminderInterval:  envDuration("TASKRR_REMINDER_INTERVAL", time.Minute),
 		Lite:              envBool("TASKRR_LITE", false),
 

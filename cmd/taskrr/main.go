@@ -67,6 +67,15 @@ func main() {
 		log.Fatalf("bootstrap failed: %v", err)
 	}
 
+	// Cipher for at-rest secrets (OIDC client secret). No-op when no key is set.
+	secrets, err := auth.NewSecretCipher(cfg.SecretKey)
+	if err != nil {
+		log.Fatalf("invalid TASKRR_SECRET_KEY: %v", err)
+	}
+	if secrets.Enabled() {
+		log.Printf("at-rest secret encryption enabled (TASKRR_SECRET_KEY set)")
+	}
+
 	// A restore stages a new DB then asks for a restart; we trigger a graceful
 	// shutdown (the container's restart policy brings the process back, and the
 	// staged DB is swapped in at startup). stop is buffered so the non-blocking
@@ -90,6 +99,7 @@ func main() {
 			Logs:              logs,
 			Lite:              cfg.Lite,
 			TrustProxyHeaders: cfg.TrustProxyHeaders,
+			Secrets:           secrets,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}
@@ -206,22 +216,35 @@ func bootstrap(st *store.Store, cfg config.Config) (int64, error) {
 
 	// Seed OIDC settings from the env on first run; the admin UI can override
 	// them later (we only write a key if it's both provided and currently unset).
-	seed := func(key, val string) error {
+	// The client secret is encrypted at rest when TASKRR_SECRET_KEY is set.
+	cipher, err := auth.NewSecretCipher(cfg.SecretKey)
+	if err != nil {
+		return 0, err
+	}
+	seed := func(key, val string, secret bool) error {
 		if val == "" {
 			return nil
 		}
 		if _, ok, err := st.GetSetting(ctx, key); err != nil || ok {
 			return err
 		}
+		if secret {
+			if val, err = cipher.Encrypt(val); err != nil {
+				return err
+			}
+		}
 		return st.SetSetting(ctx, key, val)
 	}
-	for _, kv := range []struct{ key, val string }{
-		{"oidc_issuer", cfg.OIDCIssuer},
-		{"oidc_client_id", cfg.OIDCClientID},
-		{"oidc_client_secret", cfg.OIDCClientSecret},
-		{"oidc_redirect_url", cfg.OIDCRedirectURL},
+	for _, kv := range []struct {
+		key, val string
+		secret   bool
+	}{
+		{"oidc_issuer", cfg.OIDCIssuer, false},
+		{"oidc_client_id", cfg.OIDCClientID, false},
+		{"oidc_client_secret", cfg.OIDCClientSecret, true},
+		{"oidc_redirect_url", cfg.OIDCRedirectURL, false},
 	} {
-		if err := seed(kv.key, kv.val); err != nil {
+		if err := seed(kv.key, kv.val, kv.secret); err != nil {
 			return 0, err
 		}
 	}
