@@ -174,7 +174,7 @@ export function AccountSection() {
             <div className="space-y-2 rounded-md border border-border/60 p-3">
               <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
                 <div className="min-w-0">
-                  <p className="text-sm font-medium">Authentik</p>
+                  <p className="text-sm font-medium">Single sign-on</p>
                   <p className="text-xs text-muted-foreground">
                     Single sign-on is connected to this account.
                   </p>
@@ -202,11 +202,11 @@ export function AccountSection() {
           ) : (
             <div className="space-y-2 rounded-md border border-border/60 p-3">
               <p className="text-xs text-muted-foreground">
-                Connect single sign-on so you can also sign in with Authentik.
+                Connect single sign-on so you can also sign in through your identity provider.
               </p>
               <Button size="sm" variant="outline" asChild>
                 <a href="/api/auth/oidc/link">
-                  <Link2 className="h-3.5 w-3.5" /> Connect Authentik
+                  <Link2 className="h-3.5 w-3.5" /> Connect SSO
                 </a>
               </Button>
             </div>

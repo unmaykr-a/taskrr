@@ -296,6 +296,7 @@ function setSession(open: boolean) {
 const DEMO_AUTH: AuthConfig = {
   localRegistration: true,
   oidc: false,
+  oidcOnly: false,
   requiresApproval: false,
   lite: false,
   defaultTheme: null,

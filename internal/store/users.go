@@ -4,6 +4,7 @@ import (
 	"context"
 	"database/sql"
 	"errors"
+	"strings"
 	"time"
 )
 
@@ -251,6 +252,38 @@ func (s *Store) DeleteNonAdminUsers(ctx context.Context) (int64, error) {
 	}
 	n, _ := res.RowsAffected()
 	return n, nil
+}
+
+// WipeEverything resets the instance to a near-fresh state in one transaction,
+// keeping only the user row identified by keepUserID (its username, password,
+// role, and live sessions — so the acting admin stays signed in). Everything
+// else goes: all other accounts (cascading their data), every task and
+// completion, all settings (OIDC, registration, default theme), preferences,
+// and reminder state.
+func (s *Store) WipeEverything(ctx context.Context, keepUserID int64) error {
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	for _, q := range []string{
+		`DELETE FROM users WHERE id != ?`, // cascades their tasks/sessions/prefs
+		`DELETE FROM tasks`,               // the kept admin's tasks too
+		`DELETE FROM user_preferences`,
+		`DELETE FROM reminder_settings`,
+		`DELETE FROM settings`,
+	} {
+		var err error
+		if strings.Contains(q, "?") {
+			_, err = tx.ExecContext(ctx, q, keepUserID)
+		} else {
+			_, err = tx.ExecContext(ctx, q)
+		}
+		if err != nil {
+			return err
+		}
+	}
+	return tx.Commit()
 }
 
 // MergeUsers folds sourceID into targetID in one transaction: optionally moves

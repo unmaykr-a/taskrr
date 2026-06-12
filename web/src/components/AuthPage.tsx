@@ -23,7 +23,7 @@ type Tab = "login" | "register";
 /**
  * AuthPage is the centred sign-in card shown when no one is logged in. It has
  * Login / Register tabs (Register hidden when local registration is disabled),
- * a "Sign in with Authentik" button when OIDC is on, and a "set your first
+ * an SSO button when OIDC is on, and a "set your first
  * password" step for admin-created accounts that haven't been claimed yet.
  */
 export function AuthPage() {
@@ -39,6 +39,9 @@ export function AuthPage() {
 
   const canRegister = config?.localRegistration ?? false;
   const active = tab === "register" && canRegister ? "register" : "login";
+  // OIDC-only: the local username/password form is hidden entirely; the server
+  // also refuses local sign-in (except the primary admin's break-glass path).
+  const oidcOnly = !!config?.oidcOnly;
 
   // Apply the admin's site-wide default theme on the signed-out screen.
   const defaultTheme = config?.defaultTheme;
@@ -127,6 +130,8 @@ export function AuthPage() {
           </div>
         ) : (
           <>
+        {!oidcOnly && (
+        <>
         {claiming ? (
           <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">Set your password</p>
@@ -211,14 +216,27 @@ export function AuthPage() {
             </button>
           )}
         </form>
+        </>
+        )}
 
-        {/* OIDC / Authentik sign-in sits below the login button (when enabled). */}
+        {oidcOnly && (
+          <p className="mb-3 text-center text-sm text-muted-foreground">
+            This instance uses single sign-on.
+          </p>
+        )}
+
+        {/* SSO sign-in sits below the login button — or stands alone when the
+            instance is OIDC-only (local accounts hidden). */}
         {!claiming && config?.oidc && (
           <a
             href="/api/auth/oidc/login"
-            className="mt-2 flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm hover:bg-accent"
+            className={
+              config.oidcOnly
+                ? "flex w-full items-center justify-center rounded-md bg-primary px-3 py-2 text-sm font-medium text-primary-foreground hover:bg-primary/90"
+                : "mt-2 flex w-full items-center justify-center rounded-md border px-3 py-2 text-sm hover:bg-accent"
+            }
           >
-            Sign in with Authentik
+            Sign in with SSO
           </a>
         )}
           </>

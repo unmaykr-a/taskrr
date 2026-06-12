@@ -53,11 +53,11 @@ export function RemindersSection() {
   const canSave = !enabled || webhookUrl.trim() !== "";
 
   return (
-    <section className="space-y-2">
-      <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+    <details className="rounded-lg border">
+      <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-sm font-semibold">
         <Bell className="h-3.5 w-3.5" /> Reminders
-      </h4>
-      <div className="space-y-2 rounded-md border border-border/60 p-3">
+      </summary>
+      <div className="space-y-2 border-t p-3">
         <label className="flex items-center justify-between gap-2 text-sm">
           <span>Send a webhook when a task is due</span>
           <input
@@ -110,6 +110,6 @@ export function RemindersSection() {
           {test.isError && <span className="text-xs text-destructive">{(test.error as Error).message}</span>}
         </div>
       </div>
-    </section>
+    </details>
   );
 }
