@@ -2,7 +2,6 @@ import {
   type AddButtonPosition,
   type CardSize,
   type ClockChoice,
-  type ColorPickerStyle,
   type DateOrder,
   usePrefs,
 } from "@/lib/prefs";
@@ -77,46 +76,78 @@ export function PreferencesSection() {
             background: `linear-gradient(90deg, ${prefs.taskColorFresh}, ${prefs.taskColorOverdue})`,
           }}
         />
-        <div className="flex items-center justify-between gap-2 pt-1">
-          <Label className="text-xs text-muted-foreground">
-            No-routine fade: {prefs.noRoutineFadeDays}d
-          </Label>
+        <label className="flex items-center justify-between gap-2 pt-1 text-sm">
+          <span className="text-muted-foreground">
+            Fade colours over time
+            <span className="block text-xs">
+              Off keeps every task at its recent colour — no need for per-task freeze.
+            </span>
+          </span>
           <input
-            type="range"
-            min={1}
-            max={30}
-            step={1}
-            value={prefs.noRoutineFadeDays}
-            onChange={(e) => setPrefs({ noRoutineFadeDays: Number(e.target.value) })}
-            className="w-32 accent-primary"
-            aria-label="Days for a routine-less task to fade to overdue"
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={prefs.colorFade}
+            onChange={(e) => setPrefs({ colorFade: e.target.checked })}
           />
-        </div>
-        <div className="grid grid-cols-2 gap-3">
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Colour picker</Label>
-            <select
-              className={SELECT}
-              value={prefs.colorPicker}
-              onChange={(e) => setPrefs({ colorPicker: e.target.value as ColorPickerStyle })}
-            >
-              <option value="wheel" className="bg-background">Built-in wheel</option>
-              <option value="native" className="bg-background">System picker</option>
-            </select>
+        </label>
+        {prefs.colorFade && (
+          <div className="flex items-center justify-between gap-2">
+            <Label className="text-xs text-muted-foreground">
+              No-routine fade: {prefs.noRoutineFadeDays}d
+            </Label>
+            <input
+              type="range"
+              min={1}
+              max={30}
+              step={1}
+              value={prefs.noRoutineFadeDays}
+              onChange={(e) => setPrefs({ noRoutineFadeDays: Number(e.target.value) })}
+              className="w-32 accent-primary"
+              aria-label="Days for a routine-less task to fade to overdue"
+            />
           </div>
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Add button (mobile)</Label>
-            <select
-              className={SELECT}
-              value={prefs.addButton}
-              onChange={(e) => setPrefs({ addButton: e.target.value as AddButtonPosition })}
-            >
-              <option value="top" className="bg-background">Top right</option>
-              <option value="bottom" className="bg-background">Bottom (FAB)</option>
-            </select>
-          </div>
+        )}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Add button (mobile)</Label>
+          <select
+            className={SELECT}
+            value={prefs.addButton}
+            onChange={(e) => setPrefs({ addButton: e.target.value as AddButtonPosition })}
+          >
+            <option value="top" className="bg-background">Top right</option>
+            <option value="bottom" className="bg-background">Bottom (FAB)</option>
+          </select>
         </div>
       </section>
+
+      {/* Pickers: Taskrr's own controls on by default; turn one off for the
+          device's native input. */}
+      <details className="rounded-lg border">
+        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Pickers</summary>
+        <div className="space-y-2.5 border-t p-3">
+          <p className="text-[11px] text-muted-foreground">
+            Taskrr's own pickers are on by default; turn one off to use your device's native control.
+          </p>
+          <AnimToggle
+            label="Custom colour picker"
+            hint="A colour wheel instead of the system picker"
+            checked={prefs.colorPicker === "wheel"}
+            onChange={(v) => setPrefs({ colorPicker: v ? "wheel" : "native" })}
+          />
+          <AnimToggle
+            label="Custom date picker"
+            hint="A calendar instead of the system date input"
+            checked={prefs.datePicker}
+            onChange={(v) => setPrefs({ datePicker: v })}
+          />
+          <AnimToggle
+            label="Custom time picker"
+            hint="An analog clock instead of the system time input"
+            checked={prefs.timePicker}
+            onChange={(v) => setPrefs({ timePicker: v })}
+          />
+        </div>
+      </details>
 
       {/* Layout & motion */}
       <section className="space-y-2">

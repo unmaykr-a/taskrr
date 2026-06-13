@@ -105,6 +105,10 @@ export interface StalenessTintOptions {
   overdue: string;
   /** Days over which a no-cadence task fades fully to `overdue`. */
   noRoutineFadeDays: number;
+  /** When true, no task fades — every task stays at its fresh colour (the
+   *  per-user "disable colour fade" preference, equivalent to freeze-colour on
+   *  every task). Cadence, due dates, and filters are unaffected. */
+  disableFade?: boolean;
 }
 
 export interface StalenessTint {
@@ -148,7 +152,8 @@ export function stalenessTint(
 
   // "Stay green": pin the colour (and the displayed bucket) to fresh, regardless
   // of how overdue the task actually is. Cadence/due/filters are untouched.
-  if (task.freezeColor) {
+  // Triggered per-task (freezeColor) or globally (the disableFade preference).
+  if (task.freezeColor || opts.disableFade) {
     return {
       key: "fresh",
       label: STYLES.fresh.label,
