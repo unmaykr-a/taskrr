@@ -1,11 +1,13 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, Trash2, UserPlus, X } from "lucide-react";
+import { ChevronRight, ExternalLink, Trash2, UserPlus, X } from "lucide-react";
 
 import { api, type SettingsPatch, type User } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { timeSince } from "@/lib/time";
+import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
+import { useWindows } from "@/components/windows/WindowManager";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -43,24 +45,59 @@ export function AdminPanel() {
   );
 }
 
-/** Logs: a live tail of the in-memory server/access log ring, in a collapsible
- *  section (like Advanced). Polls only while expanded and "Live" is on, and
- *  auto-scrolls to the newest line. */
-function LogsSection() {
-  const [open, setOpen] = useState(false);
+/** LogsView is the live log tail itself: polls while mounted (with a Live
+ *  toggle) and auto-scrolls. Used inline in the collapsible section and as the
+ *  body of the popped-out window. `fill` makes the log box grow to its
+ *  container (the window); otherwise it's a fixed height. */
+function LogsView({ fill = false }: { fill?: boolean }) {
   const [live, setLive] = useState(true);
   const { data: logs } = useQuery({
     queryKey: ["logs"],
     queryFn: () => api.listLogs(0),
-    enabled: open, // don't fetch/poll while collapsed
-    refetchInterval: open && live ? 4000 : false,
+    refetchInterval: live ? 4000 : false,
   });
   const boxRef = useRef<HTMLDivElement>(null);
-
-  // Keep the view pinned to the newest line while tailing.
   useEffect(() => {
-    if (open && live && boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
-  }, [logs, live, open]);
+    if (live && boxRef.current) boxRef.current.scrollTop = boxRef.current.scrollHeight;
+  }, [logs, live]);
+
+  return (
+    <div className={cn("space-y-2", fill && "flex h-full flex-col")}>
+      <div className="flex items-center justify-between gap-2">
+        <p className="text-[11px] text-muted-foreground">
+          Recent server and access logs, kept in memory since the last restart.
+        </p>
+        <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
+          <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />
+          Live
+        </label>
+      </div>
+      <div
+        ref={boxRef}
+        className={cn(
+          "overflow-auto rounded-md border bg-background/60 p-2 font-mono text-[11px] leading-relaxed",
+          fill ? "min-h-0 flex-1" : "h-64",
+        )}
+      >
+        {logs?.length === 0 && <p className="text-muted-foreground">No log lines yet.</p>}
+        {logs?.map((e) => (
+          <div key={e.seq} className="whitespace-pre-wrap break-all text-muted-foreground">
+            {e.text}
+          </div>
+        ))}
+      </div>
+    </div>
+  );
+}
+
+/** Logs: a collapsible live tail (polls only while expanded), plus a "Pop out"
+ *  button that opens the same view as a floating window — so logs can stay open
+ *  while other settings windows are used to test changes. */
+function LogsSection() {
+  const [open, setOpen] = useState(false);
+  const windows = useWindows();
+  const popOut = () =>
+    windows.open({ id: "logs", title: "Logs", width: 560, content: <LogsView fill /> });
 
   return (
     <details
@@ -69,26 +106,17 @@ function LogsSection() {
     >
       <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Logs</summary>
       <div className="space-y-2 border-t p-3">
-        <div className="flex items-center justify-between gap-2">
-          <p className="text-[11px] text-muted-foreground">
-            Recent server and access logs, kept in memory since the last restart.
-          </p>
-          <label className="flex shrink-0 cursor-pointer items-center gap-1.5 text-xs text-muted-foreground">
-            <input type="checkbox" checked={live} onChange={(e) => setLive(e.target.checked)} />
-            Live
-          </label>
+        <div className="flex justify-end">
+          <button
+            type="button"
+            onClick={popOut}
+            title="Open logs in a floating window"
+            className="flex items-center gap-1 text-xs text-muted-foreground hover:text-foreground"
+          >
+            <ExternalLink className="h-3.5 w-3.5" /> Pop out
+          </button>
         </div>
-        <div
-          ref={boxRef}
-          className="h-64 overflow-auto rounded-md border bg-background/60 p-2 font-mono text-[11px] leading-relaxed"
-        >
-          {logs?.length === 0 && <p className="text-muted-foreground">No log lines yet.</p>}
-          {logs?.map((e) => (
-            <div key={e.seq} className="whitespace-pre-wrap break-all text-muted-foreground">
-              {e.text}
-            </div>
-          ))}
-        </div>
+        {open && <LogsView />}
       </div>
     </details>
   );

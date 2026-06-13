@@ -43,6 +43,13 @@ export interface Prefs {
   noRoutineFadeDays: number;
   /** Which colour picker to use: the built-in wheel or the OS-native input. */
   colorPicker: ColorPickerStyle;
+  /** Use Taskrr's calendar date picker (true) or the OS-native date input. */
+  datePicker: boolean;
+  /** Use Taskrr's analog clock time picker (true) or the OS-native time input. */
+  timePicker: boolean;
+  /** Fade task colours from fresh→overdue over time. Off = every task stays at
+   *  its fresh colour (a global version of per-task freeze-colour). */
+  colorFade: boolean;
   /** Where the mobile "add task" button lives. */
   addButton: AddButtonPosition;
 
@@ -124,6 +131,9 @@ function defaults(): Prefs {
     taskColorOverdue: "#ef4444", // red
     noRoutineFadeDays: 7,
     colorPicker: "wheel",
+    datePicker: true,
+    timePicker: true,
+    colorFade: true,
     addButton: "top",
     cardSize: "comfortable",
     taskColumns: 0,

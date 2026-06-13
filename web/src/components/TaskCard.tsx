@@ -36,7 +36,12 @@ export function TaskCard({
   const { prefs } = usePrefs();
   const status = stalenessTint(
     task,
-    { fresh: prefs.taskColorFresh, overdue: prefs.taskColorOverdue, noRoutineFadeDays: prefs.noRoutineFadeDays },
+    {
+      fresh: prefs.taskColorFresh,
+      overdue: prefs.taskColorOverdue,
+      noRoutineFadeDays: prefs.noRoutineFadeDays,
+      disableFade: !prefs.colorFade,
+    },
     now,
   );
   const due = nextDue(task);
@@ -156,7 +161,7 @@ export function TaskCard({
                 {due && (
                   <>
                     {" · "}
-                    <span className={cn(formatDue(due, now).overdue && !task.freezeColor && "text-rose-400")}>
+                    <span className={cn(formatDue(due, now).overdue && !task.freezeColor && prefs.colorFade && "text-rose-400")}>
                       {formatDue(due, now).text}
                     </span>
                   </>

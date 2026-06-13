@@ -2,10 +2,12 @@ import { useState } from "react";
 
 import { usePrefs } from "@/lib/prefs";
 import { ClockPicker } from "@/components/ClockPicker";
+import { DatePickerCalendar } from "@/components/ui/DatePickerCalendar";
 
-// A date + analog-clock time picker that we fully control, so the time is
-// chosen from a familiar clock face (not fiddly dropdowns). 12- vs 24-hour
-// display follows the Preferences -> Time & date setting (system by default).
+// Date + time picker. By default both halves use Taskrr's own controls — a
+// calendar for the date and an analog clock for the time — but each can fall
+// back to the OS-native input via the Preferences -> Pickers toggles. 12- vs
+// 24-hour display follows the Time & date preference.
 //
 // `value` is a Date (local time); `onChange` reports a new Date. Seconds are
 // zeroed so logged times are clean.
@@ -28,6 +30,7 @@ export function DateTimePicker({
   const { prefs } = usePrefs();
   const hour12 = prefs.hour12;
   const [showClock, setShowClock] = useState(false);
+  const [showCal, setShowCal] = useState(false);
 
   const hours = value.getHours();
   const minutes = value.getMinutes();
@@ -53,29 +56,66 @@ export function DateTimePicker({
   const timeLabel = hour12
     ? `${displayHour}:${pad(minutes)} ${isPM ? "PM" : "AM"}`
     : `${pad(hours)}:${pad(minutes)}`;
+  const dateLabel = value.toLocaleDateString(undefined, { dateStyle: "medium" });
 
   return (
     <div className="space-y-3">
       <div className="flex flex-wrap items-center gap-2">
-        <input
-          type="date"
-          aria-label="Date"
-          className={INPUT}
-          value={toDateInput(value)}
-          max={max ? toDateInput(max) : undefined}
-          onChange={(e) => e.target.value && emitDate(e.target.value)}
-        />
-        <button
-          type="button"
-          onClick={() => setShowClock((s) => !s)}
-          className={`${INPUT} min-w-[92px] text-left tabular-nums`}
-          aria-expanded={showClock}
-        >
-          {timeLabel}
-        </button>
+        {prefs.datePicker ? (
+          <button
+            type="button"
+            onClick={() => setShowCal((s) => !s)}
+            className={`${INPUT} min-w-[140px] text-left`}
+            aria-expanded={showCal}
+          >
+            {dateLabel}
+          </button>
+        ) : (
+          <input
+            type="date"
+            aria-label="Date"
+            className={INPUT}
+            value={toDateInput(value)}
+            max={max ? toDateInput(max) : undefined}
+            onChange={(e) => e.target.value && emitDate(e.target.value)}
+          />
+        )}
+
+        {prefs.timePicker ? (
+          <button
+            type="button"
+            onClick={() => setShowClock((s) => !s)}
+            className={`${INPUT} min-w-[92px] text-left tabular-nums`}
+            aria-expanded={showClock}
+          >
+            {timeLabel}
+          </button>
+        ) : (
+          <input
+            type="time"
+            aria-label="Time"
+            className={INPUT}
+            value={`${pad(hours)}:${pad(minutes)}`}
+            onChange={(e) => {
+              const [h, m] = e.target.value.split(":").map(Number);
+              if (!Number.isNaN(h) && !Number.isNaN(m)) emitTime(h, m);
+            }}
+          />
+        )}
       </div>
 
-      {showClock && (
+      {prefs.datePicker && showCal && (
+        <DatePickerCalendar
+          value={value}
+          max={max}
+          onChange={(d) => {
+            emitDate(toDateInput(d));
+            setShowCal(false);
+          }}
+        />
+      )}
+
+      {prefs.timePicker && showClock && (
         <div className="rounded-lg border bg-muted/20 p-3">
           <ClockPicker hours={hours} minutes={minutes} hour12={hour12} onChange={emitTime} />
         </div>
