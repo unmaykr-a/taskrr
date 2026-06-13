@@ -86,6 +86,10 @@ export interface AuthConfig {
   lite: boolean;
   /** Site-wide default theme to apply while signed out / for new users. */
   defaultTheme: Partial<Theme> | null;
+  /** Users who haven't customised their theme follow the site default. */
+  defaultThemeEnforce: boolean;
+  /** Admins may publish saved themes to all users. */
+  themesShareable: boolean;
 }
 
 /** Registration may complete (User) or be queued for approval. */
@@ -143,6 +147,8 @@ export interface AdminSettings {
   oidc_admin_group: string;
   oidc_link_username: boolean;
   oidc_only: boolean;
+  default_theme_enforce: boolean;
+  themes_shareable: boolean;
   oidc_client_secret_set: boolean;
   oidc_enabled: boolean;
 }
@@ -158,6 +164,8 @@ export type SettingsPatch = Partial<{
   oidc_admin_group: string;
   oidc_link_username: boolean;
   oidc_only: boolean;
+  default_theme_enforce: boolean;
+  themes_shareable: boolean;
 }>;
 
 /** Fields a user can set when creating or editing a task. */
@@ -377,6 +385,13 @@ const httpApi = {
   // --- site default theme ---
   setDefaultTheme: (theme: unknown) =>
     request<void>("/api/admin/default-theme", { method: "PUT", body: JSON.stringify(theme) }),
+
+  // --- shared themes (admin-published, available to everyone) ---
+  listSharedThemes: () => request<Theme[]>("/api/themes/shared"),
+  shareTheme: (theme: Theme) =>
+    request<Theme[]>("/api/admin/shared-themes", { method: "POST", body: JSON.stringify(theme) }),
+  unshareTheme: (name: string) =>
+    request<Theme[]>(`/api/admin/shared-themes/${encodeURIComponent(name)}`, { method: "DELETE" }),
 
   // --- backups ---
   createBackup: () => request<{ name: string }>("/api/admin/backup", { method: "POST" }),
