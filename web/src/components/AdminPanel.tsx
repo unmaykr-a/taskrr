@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Trash2, UserPlus, X } from "lucide-react";
+import { ChevronRight, Trash2, UserPlus, X } from "lucide-react";
 
 import { api, type SettingsPatch, type User } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
@@ -669,9 +669,12 @@ function OIDCSettings() {
   );
 
   return (
-    <details className="rounded-lg border">
-      <summary className="flex cursor-pointer select-none items-center justify-between px-3 py-2 text-sm font-semibold">
-        Single sign-on (OIDC)
+    <details className="group rounded-lg border">
+      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 text-sm font-semibold list-none [&::-webkit-details-marker]:hidden">
+        <span className="flex items-center gap-1.5">
+          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+          Single sign-on (OIDC)
+        </span>
         <span className={data?.oidc_enabled ? "text-xs font-normal text-emerald-400" : "text-xs font-normal text-muted-foreground"}>
           {data?.oidc_enabled ? "enabled" : "not configured"}
         </span>

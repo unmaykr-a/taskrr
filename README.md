@@ -96,6 +96,7 @@ working examples. The short version:
 | `TASKRR_SECRET_KEY` | — | Encrypt the OIDC client secret at rest, so it isn't stored — or backed up — in plaintext |
 | `TASKRR_LITE` | `false` | Single-person mode: disables registration and extra accounts |
 | `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop checks for due tasks |
+| `TASKRR_SAFETY_BACKUP` | `true` | Snapshot the DB before a restore (so a mistaken restore is undoable); set `false` to skip it |
 | `TASKRR_OIDC_*` | — | Issuer, client id/secret, redirect URL — also editable later in the admin UI |
 
 Running behind a reverse proxy with HTTPS is the intended setup for anything

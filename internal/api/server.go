@@ -112,6 +112,9 @@ type Options struct {
 	// Secrets encrypts at-rest secrets (the OIDC client secret). A nil/no-op
 	// cipher keeps the legacy plaintext behaviour.
 	Secrets *auth.SecretCipher
+	// SafetyBackupOnRestore takes a backup of the current DB before a restore
+	// swaps it out (so a mistaken restore is recoverable). Default on.
+	SafetyBackupOnRestore bool
 }
 
 // Server holds the dependencies shared by all HTTP handlers.
