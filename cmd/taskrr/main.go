@@ -92,14 +92,15 @@ func main() {
 	srv := &http.Server{
 		Addr: cfg.Addr,
 		Handler: api.NewServer(st, api.Options{
-			SessionTTL:        cfg.SessionTTL,
-			CookieSecure:      cfg.CookieSecure,
-			ProtectedUserID:   adminID,
-			OnRestart:         requestRestart,
-			Logs:              logs,
-			Lite:              cfg.Lite,
-			TrustProxyHeaders: cfg.TrustProxyHeaders,
-			Secrets:           secrets,
+			SessionTTL:            cfg.SessionTTL,
+			CookieSecure:          cfg.CookieSecure,
+			ProtectedUserID:       adminID,
+			OnRestart:             requestRestart,
+			Logs:                  logs,
+			Lite:                  cfg.Lite,
+			TrustProxyHeaders:     cfg.TrustProxyHeaders,
+			Secrets:               secrets,
+			SafetyBackupOnRestore: cfg.SafetyBackupOnRestore,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

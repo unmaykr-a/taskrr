@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell } from "lucide-react";
+import { Bell, ChevronRight } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
@@ -53,8 +53,9 @@ export function RemindersSection() {
   const canSave = !enabled || webhookUrl.trim() !== "";
 
   return (
-    <details className="rounded-lg border">
-      <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-sm font-semibold">
+    <details className="group rounded-lg border">
+      <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-sm font-semibold list-none [&::-webkit-details-marker]:hidden">
+        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
         <Bell className="h-3.5 w-3.5" /> Reminders
       </summary>
       <div className="space-y-2 border-t p-3">

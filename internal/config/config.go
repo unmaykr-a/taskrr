@@ -56,6 +56,12 @@ type Config struct {
 	// accounts) for a single-person instance. The one bootstrap admin still works.
 	Lite bool
 
+	// SafetyBackupOnRestore takes an automatic backup of the current database
+	// just before a restore swaps it out, so a mistaken restore can be undone.
+	// On by default; turn it off to stop the backups folder accumulating
+	// safety snapshots on every restore.
+	SafetyBackupOnRestore bool
+
 	// --- OIDC (Phase 2; initial values, overridable later in the admin UI) ---
 	OIDCIssuer       string
 	OIDCClientID     string
@@ -85,6 +91,8 @@ func Load() Config {
 		SecretKey:         env("TASKRR_SECRET_KEY", ""),
 		ReminderInterval:  envDuration("TASKRR_REMINDER_INTERVAL", time.Minute),
 		Lite:              envBool("TASKRR_LITE", false),
+
+		SafetyBackupOnRestore: envBool("TASKRR_SAFETY_BACKUP", true),
 
 		OIDCIssuer:       env("TASKRR_OIDC_ISSUER", ""),
 		OIDCClientID:     env("TASKRR_OIDC_CLIENT_ID", ""),

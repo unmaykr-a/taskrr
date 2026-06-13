@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, KeyRound, Link2, Link2Off, Trash2, UserRound } from "lucide-react";
+import { AlertTriangle, ChevronRight, KeyRound, Link2, Link2Off, Trash2, UserRound } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
@@ -216,13 +216,18 @@ export function AccountSection() {
 
       <RemindersSection />
 
-      {/* Danger zone: irreversible self-service actions, each gated by re-typing
-          the account's own username. Collapsed by default so it's tucked away. */}
-      <details className="rounded-md border border-destructive/40 bg-destructive/5">
-        <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-xs font-semibold text-destructive">
-          <AlertTriangle className="h-3.5 w-3.5" /> Danger zone
+      {/* Advanced: the irreversible self-service actions live here (each gated by
+          re-typing the account's own username), under a "Danger zone" label.
+          Collapsed by default so it's tucked away. */}
+      <details className="group rounded-md border">
+        <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-sm font-semibold list-none [&::-webkit-details-marker]:hidden">
+          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
+          Advanced
         </summary>
-        <div className="space-y-3 border-t border-destructive/20 p-3">
+        <div className="space-y-3 border-t p-3">
+        <div className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
+          <AlertTriangle className="h-3.5 w-3.5" /> Danger zone
+        </div>
         <div className="space-y-2">
           <p className="text-xs text-muted-foreground">
             Delete all your tasks and their history. Your account and settings stay.
@@ -250,11 +255,11 @@ export function AccountSection() {
         </div>
 
         {user?.protected ? (
-          <p className="border-t border-destructive/20 pt-3 text-xs text-muted-foreground">
+          <p className="border-t pt-3 text-xs text-muted-foreground">
             This is the primary admin account and can't be deleted.
           </p>
         ) : (
-          <div className="space-y-2 border-t border-destructive/20 pt-3">
+          <div className="space-y-2 border-t pt-3">
             <p className="text-xs text-muted-foreground">
               Permanently delete your account and everything in it. You'll be signed
               out immediately. This can't be undone.

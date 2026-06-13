@@ -1,7 +1,9 @@
 # Builds and publishes the multi-arch Docker image to GHCR, so users can run
 # Taskrr straight from the compose file with no cloning or building:
-#   - every push to main updates ghcr.io/<owner>/taskrr:latest
-#   - a v* tag additionally publishes the version tag (e.g. 1.0.0)
+#   - every push to main publishes ghcr.io/<owner>/taskrr:latest AND a tag for
+#     the current version from web/package.json (e.g. :1.5.0), so every released
+#     version stays pullable on the Packages page
+#   - a v* git tag also publishes its semver tag
 name: Release
 
 on:
@@ -27,12 +29,17 @@ jobs:
           registry: ghcr.io
           username: ${{ github.actor }}
           password: ${{ secrets.GITHUB_TOKEN }}
+      # The app version is the single source of truth in web/package.json; tag
+      # each main build with it so every version stays available in GHCR.
+      - id: ver
+        run: echo "version=$(node -p "require('./web/package.json').version")" >> "$GITHUB_OUTPUT"
       - uses: docker/metadata-action@v5
         id: meta
         with:
           images: ghcr.io/${{ github.repository }}
           tags: |
             type=raw,value=latest,enable={{is_default_branch}}
+            type=raw,value=${{ steps.ver.outputs.version }},enable={{is_default_branch}}
             type=semver,pattern={{version}}
       - uses: docker/build-push-action@v6
         with:

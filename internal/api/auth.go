@@ -1196,11 +1196,17 @@ func (s *Server) handleRestoreUpload(w http.ResponseWriter, r *http.Request) {
 // actual file swap happens on the next startup (applyPendingRestore), which is
 // the only safe moment to replace an open SQLite file.
 func (s *Server) doRestore(w http.ResponseWriter, r *http.Request, stage func() error) {
-	safety, err := s.store.Backup(r.Context())
-	if err != nil {
-		log.Printf("restore: safety backup failed: %v", err)
-		writeError(w, http.StatusInternalServerError, "could not take a safety backup before restoring")
-		return
+	// Take a safety snapshot of the current DB first, unless disabled
+	// (TASKRR_SAFETY_BACKUP=false), so a mistaken restore can be undone.
+	var safety string
+	if s.opts.SafetyBackupOnRestore {
+		var err error
+		safety, err = s.store.Backup(r.Context())
+		if err != nil {
+			log.Printf("restore: safety backup failed: %v", err)
+			writeError(w, http.StatusInternalServerError, "could not take a safety backup before restoring")
+			return
+		}
 	}
 	if err := stage(); err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -1211,7 +1217,11 @@ func (s *Server) doRestore(w http.ResponseWriter, r *http.Request, stage func() 
 		return
 	}
 	s.restoring.Store(true) // block new logins during the brief pre-restart window
-	log.Printf("restore: staged; restarting (safety backup: %s)", safety)
+	if safety != "" {
+		log.Printf("restore: staged; restarting (safety backup: %s)", safety)
+	} else {
+		log.Printf("restore: staged; restarting (no safety backup — TASKRR_SAFETY_BACKUP is off)")
+	}
 	writeJSON(w, http.StatusOK, map[string]any{"ok": true, "restarting": true, "safetyBackup": safety})
 
 	if s.opts.OnRestart != nil {
