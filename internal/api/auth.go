@@ -29,6 +29,14 @@ const (
 	keyRegOIDC      = "reg_oidc"      // auto-provision a user on first OIDC login
 	keyRegApproval  = "reg_approval"  // local sign-ups need admin approval before sign-in
 	keyDefaultTheme = "default_theme" // site-wide default theme (JSON), shown signed-out
+	// keyDefaultThemeEnforce: when true, users who haven't customized their own
+	// theme follow the site default (and update when an admin changes it).
+	keyDefaultThemeEnforce = "default_theme_enforce"
+	// keyThemesShareable: when true, admins can publish a saved theme to every
+	// user (the "Share" button in the theme customizer).
+	keyThemesShareable = "themes_shareable"
+	// keySharedThemes: the JSON array of admin-published themes, available to all.
+	keySharedThemes = "shared_themes"
 )
 
 type userCtxKey struct{}
@@ -172,12 +180,14 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 	oidcOnly := oidcUp && s.boolSetting(ctx, keyOIDCOnly, false)
 	writeJSON(w, http.StatusOK, map[string]any{
 		// Lite mode and OIDC-only both force self-registration off.
-		"localRegistration": !s.opts.Lite && !oidcOnly && s.boolSetting(ctx, keyRegLocal, false),
-		"oidc":              oidcUp,
-		"oidcOnly":          oidcOnly,
-		"requiresApproval":  s.boolSetting(ctx, keyRegApproval, false),
-		"lite":              s.opts.Lite,
-		"defaultTheme":      defaultTheme,
+		"localRegistration":   !s.opts.Lite && !oidcOnly && s.boolSetting(ctx, keyRegLocal, false),
+		"oidc":                oidcUp,
+		"oidcOnly":            oidcOnly,
+		"requiresApproval":    s.boolSetting(ctx, keyRegApproval, false),
+		"lite":                s.opts.Lite,
+		"defaultTheme":        defaultTheme,
+		"defaultThemeEnforce": s.boolSetting(ctx, keyDefaultThemeEnforce, false),
+		"themesShareable":     s.boolSetting(ctx, keyThemesShareable, false),
 	})
 }
 
@@ -578,13 +588,49 @@ func (s *Server) handleGetPreferences(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not load preferences")
 		return
 	}
+	if data == "" {
+		data = "{}"
+	}
+	// Force-default theme: when enabled, users who haven't customised their own
+	// theme follow the site default. We apply it here (rather than client-side)
+	// so the result is correct regardless of load timing. The prefs blob is
+	// otherwise opaque to the server; this is the one place we peek inside it.
+	data = s.applyEnforcedTheme(r, data)
 	w.Header().Set("Content-Type", "application/json; charset=utf-8")
 	w.WriteHeader(http.StatusOK)
-	if data == "" {
-		_, _ = w.Write([]byte("{}"))
-		return
+	_, _ = w.Write([]byte(data))
+}
+
+// applyEnforcedTheme overrides the theme in a preferences blob with the site
+// default when default_theme_enforce is on and the user hasn't customised their
+// theme (prefs.themeCustom is not true). Returns the blob unchanged on any miss.
+func (s *Server) applyEnforcedTheme(r *http.Request, data string) string {
+	ctx := r.Context()
+	if !s.boolSetting(ctx, keyDefaultThemeEnforce, false) {
+		return data
 	}
-	_, _ = w.Write([]byte(data)) // already-validated JSON, stored verbatim
+	def, ok, _ := s.store.GetSetting(ctx, keyDefaultTheme)
+	if !ok || def == "" {
+		return data
+	}
+	var blob map[string]json.RawMessage
+	if err := json.Unmarshal([]byte(data), &blob); err != nil {
+		return data
+	}
+	// Respect a user who has chosen their own theme.
+	if inner, ok := blob["prefs"]; ok {
+		var p struct {
+			ThemeCustom bool `json:"themeCustom"`
+		}
+		if json.Unmarshal(inner, &p) == nil && p.ThemeCustom {
+			return data
+		}
+	}
+	blob["theme"] = json.RawMessage(def)
+	if out, err := json.Marshal(blob); err == nil {
+		return string(out)
+	}
+	return data
 }
 
 // handlePutPreferences stores the user's preferences JSON blob verbatim (after a
@@ -1274,15 +1320,17 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	get := func(k string) string { v, _, _ := s.store.GetSetting(ctx, k); return v }
 	writeJSON(w, http.StatusOK, map[string]any{
-		keyRegLocal:         s.boolSetting(ctx, keyRegLocal, false),
-		keyRegOIDC:          s.boolSetting(ctx, keyRegOIDC, true),
-		keyRegApproval:      s.boolSetting(ctx, keyRegApproval, false),
-		keyOIDCIssuer:       get(keyOIDCIssuer),
-		keyOIDCClientID:     get(keyOIDCClientID),
-		keyOIDCRedirectURL:  get(keyOIDCRedirectURL),
-		keyOIDCAdminGroup:   get(keyOIDCAdminGroup),
-		keyOIDCLinkUsername: s.boolSetting(ctx, keyOIDCLinkUsername, false),
-		keyOIDCOnly:         s.boolSetting(ctx, keyOIDCOnly, false),
+		keyRegLocal:              s.boolSetting(ctx, keyRegLocal, false),
+		keyRegOIDC:               s.boolSetting(ctx, keyRegOIDC, true),
+		keyRegApproval:           s.boolSetting(ctx, keyRegApproval, false),
+		keyOIDCIssuer:            get(keyOIDCIssuer),
+		keyOIDCClientID:          get(keyOIDCClientID),
+		keyOIDCRedirectURL:       get(keyOIDCRedirectURL),
+		keyOIDCAdminGroup:        get(keyOIDCAdminGroup),
+		keyOIDCLinkUsername:      s.boolSetting(ctx, keyOIDCLinkUsername, false),
+		keyOIDCOnly:              s.boolSetting(ctx, keyOIDCOnly, false),
+		keyDefaultThemeEnforce:   s.boolSetting(ctx, keyDefaultThemeEnforce, false),
+		keyThemesShareable:       s.boolSetting(ctx, keyThemesShareable, false),
 		"oidc_client_secret_set": get(keyOIDCClientSecret) != "", // never return the secret
 		"oidc_enabled":           s.oidcEnabled(ctx),
 	})
@@ -1291,16 +1339,18 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 // settingsPatch is a partial update; only non-nil fields are written. The client
 // secret is only changed when a non-empty value is supplied.
 type settingsPatch struct {
-	RegLocal         *bool   `json:"reg_local"`
-	RegOIDC          *bool   `json:"reg_oidc"`
-	RegApproval      *bool   `json:"reg_approval"`
-	OIDCIssuer       *string `json:"oidc_issuer"`
-	OIDCClientID     *string `json:"oidc_client_id"`
-	OIDCClientSecret *string `json:"oidc_client_secret"`
-	OIDCRedirectURL  *string `json:"oidc_redirect_url"`
-	OIDCAdminGroup   *string `json:"oidc_admin_group"`
-	OIDCLinkUsername *bool   `json:"oidc_link_username"`
-	OIDCOnly         *bool   `json:"oidc_only"`
+	RegLocal            *bool   `json:"reg_local"`
+	RegOIDC             *bool   `json:"reg_oidc"`
+	RegApproval         *bool   `json:"reg_approval"`
+	OIDCIssuer          *string `json:"oidc_issuer"`
+	OIDCClientID        *string `json:"oidc_client_id"`
+	OIDCClientSecret    *string `json:"oidc_client_secret"`
+	OIDCRedirectURL     *string `json:"oidc_redirect_url"`
+	OIDCAdminGroup      *string `json:"oidc_admin_group"`
+	OIDCLinkUsername    *bool   `json:"oidc_link_username"`
+	OIDCOnly            *bool   `json:"oidc_only"`
+	DefaultThemeEnforce *bool   `json:"default_theme_enforce"`
+	ThemesShareable     *bool   `json:"themes_shareable"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -1350,6 +1400,12 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.OIDCOnly != nil && !set(keyOIDCOnly, boolStr(*req.OIDCOnly)) {
+		return
+	}
+	if req.DefaultThemeEnforce != nil && !set(keyDefaultThemeEnforce, boolStr(*req.DefaultThemeEnforce)) {
+		return
+	}
+	if req.ThemesShareable != nil && !set(keyThemesShareable, boolStr(*req.ThemesShareable)) {
 		return
 	}
 	// Only overwrite the secret when a new, non-empty one is provided. Encrypt it

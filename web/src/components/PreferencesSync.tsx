@@ -3,7 +3,7 @@ import { useEffect, useRef } from "react";
 import { api } from "@/lib/api";
 import { useAuth } from "@/components/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
-import { DEFAULT_THEME, type Theme } from "@/lib/theme";
+import { DEFAULT_THEME, loadSavedThemes, type Theme } from "@/lib/theme";
 import { type Prefs, usePrefs } from "@/lib/prefs";
 
 interface StoredPrefs {
@@ -55,6 +55,13 @@ export function PreferencesSync() {
         const hasStored = Boolean(stored.theme || stored.prefs);
         if (stored.theme) setTheme({ ...DEFAULT_THEME, ...stored.theme } as Theme);
         if (stored.prefs) setPrefs(stored.prefs);
+        // One-time migration: saved themes used to live in localStorage and were
+        // wiped on logout. If this account has none stored yet, adopt whatever is
+        // still in localStorage so it isn't lost — it then syncs to the account.
+        if (!stored.prefs?.savedThemes?.length) {
+          const legacy = loadSavedThemes();
+          if (legacy.length) setPrefs({ savedThemes: legacy });
+        }
         hydrated.current = true;
         // First time on this account: seed the server with the current values.
         if (!hasStored) {

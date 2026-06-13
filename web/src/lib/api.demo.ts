@@ -300,6 +300,8 @@ const DEMO_AUTH: AuthConfig = {
   requiresApproval: false,
   lite: false,
   defaultTheme: null,
+  defaultThemeEnforce: false,
+  themesShareable: false,
 };
 
 const DEMO_REMINDERS: ReminderSettings = { enabled: false, webhookUrl: "", leadSeconds: 0 };
@@ -520,6 +522,11 @@ export const demoApi: Api = {
   terminateSessions: notAvailable,
   listLogs: notAvailable,
   setDefaultTheme: () => tick(undefined),
+  // No server in the demo: there are no shared themes, and the demo account
+  // isn't admin, so publishing is never reached.
+  listSharedThemes: () => tick([]),
+  shareTheme: notAvailable,
+  unshareTheme: notAvailable,
   createBackup: notAvailable,
   listBackups: notAvailable,
   backupURL: (name: string) => `#${name}`,

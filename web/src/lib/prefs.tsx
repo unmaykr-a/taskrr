@@ -18,6 +18,7 @@ import {
 
 import { installSmoothWheel } from "@/lib/smoothScroll";
 import { setTimeFormat } from "@/lib/time";
+import { type Theme } from "@/lib/theme";
 
 export type ColorPickerStyle = "wheel" | "native";
 export type AddButtonPosition = "top" | "bottom";
@@ -75,6 +76,15 @@ export interface Prefs {
    *  display's refresh rate). Touchpads/touch keep native scrolling. */
   smoothScroll: boolean;
 
+  // --- themes ---
+  /** The user's saved named themes. Persisted server-side with the rest of
+   *  prefs, so they follow the account and survive logout (they used to live in
+   *  localStorage and were wiped on sign-out). */
+  savedThemes: Theme[];
+  /** Whether the user has chosen their own theme. When false and an admin has
+   *  enabled the enforced default, they follow the site default theme. */
+  themeCustom: boolean;
+
   // --- windows ---
   /** Whether floating windows can be dragged/resized. Off = static panels. */
   draggableWindows: boolean;
@@ -127,6 +137,8 @@ function defaults(): Prefs {
     animWindows: true,
     animViews: true,
     smoothScroll: true,
+    savedThemes: [],
+    themeCustom: false,
     draggableWindows: true,
     pauseBgOnDrag: true,
     windowSizes: {},

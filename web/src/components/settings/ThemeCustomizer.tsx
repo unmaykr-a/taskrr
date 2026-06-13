@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
-import { useMutation } from "@tanstack/react-query";
-import { Download, Globe, Moon, RotateCcw, Sparkles, Sun, Upload } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { Download, Globe, Moon, RotateCcw, Share2, Sparkles, Sun, Upload, X } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { usePrefs } from "@/lib/prefs";
@@ -9,13 +9,10 @@ import { useAuth } from "@/components/AuthProvider";
 import {
   type BackgroundEffect,
   DEFAULT_THEME,
-  deleteNamedTheme,
   type FontChoice,
   generateTheme,
   type Harmony,
-  loadSavedThemes,
   PRESETS,
-  saveNamedTheme,
   type Theme,
   type ThemeColors,
   toggledMode,
@@ -59,26 +56,64 @@ export function ThemeCustomizer() {
   const { theme, setTheme } = useTheme();
   const { prefs, setPrefs } = usePrefs();
   const { user } = useAuth();
-  const [saved, setSaved] = useState<Theme[]>(loadSavedThemes);
+  const isAdmin = user?.role === "admin";
+  const queryClient = useQueryClient();
   const [name, setName] = useState("");
   const [harmony, setHarmony] = useState<Harmony>("complementary");
   const fileRef = useRef<HTMLInputElement>(null);
   const setDefault = useMutation({ mutationFn: () => api.setDefaultTheme(theme) });
 
-  const patch = (p: Partial<Theme>) => setTheme({ ...theme, ...p });
-  const setColor = (key: keyof ThemeColors, value: string) =>
-    setTheme({ ...theme, colors: { ...theme.colors, [key]: value } });
+  // Saved themes now live in the account's prefs (server-side), so they follow
+  // the account and survive logout — they used to be in localStorage and got
+  // wiped on sign-out.
+  const saved = prefs.savedThemes ?? [];
 
-  const applyPreset = (p: Theme) => setTheme({ ...p });
+  // What the instance allows (sharing) and shared themes everyone can apply.
+  const { data: config } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
+  const { data: settings } = useQuery({
+    queryKey: ["settings"],
+    queryFn: api.getSettings,
+    enabled: isAdmin,
+  });
+  const { data: shared } = useQuery({ queryKey: ["shared-themes"], queryFn: api.listSharedThemes });
+
+  const saveSetting = useMutation({
+    mutationFn: api.putSettings,
+    onSuccess: (next) => {
+      queryClient.setQueryData(["settings"], next);
+      queryClient.invalidateQueries({ queryKey: ["auth-config"] });
+    },
+  });
+  const share = useMutation({
+    mutationFn: (t: Theme) => api.shareTheme(t),
+    onSuccess: (list) => queryClient.setQueryData(["shared-themes"], list),
+  });
+  const unshare = useMutation({
+    mutationFn: (n: string) => api.unshareTheme(n),
+    onSuccess: (list) => queryClient.setQueryData(["shared-themes"], list),
+  });
+
+  // Any user-initiated theme change applies it AND marks the account as having
+  // customised its theme, so the enforced site default no longer overrides it.
+  const applyTheme = (t: Theme) => {
+    setTheme(t);
+    if (!prefs.themeCustom) setPrefs({ themeCustom: true });
+  };
+
+  const patch = (p: Partial<Theme>) => applyTheme({ ...theme, ...p });
+  const setColor = (key: keyof ThemeColors, value: string) =>
+    applyTheme({ ...theme, colors: { ...theme.colors, [key]: value } });
+
+  const applyPreset = (p: Theme) => applyTheme({ ...p });
   const generate = () => patch({ colors: generateTheme(theme.colors.accent, theme.mode, harmony) });
 
   function save() {
     const trimmed = name.trim();
     if (!trimmed) return;
-    setSaved(saveNamedTheme({ ...theme, name: trimmed }));
+    setPrefs({ savedThemes: [...saved.filter((t) => t.name !== trimmed), { ...theme, name: trimmed }] });
     setName("");
   }
-  const remove = (n: string) => setSaved(deleteNamedTheme(n));
+  const remove = (n: string) => setPrefs({ savedThemes: saved.filter((t) => t.name !== n) });
 
   function exportTheme() {
     const blob = new Blob([JSON.stringify(theme, null, 2)], { type: "application/json" });
@@ -92,7 +127,7 @@ export function ThemeCustomizer() {
   function importTheme(file: File) {
     file
       .text()
-      .then((text) => setTheme({ ...DEFAULT_THEME, ...(JSON.parse(text) as Theme) }))
+      .then((text) => applyTheme({ ...DEFAULT_THEME, ...(JSON.parse(text) as Theme) }))
       .catch(() => alert("That file isn't a valid Taskrr theme."));
   }
 
@@ -106,7 +141,7 @@ export function ThemeCustomizer() {
             <button
               key={m}
               type="button"
-              onClick={() => theme.mode !== m && setTheme(toggledMode(theme))}
+              onClick={() => theme.mode !== m && applyTheme(toggledMode(theme))}
               className={cn(
                 "flex items-center justify-center gap-1.5 rounded-md py-1.5 capitalize transition-colors",
                 theme.mode === m
@@ -147,6 +182,48 @@ export function ThemeCustomizer() {
           ))}
         </div>
       </section>
+
+      {/* Shared themes — admin-published, available to everyone. */}
+      {shared && shared.length > 0 && (
+        <section className="space-y-2">
+          <h3 className="text-sm font-semibold">Shared themes</h3>
+          <div className="grid grid-cols-3 gap-2">
+            {shared.map((p) => (
+              <div
+                key={p.name}
+                className={cn(
+                  "group relative flex items-center gap-2 rounded-lg border p-2 text-left text-xs transition-colors hover:bg-accent",
+                  theme.name === p.name && "ring-1 ring-primary",
+                )}
+              >
+                <button className="flex min-w-0 items-center gap-2" onClick={() => applyPreset(p)}>
+                  <span className="flex -space-x-1">
+                    {[p.colors.background, p.colors.card, p.colors.accent].map((c, i) => (
+                      <span
+                        key={i}
+                        className="h-4 w-4 rounded-full border border-black/20"
+                        style={{ backgroundColor: c }}
+                      />
+                    ))}
+                  </span>
+                  <span className="truncate">{p.name}</span>
+                </button>
+                {isAdmin && (
+                  <button
+                    type="button"
+                    aria-label={`Unshare ${p.name}`}
+                    title="Stop sharing"
+                    onClick={() => unshare.mutate(p.name)}
+                    className="absolute right-1 top-1 rounded p-0.5 text-muted-foreground opacity-0 transition-opacity hover:text-destructive group-hover:opacity-100"
+                  >
+                    <X className="h-3 w-3" />
+                  </button>
+                )}
+              </div>
+            ))}
+          </div>
+        </section>
+      )}
 
       {/* Colors */}
       <section className="space-y-2">
@@ -354,24 +431,40 @@ export function ThemeCustomizer() {
         {saved.length > 0 && (
           <div className="space-y-1">
             {saved.map((t) => (
-              <div key={t.name} className="flex items-center justify-between rounded-md border px-2 py-1 text-sm">
-                <button className="flex items-center gap-2 hover:underline" onClick={() => applyPreset(t)}>
+              <div key={t.name} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1 text-sm">
+                <button className="flex min-w-0 items-center gap-2 hover:underline" onClick={() => applyPreset(t)}>
                   <span
-                    className="h-3 w-3 rounded-full border border-black/20"
+                    className="h-3 w-3 shrink-0 rounded-full border border-black/20"
                     style={{ backgroundColor: t.colors.accent }}
                   />
-                  {t.name}
+                  <span className="truncate">{t.name}</span>
                 </button>
-                <button
-                  onClick={() => remove(t.name)}
-                  className="text-xs text-muted-foreground hover:text-destructive"
-                >
-                  remove
-                </button>
+                <div className="flex shrink-0 items-center gap-2">
+                  {/* Admins can publish a saved theme to all users when sharing
+                      is enabled for the instance. */}
+                  {isAdmin && config?.themesShareable && (
+                    <button
+                      type="button"
+                      onClick={() => share.mutate(t)}
+                      disabled={share.isPending}
+                      title="Share with everyone"
+                      className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
+                    >
+                      <Share2 className="h-3.5 w-3.5" /> Share
+                    </button>
+                  )}
+                  <button
+                    onClick={() => remove(t.name)}
+                    className="text-xs text-muted-foreground hover:text-destructive"
+                  >
+                    remove
+                  </button>
+                </div>
               </div>
             ))}
           </div>
         )}
+        {share.isError && <p className="text-xs text-destructive">{(share.error as Error).message}</p>}
         <div className="flex gap-2">
           <Button type="button" variant="outline" size="sm" className="flex-1" onClick={() => fileRef.current?.click()}>
             <Upload /> Import
@@ -387,22 +480,53 @@ export function ThemeCustomizer() {
             onChange={(e) => e.target.files?.[0] && importTheme(e.target.files[0])}
           />
         </div>
-        {user?.role === "admin" && (
-          <Button
-            type="button"
-            variant="outline"
-            size="sm"
-            className="w-full"
-            disabled={setDefault.isPending}
-            onClick={() => setDefault.mutate()}
-          >
-            <Globe />
-            {setDefault.isSuccess
-              ? "Saved as site default"
-              : setDefault.isPending
-                ? "Saving…"
-                : "Set as site default"}
-          </Button>
+        {isAdmin && (
+          <div className="space-y-2 rounded-lg border p-3">
+            <h4 className="text-xs font-semibold text-muted-foreground">Site themes (admin)</h4>
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              className="w-full"
+              disabled={setDefault.isPending}
+              onClick={() => setDefault.mutate()}
+            >
+              <Globe />
+              {setDefault.isSuccess
+                ? "Saved as site default"
+                : setDefault.isPending
+                  ? "Saving…"
+                  : "Set this as the site default"}
+            </Button>
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">
+                Use the default for everyone
+                <span className="block text-xs">
+                  Accounts that haven't picked their own theme follow the site default.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 accent-primary"
+                checked={settings?.default_theme_enforce ?? false}
+                onChange={(e) => saveSetting.mutate({ default_theme_enforce: e.target.checked })}
+              />
+            </label>
+            <label className="flex items-center justify-between gap-2 text-sm">
+              <span className="text-muted-foreground">
+                Allow sharing themes
+                <span className="block text-xs">
+                  Adds a Share button on saved themes to publish them to all users.
+                </span>
+              </span>
+              <input
+                type="checkbox"
+                className="h-4 w-4 shrink-0 accent-primary"
+                checked={settings?.themes_shareable ?? false}
+                onChange={(e) => saveSetting.mutate({ themes_shareable: e.target.checked })}
+              />
+            </label>
+          </div>
         )}
       </section>
 
@@ -411,7 +535,7 @@ export function ThemeCustomizer() {
         variant="ghost"
         size="sm"
         className="w-full"
-        onClick={() => setTheme({ ...DEFAULT_THEME })}
+        onClick={() => applyTheme({ ...DEFAULT_THEME })}
       >
         <RotateCcw /> Reset to default
       </Button>
