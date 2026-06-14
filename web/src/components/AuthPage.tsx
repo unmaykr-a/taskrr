@@ -11,6 +11,7 @@ import {
   type User,
 } from "@/lib/api";
 import { useTheme } from "@/components/ThemeProvider";
+import { useBranding } from "@/components/Branding";
 import { DEFAULT_THEME } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -30,6 +31,7 @@ export function AuthPage() {
   const queryClient = useQueryClient();
   const { setTheme } = useTheme();
   const { data: config } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
+  const branding = useBranding();
   const [tab, setTab] = useState<Tab>("login");
   const tabsRef = useRef<HTMLDivElement>(null);
   const [username, setUsername] = useState("");
@@ -99,15 +101,24 @@ export function AuthPage() {
     <div className="relative z-10 h-[100dvh] overflow-y-auto">
       <div className="flex min-h-full items-center justify-center p-4">
         <div className="w-full max-w-sm rounded-2xl border bg-card/95 p-6 shadow-2xl backdrop-blur">
-        <div className="mb-6 flex flex-col items-center gap-2 text-center">
-          <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow">
-            <CheckCircle2 className="h-6 w-6" />
+        {(!branding.loginHideIcon || !branding.loginHideText) && (
+          <div className="mb-6 flex flex-col items-center gap-2 text-center">
+            {!branding.loginHideIcon &&
+              (branding.icon ? (
+                <img src={branding.icon} alt="" className="h-11 w-11 rounded-xl object-cover shadow" />
+              ) : (
+                <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow">
+                  <CheckCircle2 className="h-6 w-6" />
+                </div>
+              ))}
+            {!branding.loginHideText && (
+              <div>
+                <h1 className="text-lg font-semibold tracking-tight">{branding.name}</h1>
+                {branding.tagline && <p className="text-xs text-muted-foreground">{branding.tagline}</p>}
+              </div>
+            )}
           </div>
-          <div>
-            <h1 className="text-lg font-semibold tracking-tight">Taskrr</h1>
-            <p className="text-xs text-muted-foreground">last-done tracker</p>
-          </div>
-        </div>
+        )}
 
         {pending ? (
           <div className="rounded-lg border border-emerald-500/40 bg-emerald-500/10 p-4 text-center text-sm">

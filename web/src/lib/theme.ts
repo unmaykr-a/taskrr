@@ -228,9 +228,32 @@ export function applyTheme(theme: Theme) {
 }
 
 /** Recolour the page/tab icon to match the accent (a checkmark on an accent
- *  rounded square), so the favicon tracks the theme to match the theme. */
+ *  rounded square), so the favicon tracks the theme — unless a custom branding
+ *  icon has been set, which then wins. */
+let lastAccent = "#ec8a9a";
+let brandIcon: string | null = null;
+
+/** Set (or clear) the custom branding favicon (a data URL). When set it
+ *  overrides the generated checkmark; pass "" / null to fall back to it. */
+export function setBrandIcon(icon: string | null) {
+  brandIcon = icon && icon.trim() !== "" ? icon : null;
+  setFavicon(lastAccent); // re-render with the new choice
+}
+
 export function setFavicon(accent: string) {
   if (typeof document === "undefined") return;
+  lastAccent = accent;
+
+  // A custom branding icon wins: point the favicon straight at its data URL.
+  if (brandIcon) {
+    document.querySelectorAll("link[rel~='icon']").forEach((l) => l.remove());
+    const link = document.createElement("link");
+    link.rel = "icon";
+    link.href = brandIcon;
+    document.head.appendChild(link);
+    return;
+  }
+
   const canvas = document.createElement("canvas");
   canvas.width = 64;
   canvas.height = 64;

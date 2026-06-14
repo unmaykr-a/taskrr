@@ -92,6 +92,24 @@ export interface AuthConfig {
   themesShareable: boolean;
   /** Regular users (not just admins) may publish themes too. */
   themesShareUsers: boolean;
+  /** Instance branding (name, title, icon, login toggles). */
+  branding: Branding;
+}
+
+/** Customisable instance identity, shown signed-out and signed-in. */
+export interface Branding {
+  /** App name in the sidebar + login (defaults to "Taskrr"). */
+  name: string;
+  /** Browser-tab title; empty means fall back to the name. */
+  title: string;
+  /** Small subtitle under the name. */
+  tagline: string;
+  /** A custom logo as a data URL; empty means the generated checkmark. */
+  icon: string;
+  /** Hide the icon on the login card. */
+  loginHideIcon: boolean;
+  /** Hide the name/tagline on the login card. */
+  loginHideText: boolean;
 }
 
 /** Registration may complete (User) or be queued for approval. */
@@ -152,6 +170,12 @@ export interface AdminSettings {
   default_theme_enforce: boolean;
   themes_shareable: boolean;
   themes_share_users: boolean;
+  brand_name: string;
+  brand_title: string;
+  brand_tagline: string;
+  brand_icon: string;
+  login_hide_icon: boolean;
+  login_hide_text: boolean;
   oidc_client_secret_set: boolean;
   oidc_enabled: boolean;
 }
@@ -170,6 +194,12 @@ export type SettingsPatch = Partial<{
   default_theme_enforce: boolean;
   themes_shareable: boolean;
   themes_share_users: boolean;
+  brand_name: string;
+  brand_title: string;
+  brand_tagline: string;
+  brand_icon: string;
+  login_hide_icon: boolean;
+  login_hide_text: boolean;
 }>;
 
 /** Fields a user can set when creating or editing a task. */

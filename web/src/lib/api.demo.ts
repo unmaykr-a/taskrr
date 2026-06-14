@@ -303,6 +303,14 @@ const DEMO_AUTH: AuthConfig = {
   defaultThemeEnforce: false,
   themesShareable: false,
   themesShareUsers: false,
+  branding: {
+    name: "Taskrr",
+    title: "",
+    tagline: "last-done tracker",
+    icon: "",
+    loginHideIcon: false,
+    loginHideText: false,
+  },
 };
 
 const DEMO_REMINDERS: ReminderSettings = { enabled: false, webhookUrl: "", leadSeconds: 0 };
