@@ -9,6 +9,7 @@ import {
 import { createPortal } from "react-dom";
 
 import { cn } from "@/lib/utils";
+import { usePrefs } from "@/lib/prefs";
 
 // A small, modular toast system. Call the function from useToast() to flash a
 // brief message — either anchored just above a clicked element, or pinned to a
@@ -38,7 +39,6 @@ interface ToastItem {
   id: number;
   message: string;
   style: CSSProperties;
-  enter: string;
   tone: NonNullable<ToastOptions["tone"]>;
 }
 
@@ -54,20 +54,19 @@ export function useToast(): ShowToast {
 let nextId = 1;
 const MARGIN = 16;
 
-function positionFor(opts: ToastOptions): { style: CSSProperties; enter: string } {
+// The fixed position of the toast's outer wrapper. The rise/fade animation
+// lives on an inner element so it never fights this positioning transform
+// (animating both on one node is what made the old toast slide in diagonally).
+function positionFor(opts: ToastOptions): CSSProperties {
   // Anchored: float centred just above the element, in viewport coordinates
   // (the portal container is fixed at inset-0, so these map 1:1).
   if (opts.anchor) {
     const r = opts.anchor.getBoundingClientRect();
-    return {
-      style: { left: r.left + r.width / 2, top: r.top - 8, transform: "translate(-50%, -100%)" },
-      enter: "slide-in-from-bottom-1",
-    };
+    return { left: r.left + r.width / 2, top: r.top - 8, transform: "translate(-50%, -100%)" };
   }
   const placement = opts.placement ?? "bottom-right";
   const style: CSSProperties = {};
-  const top = placement.startsWith("top");
-  if (top) style.top = MARGIN;
+  if (placement.startsWith("top")) style.top = MARGIN;
   else style.bottom = MARGIN;
   if (placement.endsWith("center")) {
     style.left = "50%";
@@ -77,7 +76,7 @@ function positionFor(opts: ToastOptions): { style: CSSProperties; enter: string 
   } else {
     style.right = MARGIN;
   }
-  return { style, enter: top ? "slide-in-from-top-2" : "slide-in-from-bottom-2" };
+  return style;
 }
 
 const TONES: Record<NonNullable<ToastOptions["tone"]>, string> = {
@@ -87,16 +86,21 @@ const TONES: Record<NonNullable<ToastOptions["tone"]>, string> = {
 };
 
 export function ToastProvider({ children }: { children: ReactNode }) {
+  const { prefs } = usePrefs();
   const [toasts, setToasts] = useState<ToastItem[]>([]);
+  const enabled = prefs.toasts;
 
-  const show = useCallback<ShowToast>((message, opts = {}) => {
-    const id = nextId++;
-    const { style, enter } = positionFor(opts);
-    setToasts((cur) => [...cur, { id, message, style, enter, tone: opts.tone ?? "default" }]);
-    window.setTimeout(() => {
-      setToasts((cur) => cur.filter((t) => t.id !== id));
-    }, opts.duration ?? 2000);
-  }, []);
+  const show = useCallback<ShowToast>(
+    (message, opts = {}) => {
+      if (!enabled) return; // the user has turned toast notifications off
+      const id = nextId++;
+      setToasts((cur) => [...cur, { id, message, style: positionFor(opts), tone: opts.tone ?? "default" }]);
+      window.setTimeout(() => {
+        setToasts((cur) => cur.filter((t) => t.id !== id));
+      }, opts.duration ?? 2000);
+    },
+    [enabled],
+  );
 
   return (
     <ToastCtx.Provider value={show}>
@@ -104,17 +108,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
       {createPortal(
         <div aria-live="polite" className="pointer-events-none fixed inset-0 z-[100]">
           {toasts.map((t) => (
-            <div
-              key={t.id}
-              style={t.style}
-              className={cn(
-                "absolute max-w-[80vw] truncate rounded-md border px-3 py-1.5 text-xs font-medium shadow-lg",
-                "animate-in fade-in-0 zoom-in-95 duration-150",
-                t.enter,
-                TONES[t.tone],
-              )}
-            >
-              {t.message}
+            // Outer node: fixed position. Inner node: the rise+fade, so the
+            // animation can't disturb the positioning transform above.
+            <div key={t.id} style={t.style} className="absolute">
+              <div
+                className={cn(
+                  "max-w-[80vw] truncate rounded-md border px-3 py-1.5 text-xs font-medium shadow-lg",
+                  "animate-in fade-in-0 slide-in-from-bottom-2 duration-200",
+                  TONES[t.tone],
+                )}
+              >
+                {t.message}
+              </div>
             </div>
           ))}
         </div>,

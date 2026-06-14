@@ -8,6 +8,7 @@ import { timeSince } from "@/lib/time";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { useWindows } from "@/components/windows/WindowManager";
+import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -129,6 +130,7 @@ const MERGE_SELECT = "h-7 rounded border border-input bg-transparent px-1.5 text
 function SessionsSection() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [open, setOpen] = useState(false);
   const { data: sessions } = useQuery({
     queryKey: ["sessions"],
@@ -138,7 +140,10 @@ function SessionsSection() {
   });
   const terminate = useMutation({
     mutationFn: (userId: number) => api.terminateSessions(userId),
-    onSuccess: () => queryClient.invalidateQueries({ queryKey: ["sessions"] }),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["sessions"] });
+      toast("Signed out everywhere", { tone: "success" });
+    },
   });
 
   return (
@@ -212,6 +217,7 @@ function SessionsSection() {
 function MergeAccounts() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: api.listUsers });
   const [sourceId, setSourceId] = useState<number | "">("");
   const [targetId, setTargetId] = useState<number | "">("");
@@ -233,6 +239,7 @@ function MergeAccounts() {
       queryClient.invalidateQueries(); // users + tasks/activity may have moved
       setSourceId("");
       setTargetId("");
+      toast("Accounts merged", { tone: "success" });
     },
   });
 
@@ -338,10 +345,23 @@ function MergeAccounts() {
  *  uploaded .db) — which restarts the server. */
 function BackupsSection() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { data: backups } = useQuery({ queryKey: ["backups"], queryFn: api.listBackups });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["backups"] });
-  const create = useMutation({ mutationFn: () => api.createBackup(), onSuccess: invalidate });
-  const del = useMutation({ mutationFn: (name: string) => api.deleteBackup(name), onSuccess: invalidate });
+  const create = useMutation({
+    mutationFn: () => api.createBackup(),
+    onSuccess: () => {
+      invalidate();
+      toast("Backup created", { tone: "success" });
+    },
+  });
+  const del = useMutation({
+    mutationFn: (name: string) => api.deleteBackup(name),
+    onSuccess: () => {
+      invalidate();
+      toast("Backup deleted", { tone: "success" });
+    },
+  });
 
   const [restarting, setRestarting] = useState(false);
   const [err, setErr] = useState<string | null>(null);
@@ -586,6 +606,7 @@ function RegistrationSettings() {
 /** Accounts awaiting approval (shown only when there are any). */
 function PendingUsers() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { data: pending } = useQuery({
     queryKey: ["pending-users"],
     queryFn: api.listPending,
@@ -597,9 +618,18 @@ function PendingUsers() {
   };
   const approve = useMutation({
     mutationFn: (v: { id: number; role: "admin" | "user" }) => api.approveUser(v.id, v.role),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast("User approved", { tone: "success" });
+    },
   });
-  const deny = useMutation({ mutationFn: (id: number) => api.adminDeleteUser(id), onSuccess: invalidate });
+  const deny = useMutation({
+    mutationFn: (id: number) => api.adminDeleteUser(id),
+    onSuccess: () => {
+      invalidate();
+      toast("Request denied", { tone: "success" });
+    },
+  });
 
   if (!pending || pending.length === 0) return null;
 
@@ -663,6 +693,7 @@ function PendingRow({
 
 function OIDCSettings() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { data } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
   const [form, setForm] = useState<SettingsPatch>({});
   const [secret, setSecret] = useState("");
@@ -672,10 +703,11 @@ function OIDCSettings() {
   const save = useMutation({
     mutationFn: (extra: SettingsPatch | undefined) =>
       api.putSettings({ ...form, ...(secret ? { oidc_client_secret: secret } : {}), ...(extra ?? {}) }),
-    onSuccess: (next) => {
+    onSuccess: (next, extra) => {
       queryClient.setQueryData(["settings"], next);
       setForm({});
       setSecret("");
+      if (extra === undefined) toast("OIDC settings saved", { tone: "success" });
     },
   });
 
@@ -774,6 +806,7 @@ function OIDCSettings() {
 function Users() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: api.listUsers });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["users"] });
 
@@ -793,11 +826,17 @@ function Users() {
   const update = useMutation({
     mutationFn: (v: { id: number; role?: "admin" | "user"; password?: string }) =>
       api.adminUpdateUser(v.id, { role: v.role, password: v.password }),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast("Saved", { tone: "success" });
+    },
   });
   const remove = useMutation({
     mutationFn: (id: number) => api.adminDeleteUser(id),
-    onSuccess: invalidate,
+    onSuccess: () => {
+      invalidate();
+      toast("User deleted", { tone: "success" });
+    },
   });
 
   const resetPassword = (u: User) => {

@@ -82,6 +82,8 @@ export interface Prefs {
   /** Eased mouse-wheel scrolling (rAF-driven, so it interpolates at the
    *  display's refresh rate). Touchpads/touch keep native scrolling. */
   smoothScroll: boolean;
+  /** Show brief toast notifications for actions (save, delete, log, …). */
+  toasts: boolean;
 
   // --- themes ---
   /** The user's saved named themes. Persisted server-side with the rest of
@@ -147,6 +149,7 @@ function defaults(): Prefs {
     animWindows: true,
     animViews: true,
     smoothScroll: true,
+    toasts: true,
     savedThemes: [],
     themeCustom: false,
     draggableWindows: true,

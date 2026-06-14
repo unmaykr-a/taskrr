@@ -6,6 +6,7 @@ import { api, type Completion, type Task } from "@/lib/api";
 import { formatDateTime } from "@/lib/time";
 import { usePrefs } from "@/lib/prefs";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/Toast";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { DateTimePicker } from "@/components/DateTimePicker";
 import { Input } from "@/components/ui/input";
@@ -50,6 +51,7 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
   const [freezeColor, setFreezeColor] = useState(task.freezeColor);
   const queryClient = useQueryClient();
 
+  const toast = useToast();
   const mutation = useMutation({
     mutationFn: () =>
       api.updateTask(task.id, {
@@ -63,6 +65,7 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       onDone();
+      toast("Task saved", { tone: "success" });
     },
   });
 
@@ -254,6 +257,7 @@ function HistoryRow({ completion: c, onChanged }: { completion: Completion; onCh
 function DangerZone({ task, onDeleted }: { task: Task; onDeleted: () => void }) {
   const [confirming, setConfirming] = useState(false);
   const queryClient = useQueryClient();
+  const toast = useToast();
   const archived = task.archivedAt != null;
 
   const mutation = useMutation({
@@ -262,6 +266,7 @@ function DangerZone({ task, onDeleted }: { task: Task; onDeleted: () => void }) 
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["activity"] });
       onDeleted();
+      toast("Task deleted", { tone: "success" });
     },
   });
 
@@ -270,6 +275,7 @@ function DangerZone({ task, onDeleted }: { task: Task; onDeleted: () => void }) 
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       onDeleted();
+      toast(archived ? "Task restored" : "Task archived", { tone: "success" });
     },
   });
 

@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
 import { api } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import {
   Dialog,
@@ -30,6 +31,7 @@ export function CreateTaskDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [intervalSeconds, setIntervalSeconds] = useState<number | null>(null);
   const queryClient = useQueryClient();
 
+  const toast = useToast();
   const mutation = useMutation({
     mutationFn: () =>
       api.createTask({
@@ -43,6 +45,7 @@ export function CreateTaskDialog({ trigger }: { trigger?: React.ReactNode }) {
       setDescription("");
       setIntervalSeconds(null);
       setOpen(false);
+      toast("Task created", { tone: "success" });
     },
   });
 
