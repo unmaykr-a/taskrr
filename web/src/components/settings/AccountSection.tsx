@@ -8,11 +8,13 @@ import { useAuth } from "@/components/AuthProvider";
 import { RemindersSection } from "@/components/settings/RemindersSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/Toast";
 
 /** Account self-service: every signed-in user can change their own username + password. */
 export function AccountSection() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [username, setUsername] = useState(user?.username ?? "");
   const [current, setCurrent] = useState("");
   const [next, setNext] = useState("");
@@ -43,6 +45,7 @@ export function AccountSection() {
       setWipeConfirm("");
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["activity"] });
+      toast("Your tasks were deleted", { tone: "success" });
     },
   });
 
@@ -63,6 +66,7 @@ export function AccountSection() {
       // Reflect the new name immediately and refresh the admin list if open.
       queryClient.setQueryData(["me"], updated);
       queryClient.invalidateQueries({ queryKey: ["users"] });
+      toast("Username updated", { tone: "success" });
     },
   });
 
@@ -73,6 +77,7 @@ export function AccountSection() {
       setNext("");
       setConfirm("");
       setErr(null);
+      toast("Password updated", { tone: "success" });
     },
     onError: (e) => setErr((e as Error).message),
   });

@@ -181,6 +181,15 @@ export function PreferencesSection() {
           </div>
         </div>
         <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">Toast notifications</span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={prefs.toasts}
+            onChange={(e) => setPrefs({ toasts: e.target.checked })}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2 text-sm">
           <span className="text-muted-foreground">Show calendar</span>
           <input
             type="checkbox"

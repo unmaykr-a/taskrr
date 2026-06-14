@@ -63,7 +63,10 @@ export function ThemeCustomizer() {
   const [name, setName] = useState("");
   const [harmony, setHarmony] = useState<Harmony>("complementary");
   const fileRef = useRef<HTMLInputElement>(null);
-  const setDefault = useMutation({ mutationFn: () => api.setDefaultTheme(theme) });
+  const setDefault = useMutation({
+    mutationFn: () => api.setDefaultTheme(theme),
+    onSuccess: () => toast("Saved as the site default", { tone: "success" }),
+  });
 
   // Saved themes now live in the account's prefs (server-side), so they follow
   // the account and survive logout — they used to be in localStorage and got
@@ -114,6 +117,7 @@ export function ThemeCustomizer() {
     if (!trimmed) return;
     setPrefs({ savedThemes: [...saved.filter((t) => t.name !== trimmed), { ...theme, name: trimmed }] });
     setName("");
+    toast("Theme saved", { tone: "success" });
   }
   const remove = (n: string) => setPrefs({ savedThemes: saved.filter((t) => t.name !== n) });
 
@@ -129,7 +133,10 @@ export function ThemeCustomizer() {
   function importTheme(file: File) {
     file
       .text()
-      .then((text) => applyTheme({ ...DEFAULT_THEME, ...(JSON.parse(text) as Theme) }))
+      .then((text) => {
+        applyTheme({ ...DEFAULT_THEME, ...(JSON.parse(text) as Theme) });
+        toast("Theme imported", { tone: "success" });
+      })
       .catch(() => alert("That file isn't a valid Taskrr theme."));
   }
 

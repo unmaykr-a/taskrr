@@ -5,6 +5,7 @@ import { Bell, ChevronRight } from "lucide-react";
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
+import { useToast } from "@/components/ui/Toast";
 
 const LEAD_OPTIONS: { label: string; value: number }[] = [
   { label: "When it's due", value: 0 },
@@ -18,6 +19,7 @@ const LEAD_OPTIONS: { label: string; value: number }[] = [
 /** Reminders: deliver a webhook when one of your tasks comes due. */
 export function RemindersSection() {
   const queryClient = useQueryClient();
+  const toast = useToast();
   const { data } = useQuery({ queryKey: ["reminders"], queryFn: api.getReminders });
 
   const [enabled, setEnabled] = useState(false);
@@ -46,9 +48,14 @@ export function RemindersSection() {
     onSuccess: (updated) => {
       queryClient.setQueryData(["reminders"], updated);
       apply(updated); // reflect any server-side normalisation
+      toast("Reminders saved", { tone: "success" });
     },
   });
-  const test = useMutation({ mutationFn: () => api.testReminder(webhookUrl.trim()) });
+  const test = useMutation({
+    mutationFn: () => api.testReminder(webhookUrl.trim()),
+    onSuccess: () => toast("Test webhook sent", { tone: "success" }),
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
 
   const canSave = !enabled || webhookUrl.trim() !== "";
 

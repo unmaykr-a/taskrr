@@ -3,6 +3,7 @@ import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check } from "lucide-react";
 
 import { api, type Task } from "@/lib/api";
+import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
@@ -19,6 +20,7 @@ export function CompleteTaskPanel({ task, onClose }: { task: Task; onClose: () =
   const [when, setWhen] = useState(() => new Date());
   const queryClient = useQueryClient();
 
+  const toast = useToast();
   const mutation = useMutation({
     mutationFn: () =>
       api.completeTask(task.id, {
@@ -30,6 +32,7 @@ export function CompleteTaskPanel({ task, onClose }: { task: Task; onClose: () =
       queryClient.invalidateQueries({ queryKey: ["completions", task.id] });
       queryClient.invalidateQueries({ queryKey: ["activity"] });
       onClose();
+      toast("Logged", { tone: "success" });
     },
   });
 

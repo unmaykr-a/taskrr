@@ -5,6 +5,7 @@ import { Archive, ArchiveRestore, CheckCheck, Trash2, X } from "lucide-react";
 import { api } from "@/lib/api";
 import { usePrefs } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
+import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 
 type BulkAction = "done" | "archive" | "unarchive" | "delete";
@@ -26,6 +27,7 @@ export function BulkBar({
 }) {
   const queryClient = useQueryClient();
   const { prefs } = usePrefs();
+  const toast = useToast();
   const [confirmDelete, setConfirmDelete] = useState(false);
 
   const run = useMutation({
@@ -35,11 +37,18 @@ export function BulkBar({
       else if (action === "unarchive") await Promise.all(ids.map((id) => api.unarchiveTask(id)));
       else await Promise.all(ids.map((id) => api.deleteTask(id)));
     },
-    onSuccess: () => {
+    onSuccess: (_data, action) => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["activity"] });
       setConfirmDelete(false);
       onClear();
+      const labels: Record<BulkAction, string> = {
+        done: "Logged",
+        archive: "Archived",
+        unarchive: "Restored",
+        delete: "Deleted",
+      };
+      toast(`${labels[action]} ${ids.length} ${ids.length === 1 ? "task" : "tasks"}`, { tone: "success" });
     },
   });
 
