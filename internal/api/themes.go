@@ -37,13 +37,20 @@ func (s *Server) handleListSharedThemes(w http.ResponseWriter, r *http.Request) 
 }
 
 // handleShareTheme publishes (or replaces, by name) a theme so every user can
-// apply it. Admin-only, and gated on the themes_shareable setting being on.
+// apply it. Gated on the themes_shareable setting; admins may always share,
+// regular users only when themes_share_users is also on.
 func (s *Server) handleShareTheme(w http.ResponseWriter, r *http.Request) {
-	if _, ok := s.requireAdmin(w, r); !ok {
+	u, ok := s.requireUser(w, r)
+	if !ok {
 		return
 	}
 	if !s.boolSetting(r.Context(), keyThemesShareable, false) {
 		writeError(w, http.StatusForbidden, "theme sharing is disabled")
+		return
+	}
+	// Admins can always share; regular users only when the admin has allowed it.
+	if u.Role != "admin" && !s.boolSetting(r.Context(), keyThemesShareUsers, false) {
+		writeError(w, http.StatusForbidden, "only admins can share themes here")
 		return
 	}
 	body, err := io.ReadAll(io.LimitReader(r.Body, 256<<10)) // 256 KiB per theme is ample

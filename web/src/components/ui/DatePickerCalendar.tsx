@@ -1,10 +1,13 @@
 import { useState } from "react";
-import { ChevronLeft, ChevronRight } from "lucide-react";
+import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
+const MONTH_LABELS = Array.from({ length: 12 }, (_, m) =>
+  new Date(2000, m, 1).toLocaleDateString(undefined, { month: "short" }),
+);
 const pad = (n: number) => String(n).padStart(2, "0");
 const key = (d: Date) => `${d.getFullYear()}-${pad(d.getMonth() + 1)}-${pad(d.getDate())}`;
 
@@ -24,6 +27,9 @@ export function DatePickerCalendar({
   max?: Date;
 }) {
   const [view, setView] = useState(() => new Date(value.getFullYear(), value.getMonth(), 1));
+  // Month/year chooser: clicking the title swaps the day grid for it.
+  const [pickerOpen, setPickerOpen] = useState(false);
+  const [pickerYear, setPickerYear] = useState(() => value.getFullYear());
 
   const year = view.getFullYear();
   const month = view.getMonth();
@@ -44,23 +50,83 @@ export function DatePickerCalendar({
     onChange(d);
   };
 
+  const gotoMonth = (y: number, m: number) => {
+    setView(new Date(y, m, 1));
+    setPickerOpen(false);
+  };
+
   return (
     <div className="rounded-lg border bg-card p-3">
       <div className="mb-2 flex items-center justify-between">
-        <h3 className="text-sm font-semibold">
+        <button
+          type="button"
+          onClick={() => {
+            setPickerYear(year);
+            setPickerOpen((o) => !o);
+          }}
+          aria-expanded={pickerOpen}
+          title="Pick a month and year"
+          className="group flex items-center gap-1 rounded text-sm font-semibold transition-colors hover:text-primary"
+        >
           {view.toLocaleDateString(undefined, { month: "long", year: "numeric" })}
-        </h3>
+          <ChevronDown
+            className={cn(
+              "h-3.5 w-3.5 text-muted-foreground transition-transform duration-200 group-hover:text-primary",
+              pickerOpen && "rotate-180",
+            )}
+          />
+        </button>
         <div className="flex gap-1">
           <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Previous month"
-            onClick={() => setView(new Date(year, month - 1, 1))}>
+            onClick={() => { setPickerOpen(false); setView(new Date(year, month - 1, 1)); }}>
             <ChevronLeft className="h-4 w-4" />
           </Button>
           <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Next month"
-            onClick={() => setView(new Date(year, month + 1, 1))}>
+            onClick={() => { setPickerOpen(false); setView(new Date(year, month + 1, 1)); }}>
             <ChevronRight className="h-4 w-4" />
           </Button>
         </div>
       </div>
+
+      {pickerOpen ? (
+        <div className="space-y-2">
+          <div className="flex items-center justify-between">
+            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Previous year"
+              onClick={() => setPickerYear((y) => y - 1)}>
+              <ChevronLeft className="h-4 w-4" />
+            </Button>
+            <span className="text-sm font-medium tabular-nums">{pickerYear}</span>
+            <Button variant="ghost" size="icon" className="h-7 w-7" aria-label="Next year"
+              onClick={() => setPickerYear((y) => y + 1)}>
+              <ChevronRight className="h-4 w-4" />
+            </Button>
+          </div>
+          <div className="grid grid-cols-3 gap-1">
+            {MONTH_LABELS.map((label, m) => {
+              const now = new Date();
+              const isViewed = pickerYear === year && m === month;
+              const isThisMonth = pickerYear === now.getFullYear() && m === now.getMonth();
+              return (
+                <button
+                  key={label}
+                  type="button"
+                  onClick={() => gotoMonth(pickerYear, m)}
+                  className={cn(
+                    "rounded-md py-2 text-xs transition-colors",
+                    isViewed
+                      ? "bg-primary/15 font-medium text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                    isThisMonth && !isViewed && "ring-1 ring-primary/40",
+                  )}
+                >
+                  {label}
+                </button>
+              );
+            })}
+          </div>
+        </div>
+      ) : (
+      <>
       <div className="grid select-none grid-cols-7 gap-1 text-center text-[10px] text-muted-foreground">
         {WEEKDAYS.map((d) => (
           <div key={d} className="py-1">{d}</div>
@@ -93,6 +159,8 @@ export function DatePickerCalendar({
           );
         })}
       </div>
+      </>
+      )}
     </div>
   );
 }

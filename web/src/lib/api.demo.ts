@@ -302,6 +302,7 @@ const DEMO_AUTH: AuthConfig = {
   defaultTheme: null,
   defaultThemeEnforce: false,
   themesShareable: false,
+  themesShareUsers: false,
 };
 
 const DEMO_REMINDERS: ReminderSettings = { enabled: false, webhookUrl: "", leadSeconds: 0 };

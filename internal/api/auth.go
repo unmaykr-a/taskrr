@@ -35,6 +35,9 @@ const (
 	// keyThemesShareable: when true, admins can publish a saved theme to every
 	// user (the "Share" button in the theme customizer).
 	keyThemesShareable = "themes_shareable"
+	// keyThemesShareUsers: when true (and sharing is on), non-admin users may
+	// share themes too, not just admins.
+	keyThemesShareUsers = "themes_share_users"
 	// keySharedThemes: the JSON array of admin-published themes, available to all.
 	keySharedThemes = "shared_themes"
 )
@@ -188,6 +191,7 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		"defaultTheme":        defaultTheme,
 		"defaultThemeEnforce": s.boolSetting(ctx, keyDefaultThemeEnforce, false),
 		"themesShareable":     s.boolSetting(ctx, keyThemesShareable, false),
+		"themesShareUsers":    s.boolSetting(ctx, keyThemesShareUsers, false),
 	})
 }
 
@@ -1331,6 +1335,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyOIDCOnly:              s.boolSetting(ctx, keyOIDCOnly, false),
 		keyDefaultThemeEnforce:   s.boolSetting(ctx, keyDefaultThemeEnforce, false),
 		keyThemesShareable:       s.boolSetting(ctx, keyThemesShareable, false),
+		keyThemesShareUsers:      s.boolSetting(ctx, keyThemesShareUsers, false),
 		"oidc_client_secret_set": get(keyOIDCClientSecret) != "", // never return the secret
 		"oidc_enabled":           s.oidcEnabled(ctx),
 	})
@@ -1351,6 +1356,7 @@ type settingsPatch struct {
 	OIDCOnly            *bool   `json:"oidc_only"`
 	DefaultThemeEnforce *bool   `json:"default_theme_enforce"`
 	ThemesShareable     *bool   `json:"themes_shareable"`
+	ThemesShareUsers    *bool   `json:"themes_share_users"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -1406,6 +1412,9 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.ThemesShareable != nil && !set(keyThemesShareable, boolStr(*req.ThemesShareable)) {
+		return
+	}
+	if req.ThemesShareUsers != nil && !set(keyThemesShareUsers, boolStr(*req.ThemesShareUsers)) {
 		return
 	}
 	// Only overwrite the secret when a new, non-empty one is provided. Encrypt it

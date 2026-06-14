@@ -90,6 +90,8 @@ export interface AuthConfig {
   defaultThemeEnforce: boolean;
   /** Admins may publish saved themes to all users. */
   themesShareable: boolean;
+  /** Regular users (not just admins) may publish themes too. */
+  themesShareUsers: boolean;
 }
 
 /** Registration may complete (User) or be queued for approval. */
@@ -149,6 +151,7 @@ export interface AdminSettings {
   oidc_only: boolean;
   default_theme_enforce: boolean;
   themes_shareable: boolean;
+  themes_share_users: boolean;
   oidc_client_secret_set: boolean;
   oidc_enabled: boolean;
 }
@@ -166,6 +169,7 @@ export type SettingsPatch = Partial<{
   oidc_only: boolean;
   default_theme_enforce: boolean;
   themes_shareable: boolean;
+  themes_share_users: boolean;
 }>;
 
 /** Fields a user can set when creating or editing a task. */
