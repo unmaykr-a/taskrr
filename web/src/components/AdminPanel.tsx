@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { ChevronRight, ExternalLink, Trash2, UserPlus, X } from "lucide-react";
+import { CheckCircle2, ChevronRight, ExternalLink, Trash2, UserPlus, X } from "lucide-react";
 
 import { api, type SettingsPatch, type User } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
@@ -31,6 +31,8 @@ export function AdminPanel() {
         </>
       )}
       <OIDCSettings />
+      <hr className="border-border/60" />
+      <BrandingSettings />
       <hr className="border-border/60" />
       <PendingUsers />
       {!lite && <Users />}
@@ -118,6 +120,161 @@ function LogsSection() {
           </button>
         </div>
         {open && <LogsView />}
+      </div>
+    </details>
+  );
+}
+
+/** Branding: instance name, tab title, tagline, a custom icon, and login-card
+ *  toggles. Saved together; the live UI (sidebar, title, favicon) refreshes via
+ *  the auth-config cache. */
+function BrandingSettings() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { data } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
+  const fileRef = useRef<HTMLInputElement>(null);
+
+  const [name, setName] = useState("");
+  const [title, setTitle] = useState("");
+  const [tagline, setTagline] = useState("");
+  const [icon, setIcon] = useState("");
+  const [hideIcon, setHideIcon] = useState(false);
+  const [hideText, setHideText] = useState(false);
+  const [hydrated, setHydrated] = useState(false);
+
+  // Seed the form from the server once.
+  useEffect(() => {
+    if (data && !hydrated) {
+      setName(data.brand_name ?? "");
+      setTitle(data.brand_title ?? "");
+      setTagline(data.brand_tagline ?? "");
+      setIcon(data.brand_icon ?? "");
+      setHideIcon(data.login_hide_icon ?? false);
+      setHideText(data.login_hide_text ?? false);
+      setHydrated(true);
+    }
+  }, [data, hydrated]);
+
+  const save = useMutation({
+    mutationFn: () =>
+      api.putSettings({
+        brand_name: name.trim(),
+        brand_title: title.trim(),
+        brand_tagline: tagline.trim(),
+        brand_icon: icon,
+        login_hide_icon: hideIcon,
+        login_hide_text: hideText,
+      }),
+    onSuccess: (next) => {
+      queryClient.setQueryData(["settings"], next);
+      queryClient.invalidateQueries({ queryKey: ["auth-config"] }); // refresh live branding
+      toast("Branding saved", { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  // Downscale any uploaded image to a 128x128 PNG (cover) so the stored data
+  // URL stays small (well under the server's 256 KB cap) and crisp as a favicon.
+  function onPickFile(file: File) {
+    const reader = new FileReader();
+    reader.onload = () => {
+      const img = new Image();
+      img.onload = () => {
+        const sizePx = 128;
+        const c = document.createElement("canvas");
+        c.width = sizePx;
+        c.height = sizePx;
+        const ctx = c.getContext("2d");
+        if (!ctx) return;
+        const scale = Math.max(sizePx / img.width, sizePx / img.height);
+        const w = img.width * scale;
+        const h = img.height * scale;
+        ctx.drawImage(img, (sizePx - w) / 2, (sizePx - h) / 2, w, h);
+        setIcon(c.toDataURL("image/png"));
+      };
+      img.onerror = () => toast("That file isn't an image", { tone: "error" });
+      img.src = reader.result as string;
+    };
+    reader.readAsDataURL(file);
+  }
+
+  return (
+    <details className="rounded-lg border">
+      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Branding</summary>
+      <div className="space-y-3 border-t p-3">
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Name</Label>
+          <Input value={name} placeholder="Taskrr" onChange={(e) => setName(e.target.value)} className="h-8" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Browser tab title</Label>
+          <Input value={title} placeholder="(defaults to the name)" onChange={(e) => setTitle(e.target.value)} className="h-8" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Tagline</Label>
+          <Input value={tagline} placeholder="last-done tracker" onChange={(e) => setTagline(e.target.value)} className="h-8" />
+        </div>
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Icon</Label>
+          <div className="flex items-center gap-2">
+            {icon ? (
+              <img src={icon} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover" />
+            ) : (
+              <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground">
+                <CheckCircle2 className="h-5 w-5" />
+              </div>
+            )}
+            <Button type="button" variant="outline" size="sm" onClick={() => fileRef.current?.click()}>
+              Upload
+            </Button>
+            {icon && (
+              <button
+                type="button"
+                onClick={() => setIcon("")}
+                className="text-xs text-muted-foreground hover:text-destructive"
+              >
+                remove
+              </button>
+            )}
+            <input
+              ref={fileRef}
+              type="file"
+              accept="image/*"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) onPickFile(f);
+              }}
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Used for the tab icon, the sidebar, and the login card. Square images work best.
+          </p>
+        </div>
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">Hide icon on the login page</span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={hideIcon}
+            onChange={(e) => setHideIcon(e.target.checked)}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">Hide name &amp; tagline on the login page</span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={hideText}
+            onChange={(e) => setHideText(e.target.checked)}
+          />
+        </label>
+        <div className="flex justify-end">
+          <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
+            {save.isPending ? "Saving…" : "Save branding"}
+          </Button>
+        </div>
       </div>
     </details>
   );

@@ -7,6 +7,7 @@ import { type Filter, FILTERS } from "@/lib/filters";
 import { clearStoredPreferences, usePrefs } from "@/lib/prefs";
 import { DEFAULT_THEME } from "@/lib/theme";
 import { cn } from "@/lib/utils";
+import { useBranding } from "@/components/Branding";
 import { Button } from "@/components/ui/button";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
@@ -40,6 +41,7 @@ export function Sidebar({
   const { user } = useAuth();
   const { setTheme } = useTheme();
   const { prefs } = usePrefs();
+  const branding = useBranding();
   const navRef = useRef<HTMLElement>(null);
   // Signing out: close every open window and wipe the query cache so the next
   // account never sees the previous user's tasks/calendar (their data is
@@ -62,13 +64,19 @@ export function Sidebar({
   return (
     <div className="flex h-full w-60 flex-col overflow-y-auto border-r border-border/60 bg-sidebar p-4">
       <div className="mb-6 flex items-center justify-between">
-        <div className="flex items-center gap-2.5">
-          <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow">
-            <CheckCircle2 className="h-5 w-5" />
-          </div>
-          <div>
-            <h1 className="text-base font-semibold leading-none tracking-tight">Taskrr</h1>
-            <p className="text-[11px] text-muted-foreground">last-done tracker</p>
+        <div className="flex min-w-0 items-center gap-2.5">
+          {branding.icon ? (
+            <img src={branding.icon} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover shadow" />
+          ) : (
+            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow">
+              <CheckCircle2 className="h-5 w-5" />
+            </div>
+          )}
+          <div className="min-w-0">
+            <h1 className="truncate text-base font-semibold leading-none tracking-tight">{branding.name}</h1>
+            {branding.tagline && (
+              <p className="truncate text-[11px] text-muted-foreground">{branding.tagline}</p>
+            )}
           </div>
         </div>
         {/* Close button only matters in the mobile drawer. */}

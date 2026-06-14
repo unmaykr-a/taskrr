@@ -4,6 +4,7 @@ import App from "@/App";
 import { useAuth } from "@/components/AuthProvider";
 import { AuthPage } from "@/components/AuthPage";
 import { Background } from "@/components/Background";
+import { BrandingApplier } from "@/components/Branding";
 import { DemoBanner } from "@/components/DemoBanner";
 
 /**
@@ -16,6 +17,7 @@ export function Gate() {
 
   return (
     <>
+      <BrandingApplier />
       <Background />
       {loading ? (
         <div className="relative z-10 flex min-h-[100dvh] items-center justify-center">

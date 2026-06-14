@@ -40,6 +40,21 @@ const (
 	keyThemesShareUsers = "themes_share_users"
 	// keySharedThemes: the JSON array of admin-published themes, available to all.
 	keySharedThemes = "shared_themes"
+
+	// --- branding (admin-editable; shown signed-out, so exposed in authConfig) ---
+	keyBrandName     = "brand_name"      // app name in the sidebar + login
+	keyBrandTitle    = "brand_title"     // browser tab / document title
+	keyBrandTagline  = "brand_tagline"   // the small subtitle under the name
+	keyBrandIcon     = "brand_icon"      // a data-URL logo; "" = generated mark
+	keyLoginHideIcon = "login_hide_icon" // hide the icon on the login card
+	keyLoginHideText = "login_hide_text" // hide the name/tagline on the login card
+)
+
+// Branding defaults (used when a setting is unset/empty).
+const (
+	defaultBrandName    = "Taskrr"
+	defaultBrandTagline = "last-done tracker"
+	maxBrandIconBytes   = 256 << 10 // 256 KiB data URL cap
 )
 
 type userCtxKey struct{}
@@ -130,6 +145,28 @@ func (s *Server) boolSetting(ctx context.Context, key string, def bool) bool {
 	return v == "true"
 }
 
+// stringSetting returns a stored string setting, or def when unset/empty.
+func (s *Server) stringSetting(ctx context.Context, key, def string) string {
+	v, ok, err := s.store.GetSetting(ctx, key)
+	if err != nil || !ok || v == "" {
+		return def
+	}
+	return v
+}
+
+// branding gathers the instance's customisable identity for the SPA. It's part
+// of authConfig because the login screen (signed out) needs it.
+func (s *Server) branding(ctx context.Context) map[string]any {
+	return map[string]any{
+		"name":          s.stringSetting(ctx, keyBrandName, defaultBrandName),
+		"title":         s.stringSetting(ctx, keyBrandTitle, ""),
+		"tagline":       s.stringSetting(ctx, keyBrandTagline, defaultBrandTagline),
+		"icon":          s.stringSetting(ctx, keyBrandIcon, ""),
+		"loginHideIcon": s.boolSetting(ctx, keyLoginHideIcon, false),
+		"loginHideText": s.boolSetting(ctx, keyLoginHideText, false),
+	}
+}
+
 func (s *Server) setSessionCookie(w http.ResponseWriter, token string, expires time.Time) {
 	http.SetCookie(w, &http.Cookie{
 		Name:     sessionCookie,
@@ -192,6 +229,7 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		"defaultThemeEnforce": s.boolSetting(ctx, keyDefaultThemeEnforce, false),
 		"themesShareable":     s.boolSetting(ctx, keyThemesShareable, false),
 		"themesShareUsers":    s.boolSetting(ctx, keyThemesShareUsers, false),
+		"branding":            s.branding(ctx),
 	})
 }
 
@@ -1336,6 +1374,12 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyDefaultThemeEnforce:   s.boolSetting(ctx, keyDefaultThemeEnforce, false),
 		keyThemesShareable:       s.boolSetting(ctx, keyThemesShareable, false),
 		keyThemesShareUsers:      s.boolSetting(ctx, keyThemesShareUsers, false),
+		keyBrandName:             get(keyBrandName),
+		keyBrandTitle:            get(keyBrandTitle),
+		keyBrandTagline:          get(keyBrandTagline),
+		keyBrandIcon:             get(keyBrandIcon),
+		keyLoginHideIcon:         s.boolSetting(ctx, keyLoginHideIcon, false),
+		keyLoginHideText:         s.boolSetting(ctx, keyLoginHideText, false),
 		"oidc_client_secret_set": get(keyOIDCClientSecret) != "", // never return the secret
 		"oidc_enabled":           s.oidcEnabled(ctx),
 	})
@@ -1357,6 +1401,12 @@ type settingsPatch struct {
 	DefaultThemeEnforce *bool   `json:"default_theme_enforce"`
 	ThemesShareable     *bool   `json:"themes_shareable"`
 	ThemesShareUsers    *bool   `json:"themes_share_users"`
+	BrandName           *string `json:"brand_name"`
+	BrandTitle          *string `json:"brand_title"`
+	BrandTagline        *string `json:"brand_tagline"`
+	BrandIcon           *string `json:"brand_icon"`
+	LoginHideIcon       *bool   `json:"login_hide_icon"`
+	LoginHideText       *bool   `json:"login_hide_text"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -1415,6 +1465,37 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.ThemesShareUsers != nil && !set(keyThemesShareUsers, boolStr(*req.ThemesShareUsers)) {
+		return
+	}
+	// Branding. The icon is a data URL (or empty to clear); cap its size so it
+	// can't bloat the settings row / every authConfig response.
+	if req.BrandName != nil && !set(keyBrandName, strings.TrimSpace(*req.BrandName)) {
+		return
+	}
+	if req.BrandTitle != nil && !set(keyBrandTitle, strings.TrimSpace(*req.BrandTitle)) {
+		return
+	}
+	if req.BrandTagline != nil && !set(keyBrandTagline, strings.TrimSpace(*req.BrandTagline)) {
+		return
+	}
+	if req.BrandIcon != nil {
+		icon := strings.TrimSpace(*req.BrandIcon)
+		if len(icon) > maxBrandIconBytes {
+			writeError(w, http.StatusBadRequest, "icon is too large (max 256 KB)")
+			return
+		}
+		if icon != "" && !strings.HasPrefix(icon, "data:image/") {
+			writeError(w, http.StatusBadRequest, "icon must be an uploaded image")
+			return
+		}
+		if !set(keyBrandIcon, icon) {
+			return
+		}
+	}
+	if req.LoginHideIcon != nil && !set(keyLoginHideIcon, boolStr(*req.LoginHideIcon)) {
+		return
+	}
+	if req.LoginHideText != nil && !set(keyLoginHideText, boolStr(*req.LoginHideText)) {
 		return
 	}
 	// Only overwrite the secret when a new, non-empty one is provided. Encrypt it
