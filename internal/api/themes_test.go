@@ -89,11 +89,19 @@ func TestSharedThemes(t *testing.T) {
 		t.Fatalf("re-share same name should replace; got %d themes", len(list))
 	}
 
-	// A non-admin cannot publish.
+	// A non-admin cannot publish by default.
 	w = httptest.NewRecorder()
 	s.handleShareTheme(w, authed("POST", `{"name":"Sneaky"}`, user))
 	if w.Code != 403 {
 		t.Fatalf("non-admin share = %d, want 403", w.Code)
+	}
+
+	// ...but can once the admin allows everyone to share.
+	_ = st.SetSetting(ctx, keyThemesShareUsers, "true")
+	w = httptest.NewRecorder()
+	s.handleShareTheme(w, authed("POST", `{"name":"Sunrise","colors":{"accent":"#ee9b00"}}`, user))
+	if w.Code != 200 {
+		t.Fatalf("non-admin share with themes_share_users on = %d, want 200 (%s)", w.Code, w.Body.String())
 	}
 
 	// Unshare by name.

@@ -23,6 +23,7 @@ import { Button } from "@/components/ui/button";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { useToast } from "@/components/ui/Toast";
 
 const SELECT =
   "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -58,6 +59,7 @@ export function ThemeCustomizer() {
   const { user } = useAuth();
   const isAdmin = user?.role === "admin";
   const queryClient = useQueryClient();
+  const toast = useToast();
   const [name, setName] = useState("");
   const [harmony, setHarmony] = useState<Harmony>("complementary");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -309,8 +311,9 @@ export function ThemeCustomizer() {
       </section>
 
       {/* Background effect */}
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Background</h3>
+      <details className="rounded-lg border">
+        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Background</summary>
+        <div className="space-y-2 border-t p-3">
         <select
           className={SELECT}
           value={theme.background}
@@ -412,11 +415,13 @@ export function ThemeCustomizer() {
             />
           </div>
         )}
-      </section>
+        </div>
+      </details>
 
       {/* Save / share */}
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Save &amp; share</h3>
+      <details className="rounded-lg border">
+        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Save &amp; share</summary>
+        <div className="space-y-2 border-t p-3">
         <div className="flex gap-2">
           <Input
             value={name}
@@ -440,12 +445,17 @@ export function ThemeCustomizer() {
                   <span className="truncate">{t.name}</span>
                 </button>
                 <div className="flex shrink-0 items-center gap-2">
-                  {/* Admins can publish a saved theme to all users when sharing
-                      is enabled for the instance. */}
-                  {isAdmin && config?.themesShareable && (
+                  {/* Publish a saved theme to all users when sharing is enabled —
+                      admins always, regular users when the admin allows it. */}
+                  {config?.themesShareable && (isAdmin || config?.themesShareUsers) && (
                     <button
                       type="button"
-                      onClick={() => share.mutate(t)}
+                      onClick={(e) => {
+                        const anchor = e.currentTarget;
+                        share.mutate(t, {
+                          onSuccess: () => toast("Shared with everyone", { anchor, tone: "success" }),
+                        });
+                      }}
                       disabled={share.isPending}
                       title="Share with everyone"
                       className="flex items-center gap-1 text-xs text-muted-foreground hover:text-primary disabled:opacity-50"
@@ -526,9 +536,26 @@ export function ThemeCustomizer() {
                 onChange={(e) => saveSetting.mutate({ themes_shareable: e.target.checked })}
               />
             </label>
+            {settings?.themes_shareable && (
+              <label className="flex items-center justify-between gap-2 pl-3 text-sm">
+                <span className="text-muted-foreground">
+                  Let everyone share
+                  <span className="block text-xs">
+                    Regular users get the Share button too, not just admins.
+                  </span>
+                </span>
+                <input
+                  type="checkbox"
+                  className="h-4 w-4 shrink-0 accent-primary"
+                  checked={settings?.themes_share_users ?? false}
+                  onChange={(e) => saveSetting.mutate({ themes_share_users: e.target.checked })}
+                />
+              </label>
+            )}
           </div>
         )}
-      </section>
+        </div>
+      </details>
 
       <Button
         type="button"
