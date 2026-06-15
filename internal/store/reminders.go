@@ -54,32 +54,42 @@ func (s *Store) SetReminderSettings(ctx context.Context, userID int64, rs Remind
 	return err
 }
 
-// ReminderCandidate is a due-eligible task joined with its owner's webhook config
-// and the due-time it was last reminded for. Due-ness and once-per-cycle dedup
-// are decided by the caller (in Go), mirroring the frontend's nextDue logic.
+// ReminderCandidate is a due-eligible task paired with one recipient's webhook
+// config and the due-time that recipient was last reminded for. A shared task
+// yields one candidate per enabled recipient (owner + accepted members).
+// Due-ness and once-per-cycle dedup are decided by the caller (in Go),
+// mirroring the frontend's nextDue logic.
 type ReminderCandidate struct {
 	TaskID        int64
 	OwnerID       int64
+	UserID        int64 // the recipient to notify (owner or an accepted member)
 	TaskName      string
 	IntervalSecs  int64
 	WebhookURL    string
 	LeadSeconds   int64
 	LastCompleted time.Time
-	// LastRemindedDue is the RFC3339 dueAt we last reminded for, or "" if never.
+	// LastRemindedDue is the RFC3339 dueAt we last reminded this recipient for,
+	// or "" if never.
 	LastRemindedDue string
 }
 
-// ListReminderCandidates returns every non-archived cadence task that has been
-// completed at least once and whose owner has reminders enabled with a webhook.
+// ListReminderCandidates returns, for every non-archived cadence task completed
+// at least once, one row per recipient (the owner or an accepted member) who has
+// reminders enabled with a webhook. Each recipient's last-reminded due-time is
+// looked up per (task, user) so collaborators are reminded independently.
 func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT t.id, t.owner_id, t.name, t.interval_seconds, rs.webhook_url, rs.lead_seconds,
+		SELECT t.id, t.owner_id, rs.user_id, t.name, t.interval_seconds, rs.webhook_url, rs.lead_seconds,
 		       (SELECT MAX(completed_at) FROM completions c WHERE c.task_id = t.id) AS last_completed_at,
-		       COALESCE((SELECT due_at FROM task_reminders tr WHERE tr.task_id = t.id), '') AS last_reminded_due
+		       COALESCE((SELECT due_at FROM task_reminders tr
+		                  WHERE tr.task_id = t.id AND tr.user_id = rs.user_id), '') AS last_reminded_due
 		FROM tasks t
-		JOIN reminder_settings rs ON rs.user_id = t.owner_id
-		WHERE rs.enabled = 1 AND TRIM(rs.webhook_url) <> ''
-		  AND t.archived_at IS NULL
+		JOIN reminder_settings rs
+		  ON rs.enabled = 1 AND TRIM(rs.webhook_url) <> ''
+		 AND (rs.user_id = t.owner_id
+		      OR EXISTS (SELECT 1 FROM task_shares sh
+		                  WHERE sh.task_id = t.id AND sh.user_id = rs.user_id AND sh.status = 'accepted'))
+		WHERE t.archived_at IS NULL
 		  AND t.interval_seconds IS NOT NULL AND t.interval_seconds > 0`)
 	if err != nil {
 		return nil, err
@@ -91,7 +101,7 @@ func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate
 			c        ReminderCandidate
 			lastComp sql.NullString
 		)
-		if err := rows.Scan(&c.TaskID, &c.OwnerID, &c.TaskName, &c.IntervalSecs,
+		if err := rows.Scan(&c.TaskID, &c.OwnerID, &c.UserID, &c.TaskName, &c.IntervalSecs,
 			&c.WebhookURL, &c.LeadSeconds, &lastComp, &c.LastRemindedDue); err != nil {
 			return nil, err
 		}
@@ -104,13 +114,13 @@ func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate
 	return out, rows.Err()
 }
 
-// MarkReminded records that a task was reminded for a given due-time, so the
-// same cycle won't fire again. Keyed by task, so it advances with each cycle.
-func (s *Store) MarkReminded(ctx context.Context, taskID int64, dueAt time.Time) error {
+// MarkReminded records that a recipient was reminded for a task's given due-time,
+// so the same cycle won't fire again for that recipient. Keyed by (task, user).
+func (s *Store) MarkReminded(ctx context.Context, taskID, userID int64, dueAt time.Time) error {
 	_, err := s.db.ExecContext(ctx,
-		`INSERT INTO task_reminders (task_id, due_at, sent_at) VALUES (?, ?, ?)
-		 ON CONFLICT(task_id) DO UPDATE SET due_at = excluded.due_at, sent_at = excluded.sent_at`,
-		taskID, dueAt.UTC().Format(timeLayout), time.Now().UTC().Format(timeLayout),
+		`INSERT INTO task_reminders (task_id, user_id, due_at, sent_at) VALUES (?, ?, ?, ?)
+		 ON CONFLICT(task_id, user_id) DO UPDATE SET due_at = excluded.due_at, sent_at = excluded.sent_at`,
+		taskID, userID, dueAt.UTC().Format(timeLayout), time.Now().UTC().Format(timeLayout),
 	)
 	return err
 }

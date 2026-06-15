@@ -18,28 +18,34 @@ func testService(st Store) *Service {
 	return &Service{store: st, client: newHTTPClient(func(net.IP) bool { return false })}
 }
 
+// markKey dedups reminders per (task, recipient), mirroring the real store.
+type markKey struct {
+	task int64
+	user int64
+}
+
 // fakeStore is an in-memory Store for exercising Tick without a database.
 type fakeStore struct {
 	cands  []store.ReminderCandidate
-	marked map[int64]time.Time
+	marked map[markKey]time.Time
 }
 
 func (f *fakeStore) ListReminderCandidates(context.Context) ([]store.ReminderCandidate, error) {
 	out := make([]store.ReminderCandidate, len(f.cands))
 	copy(out, f.cands)
 	for i := range out {
-		if due, ok := f.marked[out[i].TaskID]; ok {
+		if due, ok := f.marked[markKey{out[i].TaskID, out[i].UserID}]; ok {
 			out[i].LastRemindedDue = due.UTC().Format(time.RFC3339)
 		}
 	}
 	return out, nil
 }
 
-func (f *fakeStore) MarkReminded(_ context.Context, taskID int64, dueAt time.Time) error {
+func (f *fakeStore) MarkReminded(_ context.Context, taskID, userID int64, dueAt time.Time) error {
 	if f.marked == nil {
-		f.marked = map[int64]time.Time{}
+		f.marked = map[markKey]time.Time{}
 	}
-	f.marked[taskID] = dueAt
+	f.marked[markKey{taskID, userID}] = dueAt
 	return nil
 }
 
@@ -134,7 +140,7 @@ func TestSendRejectsLoopback(t *testing.T) {
 		t.Fatalf("loopback webhook should have been blocked, but server was hit %d time(s)", got)
 	}
 	// A blocked delivery is not marked, so it isn't silently considered "done".
-	if _, ok := fs.marked[9]; ok {
+	if _, ok := fs.marked[markKey{9, 0}]; ok {
 		t.Fatal("a blocked delivery must not be marked as reminded")
 	}
 }
