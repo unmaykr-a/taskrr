@@ -101,6 +101,7 @@ func main() {
 			TrustProxyHeaders:     cfg.TrustProxyHeaders,
 			Secrets:               secrets,
 			SafetyBackupOnRestore: cfg.SafetyBackupOnRestore,
+			UpdateCheckURL:        cfg.UpdateCheckURL,
 		}).Handler(),
 		ReadHeaderTimeout: 10 * time.Second,
 	}

@@ -66,9 +66,13 @@ documents every option.
   chart of your last 30 days.
 - Filters with live counts: all, due soon, overdue, never done, archived —
   and bulk actions (log / archive / delete several at once).
+- Keep larger lists tidy: tags (with search and a tag filter), folder grouping,
+  and sorting by name or last-done.
 - Multiple users with per-user data, local password login, and optional OIDC
   single sign-on (tested with Authentik and Pocket ID), including group-to-admin-role
   mapping. A lite mode turns the multi-user surface off for solo use.
+- Share a task with another user so you both see and log it — admin-enabled,
+  with who-logged-last and a per-user opt-out.
 - An admin area in the UI: user management, registration controls with an
   approval queue, active sessions, live server logs, backups with one-click
   restore, and instance settings.
@@ -97,6 +101,7 @@ working examples. The short version:
 | `TASKRR_LITE` | `false` | Single-person mode: disables registration and extra accounts |
 | `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop checks for due tasks |
 | `TASKRR_SAFETY_BACKUP` | `true` | Snapshot the DB before a restore (so a mistaken restore is undoable); set `false` to skip it |
+| `TASKRR_UPDATE_CHECK_URL` | project package.json | Source the admin changelog's update check reads for the latest version; set empty to disable |
 | `TASKRR_OIDC_*` | — | Issuer, client id/secret, redirect URL — also editable later in the admin UI |
 
 Running behind a reverse proxy with HTTPS is the intended setup for anything

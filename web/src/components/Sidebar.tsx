@@ -1,9 +1,9 @@
-import { useRef } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, LogOut, Settings, X } from "lucide-react";
+import { Check, LogOut, Settings, X } from "lucide-react";
 
 import { api } from "@/lib/api";
-import { type Filter, FILTERS } from "@/lib/filters";
+import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
 import { clearStoredPreferences, usePrefs } from "@/lib/prefs";
 import { DEFAULT_THEME } from "@/lib/theme";
 import { cn } from "@/lib/utils";
@@ -12,6 +12,8 @@ import { Button } from "@/components/ui/button";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
 import { SettingsPanel } from "@/components/SettingsPanel";
+import { ChangelogDialog } from "@/components/ChangelogDialog";
+import { currentRelease, formatReleaseDate } from "@/lib/releases";
 import { useAuth } from "@/components/AuthProvider";
 import { useTheme } from "@/components/ThemeProvider";
 import { useWindows } from "@/components/windows/WindowManager";
@@ -29,11 +31,14 @@ export function Sidebar({
   filter,
   onFilterChange,
   counts,
+  shareEnabled = false,
   onClose,
 }: {
   filter: Filter;
   onFilterChange: (f: Filter) => void;
   counts: Record<Filter, number>;
+  /** Whether task sharing is on (shows the Shared + Requests views). */
+  shareEnabled?: boolean;
   onClose?: () => void;
 }) {
   const windows = useWindows();
@@ -43,6 +48,8 @@ export function Sidebar({
   const { prefs } = usePrefs();
   const branding = useBranding();
   const navRef = useRef<HTMLElement>(null);
+  const [changelogOpen, setChangelogOpen] = useState(false);
+  const release = currentRelease();
   // Signing out: close every open window and wipe the query cache so the next
   // account never sees the previous user's tasks/calendar (their data is
   // owner-scoped server-side, so stale cache is the only leak — and editing it
@@ -69,7 +76,7 @@ export function Sidebar({
             <img src={branding.icon} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover shadow" />
           ) : (
             <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary text-primary-foreground shadow">
-              <CheckCircle2 className="h-5 w-5" />
+              <Check className="h-5 w-5" strokeWidth={3} />
             </div>
           )}
           <div className="min-w-0">
@@ -93,8 +100,10 @@ export function Sidebar({
           pick up a sibling margin; the bubble glides to the selected view. */}
       <nav ref={navRef} className="relative mt-6 flex flex-col gap-1">
         <SlidingHighlight containerRef={navRef} activeKey={filter} className="rounded-md bg-primary/15" />
-        {FILTERS.map((f) => {
+        {(shareEnabled ? [...FILTERS, ...SHARE_FILTERS] : FILTERS).map((f) => {
           const active = filter === f.key;
+          // A pending invite gives the Requests view a calm accent pulse.
+          const pulse = f.key === "requests" && counts.requests > 0;
           return (
             <button
               key={f.key}
@@ -115,11 +124,23 @@ export function Sidebar({
                   active ? "scale-y-100 opacity-100" : "scale-y-0 opacity-0",
                 )}
               />
-              <span>{f.label}</span>
+              <span className="flex items-center gap-1.5">
+                {f.label}
+                {pulse && (
+                  <span
+                    aria-hidden
+                    className={cn("h-1.5 w-1.5 rounded-full bg-primary", prefs.animFeedback && "animate-pulse")}
+                  />
+                )}
+              </span>
               {/* Keyed by the value so a changing count pops in. */}
               <span
                 key={counts[f.key]}
-                className={cn("text-xs tabular-nums", prefs.animFeedback && "animate-in zoom-in-75 duration-200")}
+                className={cn(
+                  "text-xs tabular-nums",
+                  pulse && "font-medium text-primary",
+                  prefs.animFeedback && "animate-in zoom-in-75 duration-200",
+                )}
               >
                 {counts[f.key]}
               </span>
@@ -148,7 +169,19 @@ export function Sidebar({
         </div>
 
         <div className="flex items-center justify-between gap-2">
-          <span className="text-[11px] text-muted-foreground">v{__APP_VERSION__}</span>
+          <button
+            type="button"
+            onClick={() => setChangelogOpen(true)}
+            title={release ? `Released ${formatReleaseDate(release.date)}` : undefined}
+            className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            v{__APP_VERSION__}
+            {release && release.changes.length > 0 && (
+              <span className="rounded bg-secondary px-1 text-[10px] tabular-nums text-secondary-foreground">
+                {release.changes.length}
+              </span>
+            )}
+          </button>
           <Button
             variant="outline"
             size="sm"
@@ -164,6 +197,7 @@ export function Sidebar({
             <Settings /> Settings
           </Button>
         </div>
+        <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />
       </div>
     </div>
   );

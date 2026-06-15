@@ -44,6 +44,8 @@ interface StoredTask {
   colorFresh: string | null;
   colorOverdue: string | null;
   freezeColor: boolean;
+  tags: string[];
+  folder: string;
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
@@ -97,6 +99,8 @@ interface SeedTask {
   colorFresh?: string | null;
   colorOverdue?: string | null;
   archived?: boolean;
+  tags?: string[];
+  folder?: string;
   /** Completion ages in seconds-ago, newest first. */
   log: number[];
   /** Optional notes keyed by index into `log`. */
@@ -110,24 +114,30 @@ const SEED: SeedTask[] = [
     name: "Water the plants",
     description: "The big ones by the window get thirsty fast.",
     intervalSeconds: 3 * DAY,
+    tags: ["plants", "home"],
+    folder: "Home",
     log: [2 * DAY + 4 * HOUR, 5 * DAY, 8 * DAY, 11 * DAY, 15 * DAY, 18 * DAY, 22 * DAY, 27 * DAY],
     notes: { 2: "skipped the succulents" },
   },
   {
     name: "Change bed sheets",
     intervalSeconds: 7 * DAY,
+    folder: "Home",
     log: [20 * HOUR, 7 * DAY, 14 * DAY, 22 * DAY, 30 * DAY],
   },
   {
     name: "Clean the litter box",
     description: "Scoop daily, full change weekly.",
     intervalSeconds: 1 * DAY,
+    tags: ["pets"],
     log: [2 * DAY + 2 * HOUR, 3 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 7 * DAY, 8 * DAY, 9 * DAY, 10 * DAY],
   },
   {
     name: "Back up the NAS",
     description: "Pull a fresh snapshot to the offsite drive.",
     intervalSeconds: 14 * DAY,
+    tags: ["tech"],
+    folder: "Tech",
     log: [3 * DAY, 17 * DAY, 32 * DAY, 47 * DAY],
     notes: { 0: "all volumes verified" },
   },
@@ -145,18 +155,22 @@ const SEED: SeedTask[] = [
     name: "Call grandma",
     description: "She likes Sunday afternoons.",
     intervalSeconds: 14 * DAY,
+    tags: ["family"],
     log: [10 * DAY, 24 * DAY, 39 * DAY],
     notes: { 0: "told her about the new job" },
   },
   {
     name: "Descale the coffee machine",
     intervalSeconds: 60 * DAY,
+    folder: "Home",
     log: [70 * DAY, 132 * DAY],
   },
   {
     name: "Water the herb garden",
     description: "Basil sulks if it dries out.",
     intervalSeconds: 2 * DAY,
+    tags: ["plants"],
+    folder: "Home",
     freezeColor: true,
     colorFresh: "#10b981",
     log: [18 * HOUR, 2 * DAY + 6 * HOUR, 4 * DAY, 6 * DAY, 9 * DAY, 12 * DAY],
@@ -199,6 +213,8 @@ function seed(): DB {
       colorFresh: s.colorFresh ?? null,
       colorOverdue: s.colorOverdue ?? null,
       freezeColor: s.freezeColor ?? false,
+      tags: s.tags ?? [],
+      folder: s.folder ?? "",
       archivedAt: s.archived ? iso(oldest + DAY) : null,
       createdAt: iso(oldest + 2 * DAY),
       updatedAt: iso(oldest + 2 * DAY),
@@ -233,16 +249,22 @@ function toTask(db: DB, t: StoredTask): Task {
     colorFresh: t.colorFresh,
     colorOverdue: t.colorOverdue,
     freezeColor: t.freezeColor,
+    tags: t.tags ?? [],
+    folder: t.folder ?? "",
     archivedAt: t.archivedAt,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
     lastCompletedAt: last,
     completionCount: mine.length,
+    // The demo is single-user: nothing is ever shared.
+    ownerId: 1,
+    shared: false,
+    lastCompletedBy: null,
   };
 }
 
 function toCompletion(c: StoredCompletion): Completion {
-  return { id: c.id, taskId: c.taskId, completedAt: c.completedAt, note: c.note, createdAt: c.createdAt };
+  return { id: c.id, taskId: c.taskId, userId: 1, completedAt: c.completedAt, note: c.note, createdAt: c.createdAt };
 }
 
 function findTask(db: DB, id: number): StoredTask {
@@ -271,6 +293,7 @@ function demoUser(): User {
     passwordSet: true,
     oidcLinked: false,
     protected: false,
+    allowShares: true,
     createdAt: iso(120 * DAY),
     updatedAt: iso(120 * DAY),
   };
@@ -303,6 +326,7 @@ const DEMO_AUTH: AuthConfig = {
   defaultThemeEnforce: false,
   themesShareable: false,
   themesShareUsers: false,
+  tasksShareable: false,
   branding: {
     name: "Taskrr",
     title: "",
@@ -339,6 +363,8 @@ export const demoApi: Api = {
       colorFresh: input.colorFresh ?? null,
       colorOverdue: input.colorOverdue ?? null,
       freezeColor: input.freezeColor ?? false,
+      tags: input.tags ?? [],
+      folder: input.folder ?? "",
       archivedAt: null,
       createdAt: now,
       updatedAt: now,
@@ -357,6 +383,8 @@ export const demoApi: Api = {
     if (input.colorFresh !== undefined) t.colorFresh = input.colorFresh;
     if (input.colorOverdue !== undefined) t.colorOverdue = input.colorOverdue;
     if (input.freezeColor !== undefined) t.freezeColor = input.freezeColor;
+    if (input.tags !== undefined) t.tags = input.tags;
+    if (input.folder !== undefined) t.folder = input.folder;
     t.updatedAt = new Date().toISOString();
     saveDB(db);
     return tick(toTask(db, t));
@@ -445,6 +473,17 @@ export const demoApi: Api = {
       }));
     return tick(rows);
   },
+
+  // --- shared tasks (the demo is single-user, so sharing is hidden/empty) ---
+  shareTask: notAvailable,
+  respondShare: notAvailable,
+  leaveTask: notAvailable,
+  listMembers: () => tick([]),
+  listIncomingShares: () => tick([]),
+  setAllowShares: () => tick(demoUser()),
+
+  // No server in the demo, so there's nothing to check against.
+  checkLatestVersion: () => tick({ latest: "" }),
 
   // --- auth ---
   authConfig: () => tick(DEMO_AUTH),

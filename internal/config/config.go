@@ -62,6 +62,12 @@ type Config struct {
 	// safety snapshots on every restore.
 	SafetyBackupOnRestore bool
 
+	// UpdateCheckURL is fetched (server-side) to report the latest released
+	// version in the changelog menu. It should return JSON with a "version"
+	// field; the default points at the project's package.json on GitHub. Set it
+	// empty to disable the check entirely.
+	UpdateCheckURL string
+
 	// --- OIDC (Phase 2; initial values, overridable later in the admin UI) ---
 	OIDCIssuer       string
 	OIDCClientID     string
@@ -93,6 +99,8 @@ func Load() Config {
 		Lite:              envBool("TASKRR_LITE", false),
 
 		SafetyBackupOnRestore: envBool("TASKRR_SAFETY_BACKUP", true),
+		UpdateCheckURL: envAllowEmpty("TASKRR_UPDATE_CHECK_URL",
+			"https://raw.githubusercontent.com/unmaykr-a/taskrr/main/web/package.json"),
 
 		OIDCIssuer:       env("TASKRR_OIDC_ISSUER", ""),
 		OIDCClientID:     env("TASKRR_OIDC_CLIENT_ID", ""),
@@ -104,6 +112,16 @@ func Load() Config {
 // env returns the value of key, or def if the variable is unset or empty.
 func env(key, def string) string {
 	if v, ok := os.LookupEnv(key); ok && v != "" {
+		return v
+	}
+	return def
+}
+
+// envAllowEmpty returns the value whenever the key is set (even to ""), so an
+// explicit empty value is meaningful (e.g. disabling a feature); the default
+// applies only when the key is absent.
+func envAllowEmpty(key, def string) string {
+	if v, ok := os.LookupEnv(key); ok {
 		return v
 	}
 	return def

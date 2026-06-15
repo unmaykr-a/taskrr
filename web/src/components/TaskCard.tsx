@@ -1,6 +1,6 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Clock, Settings2, Zap } from "lucide-react";
+import { Check, Clock, Settings2, Users, Zap } from "lucide-react";
 
 import { api, type Task } from "@/lib/api";
 import { formatDateTime, formatDue, formatInterval, timeSince } from "@/lib/time";
@@ -25,11 +25,13 @@ export function TaskCard({
   selectable = false,
   selected = false,
   onToggleSelected,
+  onTagClick,
 }: {
   task: Task;
   selectable?: boolean;
   selected?: boolean;
   onToggleSelected?: () => void;
+  onTagClick?: (tag: string) => void;
 }) {
   // Subscribe to the ticking clock so relative times / colours stay current.
   const now = useNow();
@@ -106,6 +108,9 @@ export function TaskCard({
               </span>
             )}
             <CardTitle className="truncate text-base">{task.name}</CardTitle>
+            {task.shared && (
+              <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Shared task" />
+            )}
           </div>
           {/* Keyed by the count so each new log pops the badge in. */}
           <Badge
@@ -137,6 +142,9 @@ export function TaskCard({
         {!compact && task.lastCompletedAt && (
           <p className="pl-[18px] text-xs text-muted-foreground">
             {formatDateTime(task.lastCompletedAt)}
+            {task.shared && task.lastCompletedBy && (
+              <span> · by {task.lastCompletedBy}</span>
+            )}
           </p>
         )}
 
@@ -168,6 +176,24 @@ export function TaskCard({
                 )}
               </p>
             )}
+          </div>
+        )}
+
+        {task.tags.length > 0 && (
+          <div className="flex flex-wrap gap-1 pt-1">
+            {task.tags.map((tag) => (
+              <button
+                key={tag}
+                type="button"
+                onClick={(e) => {
+                  e.stopPropagation();
+                  onTagClick?.(tag);
+                }}
+                className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground transition-colors hover:bg-secondary/70"
+              >
+                {tag}
+              </button>
+            ))}
           </div>
         )}
       </CardContent>

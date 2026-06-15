@@ -2,7 +2,7 @@ import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Plus } from "lucide-react";
 
-import { api } from "@/lib/api";
+import { api, type Task } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import {
@@ -18,6 +18,9 @@ import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { IntervalField } from "@/components/IntervalField";
+import { TagInput } from "@/components/ui/TagInput";
+import { FolderInput } from "@/components/ui/FolderInput";
+import { folderNames } from "@/lib/folders";
 
 /**
  * CreateTaskDialog owns the "new task" form. `trigger` lets callers supply their
@@ -29,7 +32,10 @@ export function CreateTaskDialog({ trigger }: { trigger?: React.ReactNode }) {
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [intervalSeconds, setIntervalSeconds] = useState<number | null>(null);
+  const [tags, setTags] = useState<string[]>([]);
+  const [folder, setFolder] = useState("");
   const queryClient = useQueryClient();
+  const folderSuggestions = folderNames(queryClient.getQueryData<Task[]>(["tasks"]) ?? []);
 
   const toast = useToast();
   const mutation = useMutation({
@@ -38,12 +44,16 @@ export function CreateTaskDialog({ trigger }: { trigger?: React.ReactNode }) {
         name: name.trim(),
         description: description.trim() || undefined,
         intervalSeconds,
+        tags,
+        folder: folder.trim(),
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       setName("");
       setDescription("");
       setIntervalSeconds(null);
+      setTags([]);
+      setFolder("");
       setOpen(false);
       toast("Task created", { tone: "success" });
     },
@@ -93,6 +103,14 @@ export function CreateTaskDialog({ trigger }: { trigger?: React.ReactNode }) {
             />
           </div>
           <IntervalField value={intervalSeconds} onChange={setIntervalSeconds} />
+          <div className="space-y-2">
+            <Label>Tags (optional)</Label>
+            <TagInput value={tags} onChange={setTags} />
+          </div>
+          <div className="space-y-2">
+            <Label htmlFor="task-folder">Folder (optional)</Label>
+            <FolderInput value={folder} onChange={setFolder} suggestions={folderSuggestions} />
+          </div>
           {mutation.isError && (
             <p className="text-sm text-destructive">{(mutation.error as Error).message}</p>
           )}

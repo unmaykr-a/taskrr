@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ChevronRight, KeyRound, Link2, Link2Off, Trash2, UserRound } from "lucide-react";
+import { AlertTriangle, ChevronRight, KeyRound, Link2, Link2Off, Trash2, UserRound, Users } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
@@ -82,6 +82,16 @@ export function AccountSection() {
     onError: (e) => setErr((e as Error).message),
   });
 
+  // Per-user opt-out for receiving shared tasks (shown only when sharing is on).
+  const allowShares = useMutation({
+    mutationFn: (allow: boolean) => api.setAllowShares(allow),
+    onSuccess: (updated) => {
+      queryClient.setQueryData(["me"], updated);
+      toast("Sharing preference saved", { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
   const submit = () => {
     setErr(null);
     if (next.length < 8) return setErr("Password must be at least 8 characters.");
@@ -121,6 +131,27 @@ export function AccountSection() {
         {rename.isError && <p className="text-xs text-destructive">{(rename.error as Error).message}</p>}
         {rename.isSuccess && <p className="text-xs text-emerald-500">Username updated.</p>}
       </section>
+
+      {config?.tasksShareable && (
+        <section className="space-y-2">
+          <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
+            <Users className="h-3.5 w-3.5" /> Sharing
+          </h4>
+          <label className="flex items-center justify-between gap-2 text-sm">
+            <span className="text-muted-foreground">
+              Let others share tasks with me
+              <span className="block text-xs">When off, people can't send you tasks.</span>
+            </span>
+            <input
+              type="checkbox"
+              className="h-4 w-4 accent-primary"
+              checked={user?.allowShares ?? true}
+              disabled={allowShares.isPending}
+              onChange={(e) => allowShares.mutate(e.target.checked)}
+            />
+          </label>
+        </section>
+      )}
 
       <section className="space-y-2">
         <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">

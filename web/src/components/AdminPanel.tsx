@@ -32,6 +32,8 @@ export function AdminPanel() {
       )}
       <OIDCSettings />
       <hr className="border-border/60" />
+      <SharingSettings />
+      <hr className="border-border/60" />
       <BrandingSettings />
       <hr className="border-border/60" />
       <PendingUsers />
@@ -754,6 +756,35 @@ function RegistrationSettings() {
           className="h-4 w-4 accent-primary"
           checked={data?.reg_approval ?? false}
           onChange={(e) => save.mutate({ reg_approval: e.target.checked })}
+        />
+      </label>
+    </section>
+  );
+}
+
+/** Admin gate for the whole shared-tasks feature. */
+function SharingSettings() {
+  const queryClient = useQueryClient();
+  const { data } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
+  const save = useMutation({
+    mutationFn: (patch: SettingsPatch) => api.putSettings(patch),
+    onSuccess: (next) => queryClient.setQueryData(["settings"], next),
+  });
+  return (
+    <section className="space-y-2">
+      <h3 className="text-sm font-semibold">Task sharing</h3>
+      <label className="flex items-center justify-between gap-2 text-sm">
+        <span className="text-muted-foreground">
+          Let users share tasks
+          <span className="block text-xs">
+            Adds a Share action and the Shared / Requests views. Users can opt out individually.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          className="h-4 w-4 accent-primary"
+          checked={data?.tasks_shareable ?? false}
+          onChange={(e) => save.mutate({ tasks_shareable: e.target.checked })}
         />
       </label>
     </section>
