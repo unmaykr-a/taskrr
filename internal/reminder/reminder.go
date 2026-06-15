@@ -34,7 +34,7 @@ import (
 // Store is the slice of the data layer the reminder loop needs.
 type Store interface {
 	ListReminderCandidates(ctx context.Context) ([]store.ReminderCandidate, error)
-	MarkReminded(ctx context.Context, taskID int64, dueAt time.Time) error
+	MarkReminded(ctx context.Context, taskID, userID int64, dueAt time.Time) error
 }
 
 // Service evaluates and delivers reminders.
@@ -135,7 +135,7 @@ func (s *Service) Tick(ctx context.Context) {
 			log.Printf("reminder: task %d webhook failed: %v", c.TaskID, err)
 			continue // leave un-marked so it retries next tick
 		}
-		if err := s.store.MarkReminded(ctx, c.TaskID, due); err != nil {
+		if err := s.store.MarkReminded(ctx, c.TaskID, c.UserID, due); err != nil {
 			log.Printf("reminder: mark task %d reminded: %v", c.TaskID, err)
 		}
 	}

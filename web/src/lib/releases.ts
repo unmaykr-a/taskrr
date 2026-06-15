@@ -37,6 +37,20 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.12.0",
+    date: "2026-06-15",
+    changes: [
+      feat(
+        "Reminders for shared tasks",
+        "Members of a shared task now get their own due reminders (if they've set a webhook), not just the owner — each reminded independently.",
+      ),
+      fix(
+        "Shared badge",
+        "A task is marked shared only once an invite is accepted; a pending invite alone no longer badges it.",
+      ),
+    ],
+  },
+  {
     version: "1.11.0",
     date: "2026-06-15",
     changes: [

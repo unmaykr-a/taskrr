@@ -404,3 +404,29 @@ func TestGetUserAllowSharesUnknownUser(t *testing.T) {
 		t.Fatalf("GetUserAllowShares(unknown) = %v, want ErrNotFound", err)
 	}
 }
+
+// TestSharedFlagOnlyWhenAccepted: a task is flagged shared only once a member
+// has accepted — a pending invite alone doesn't badge it as shared.
+func TestSharedFlagOnlyWhenAccepted(t *testing.T) {
+	ctx := context.Background()
+	st := newTestStore(t)
+	owner, _ := st.CreateUser(ctx, UserInput{Username: "owner", Role: "user"})
+	member, _ := st.CreateUser(ctx, UserInput{Username: "member", Role: "user"})
+	task, _ := st.CreateTask(ctx, owner.ID, TaskInput{Name: "t"})
+
+	if got, _ := st.GetTask(ctx, owner.ID, task.ID); got.Shared {
+		t.Fatal("a task with no shares should not be flagged shared")
+	}
+	if _, err := st.ShareTask(ctx, owner.ID, task.ID, member.ID); err != nil {
+		t.Fatalf("ShareTask: %v", err)
+	}
+	if got, _ := st.GetTask(ctx, owner.ID, task.ID); got.Shared {
+		t.Fatal("a pending invite should not flag the task as shared")
+	}
+	if err := st.RespondToShare(ctx, member.ID, task.ID, true); err != nil {
+		t.Fatalf("RespondToShare: %v", err)
+	}
+	if got, _ := st.GetTask(ctx, owner.ID, task.ID); !got.Shared {
+		t.Fatal("an accepted share should flag the task as shared")
+	}
+}

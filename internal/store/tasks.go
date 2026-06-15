@@ -33,7 +33,7 @@ const taskSelect = `
 		t.color_fresh, t.color_overdue, t.freeze_color, t.tags, t.folder, t.archived_at, t.created_at, t.updated_at, t.owner_id,
 		(SELECT MAX(completed_at) FROM completions c WHERE c.task_id = t.id) AS last_completed_at,
 		(SELECT COUNT(*)          FROM completions c WHERE c.task_id = t.id) AS completion_count,
-		EXISTS (SELECT 1 FROM task_shares sh WHERE sh.task_id = t.id) AS shared,
+		EXISTS (SELECT 1 FROM task_shares sh WHERE sh.task_id = t.id AND sh.status = 'accepted') AS shared,
 		(SELECT u.username FROM completions c JOIN users u ON u.id = c.user_id
 		 WHERE c.task_id = t.id ORDER BY c.completed_at DESC, c.id DESC LIMIT 1) AS last_completed_by
 	FROM tasks t`
