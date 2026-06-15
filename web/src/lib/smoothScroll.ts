@@ -21,7 +21,10 @@ const LINE_PX = 16;
 /** Pixel deltas below this are treated as touchpad input and left native. */
 const TOUCHPAD_MAX_PX = 40;
 
-type ScrollState = { target: number };
+// `written` is the scrollTop we last set ourselves, so the next frame can tell
+// our own write apart from an external change (a scrollbar drag, anchor jump,
+// etc.) and bow out instead of fighting it.
+type ScrollState = { target: number; written?: number };
 
 /** Walk up from `from` to the nearest element that can actually scroll further
  *  in the wheel's direction, falling back to the document scroller. */
@@ -59,6 +62,13 @@ export function installSmoothWheel(): () => void {
     const k = 1 - Math.exp(-dt / TAU);
     let active = false;
     states.forEach((s, el) => {
+      // If the position moved by something other than our own last write — the
+      // user grabbed the scrollbar, or the page jumped to an anchor — abandon
+      // the animation so we don't yank it back ("stuck in place" jitter).
+      if (s.written !== undefined && Math.abs(el.scrollTop - s.written) > 2) {
+        states.delete(el);
+        return;
+      }
       const diff = s.target - el.scrollTop;
       if (Math.abs(diff) < 0.5) {
         el.scrollTop = s.target;
@@ -66,6 +76,7 @@ export function installSmoothWheel(): () => void {
         return;
       }
       el.scrollTop += diff * k;
+      s.written = el.scrollTop;
       active = true;
     });
     if (active) raf = requestAnimationFrame(tick);
@@ -82,7 +93,14 @@ export function installSmoothWheel(): () => void {
     if (!el) return;
     e.preventDefault();
 
-    const s = states.get(el) ?? { target: el.scrollTop };
+    // Resume an in-flight animation, but if the element was moved externally
+    // since our last write (e.g. a scrollbar drag), start fresh from where it
+    // actually sits rather than from the stale target.
+    const prev = states.get(el);
+    const s =
+      prev && (prev.written === undefined || Math.abs(el.scrollTop - prev.written) <= 2)
+        ? prev
+        : { target: el.scrollTop };
     const max = el.scrollHeight - el.clientHeight;
     s.target = Math.max(0, Math.min(max, s.target + px));
     states.set(el, s);
