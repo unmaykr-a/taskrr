@@ -37,6 +37,20 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.12.1",
+    date: "2026-06-15",
+    changes: [
+      fix(
+        "Changelog scrolling",
+        "Dragging the scrollbar in the changelog no longer fights an in-progress smooth-scroll and snaps back.",
+      ),
+      fix(
+        "Version label",
+        "Removed the static change-count badge next to the version, which never changed or cleared.",
+      ),
+    ],
+  },
+  {
     version: "1.12.0",
     date: "2026-06-15",
     changes: [

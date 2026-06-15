@@ -176,11 +176,6 @@ export function Sidebar({
             className="inline-flex items-center gap-1.5 text-[11px] text-muted-foreground transition-colors hover:text-foreground"
           >
             v{__APP_VERSION__}
-            {release && release.changes.length > 0 && (
-              <span className="rounded bg-secondary px-1 text-[10px] tabular-nums text-secondary-foreground">
-                {release.changes.length}
-              </span>
-            )}
           </button>
           <Button
             variant="outline"
