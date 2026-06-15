@@ -19,6 +19,7 @@ import {
 import { installSmoothWheel } from "@/lib/smoothScroll";
 import { setTimeFormat } from "@/lib/time";
 import { type Theme } from "@/lib/theme";
+import { type SortKey } from "@/lib/sort";
 
 export type ColorPickerStyle = "wheel" | "native";
 export type AddButtonPosition = "top" | "bottom";
@@ -56,6 +57,10 @@ export interface Prefs {
   // --- layout ---
   /** Task card density. */
   cardSize: CardSize;
+  /** How the task list is ordered (see lib/sort.ts). */
+  sortBy: SortKey;
+  /** Group the task list into collapsible sections by folder. */
+  groupByFolder: boolean;
   /** Fixed number of task columns, or 0 for the responsive default. */
   taskColumns: number;
   /** Show the calendar / activity-chart side panels. */
@@ -138,6 +143,8 @@ function defaults(): Prefs {
     colorFade: true,
     addButton: "top",
     cardSize: "comfortable",
+    sortBy: "smart",
+    groupByFolder: false,
     taskColumns: 0,
     showCalendar: true,
     showActivity: true,

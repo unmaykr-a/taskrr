@@ -1,6 +1,6 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, KeyRound, LogIn } from "lucide-react";
+import { Check, KeyRound, LogIn } from "lucide-react";
 
 import {
   api,
@@ -108,7 +108,7 @@ export function AuthPage() {
                 <img src={branding.icon} alt="" className="h-11 w-11 rounded-xl object-cover shadow" />
               ) : (
                 <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-primary text-primary-foreground shadow">
-                  <CheckCircle2 className="h-6 w-6" />
+                  <Check className="h-6 w-6" strokeWidth={3} />
                 </div>
               ))}
             {!branding.loginHideText && (

@@ -40,6 +40,9 @@ const (
 	keyThemesShareUsers = "themes_share_users"
 	// keySharedThemes: the JSON array of admin-published themes, available to all.
 	keySharedThemes = "shared_themes"
+	// keyTasksShareable: admin gate for the whole shared-tasks feature. When off,
+	// the share UI is hidden and the share endpoint refuses new shares.
+	keyTasksShareable = "tasks_shareable"
 
 	// --- branding (admin-editable; shown signed-out, so exposed in authConfig) ---
 	keyBrandName     = "brand_name"      // app name in the sidebar + login
@@ -229,6 +232,7 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		"defaultThemeEnforce": s.boolSetting(ctx, keyDefaultThemeEnforce, false),
 		"themesShareable":     s.boolSetting(ctx, keyThemesShareable, false),
 		"themesShareUsers":    s.boolSetting(ctx, keyThemesShareUsers, false),
+		"tasksShareable":      s.boolSetting(ctx, keyTasksShareable, false),
 		"branding":            s.branding(ctx),
 	})
 }
@@ -1374,6 +1378,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyDefaultThemeEnforce:   s.boolSetting(ctx, keyDefaultThemeEnforce, false),
 		keyThemesShareable:       s.boolSetting(ctx, keyThemesShareable, false),
 		keyThemesShareUsers:      s.boolSetting(ctx, keyThemesShareUsers, false),
+		keyTasksShareable:        s.boolSetting(ctx, keyTasksShareable, false),
 		keyBrandName:             get(keyBrandName),
 		keyBrandTitle:            get(keyBrandTitle),
 		keyBrandTagline:          get(keyBrandTagline),
@@ -1401,6 +1406,7 @@ type settingsPatch struct {
 	DefaultThemeEnforce *bool   `json:"default_theme_enforce"`
 	ThemesShareable     *bool   `json:"themes_shareable"`
 	ThemesShareUsers    *bool   `json:"themes_share_users"`
+	TasksShareable      *bool   `json:"tasks_shareable"`
 	BrandName           *string `json:"brand_name"`
 	BrandTitle          *string `json:"brand_title"`
 	BrandTagline        *string `json:"brand_tagline"`
@@ -1465,6 +1471,9 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.ThemesShareUsers != nil && !set(keyThemesShareUsers, boolStr(*req.ThemesShareUsers)) {
+		return
+	}
+	if req.TasksShareable != nil && !set(keyTasksShareable, boolStr(*req.TasksShareable)) {
 		return
 	}
 	// Branding. The icon is a data URL (or empty to clear); cap its size so it

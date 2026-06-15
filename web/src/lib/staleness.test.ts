@@ -13,11 +13,16 @@ function task(partial: Partial<Task>): Task {
     colorFresh: null,
     colorOverdue: null,
     freezeColor: false,
+    tags: [],
+    folder: "",
     archivedAt: null,
     createdAt: "",
     updatedAt: "",
     lastCompletedAt: null,
     completionCount: 0,
+    ownerId: 1,
+    shared: false,
+    lastCompletedBy: null,
     ...partial,
   };
 }

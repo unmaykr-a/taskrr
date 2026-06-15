@@ -23,8 +23,11 @@ var hexColor = regexp.MustCompile(`^#[0-9a-fA-F]{6}$`)
 // JSON body cap, and an oversized task name would ride along in every ListTasks
 // response forever.
 const (
-	maxNameLen = 200
-	maxTextLen = 2000 // descriptions and completion notes
+	maxNameLen   = 200
+	maxTextLen   = 2000 // descriptions and completion notes
+	maxTags      = 20
+	maxTagLen    = 40
+	maxFolderLen = 60
 )
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
@@ -49,12 +52,40 @@ func (s *Server) handleListTasks(w http.ResponseWriter, r *http.Request) {
 // taskRequest is the JSON body for creating or updating a task. IntervalSeconds
 // is a pointer so we can tell "not provided / cleared" (null) from a real value.
 type taskRequest struct {
-	Name            string  `json:"name"`
-	Description     string  `json:"description"`
-	IntervalSeconds *int64  `json:"intervalSeconds"`
-	ColorFresh      *string `json:"colorFresh"`
-	ColorOverdue    *string `json:"colorOverdue"`
-	FreezeColor     bool    `json:"freezeColor"`
+	Name            string   `json:"name"`
+	Description     string   `json:"description"`
+	IntervalSeconds *int64   `json:"intervalSeconds"`
+	ColorFresh      *string  `json:"colorFresh"`
+	ColorOverdue    *string  `json:"colorOverdue"`
+	FreezeColor     bool     `json:"freezeColor"`
+	Tags            []string `json:"tags"`
+	Folder          string   `json:"folder"`
+}
+
+// normalizeTags trims, drops empties, caps length, and de-duplicates
+// (case-insensitively, keeping first spelling) the submitted tags.
+func normalizeTags(in []string) ([]string, string) {
+	out := make([]string, 0, len(in))
+	seen := make(map[string]bool)
+	for _, t := range in {
+		t = strings.TrimSpace(t)
+		if t == "" {
+			continue
+		}
+		if utf8.RuneCountInString(t) > maxTagLen {
+			return nil, fmt.Sprintf("tags must be at most %d characters", maxTagLen)
+		}
+		key := strings.ToLower(t)
+		if seen[key] {
+			continue
+		}
+		seen[key] = true
+		out = append(out, t)
+	}
+	if len(out) > maxTags {
+		return nil, fmt.Sprintf("a task can have at most %d tags", maxTags)
+	}
+	return out, ""
 }
 
 // toInput validates the request and converts it into a store.TaskInput.
@@ -77,6 +108,14 @@ func (req taskRequest) toInput() (store.TaskInput, string) {
 			return store.TaskInput{}, "colours must be in #rrggbb form, or null"
 		}
 	}
+	tags, msg := normalizeTags(req.Tags)
+	if msg != "" {
+		return store.TaskInput{}, msg
+	}
+	folder := strings.TrimSpace(req.Folder)
+	if utf8.RuneCountInString(folder) > maxFolderLen {
+		return store.TaskInput{}, fmt.Sprintf("folder must be at most %d characters", maxFolderLen)
+	}
 	return store.TaskInput{
 		Name:            name,
 		Description:     strings.TrimSpace(req.Description),
@@ -84,6 +123,8 @@ func (req taskRequest) toInput() (store.TaskInput, string) {
 		ColorFresh:      req.ColorFresh,
 		ColorOverdue:    req.ColorOverdue,
 		FreezeColor:     req.FreezeColor,
+		Tags:            tags,
+		Folder:          folder,
 	}, ""
 }
 

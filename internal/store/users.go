@@ -21,6 +21,9 @@ type User struct {
 	PasswordSet  bool      `json:"passwordSet"`
 	OIDCLinked   bool      `json:"oidcLinked"`
 	Approved     bool      `json:"approved"`
+	// AllowShares is the per-user opt-in (default true) to receiving shared
+	// tasks. When false, the share API refuses to target this user.
+	AllowShares bool `json:"allowShares"`
 	// Protected is set by the API layer (not the DB) for the bootstrap admin, so
 	// the UI can disable controls other admins aren't allowed to use.
 	Protected bool      `json:"protected"`
@@ -39,21 +42,23 @@ type UserInput struct {
 	Approved     *bool
 }
 
-const userSelect = `SELECT id, username, password_hash, role, oidc_subject, approved, created_at, updated_at FROM users`
+const userSelect = `SELECT id, username, password_hash, role, oidc_subject, approved, allow_shares, created_at, updated_at FROM users`
 
 func scanUser(sc scanner) (User, error) {
 	var (
-		u        User
-		hash     sql.NullString
-		subject  sql.NullString
-		approved int
-		created  string
-		updated  string
+		u           User
+		hash        sql.NullString
+		subject     sql.NullString
+		approved    int
+		allowShares int
+		created     string
+		updated     string
 	)
-	if err := sc.Scan(&u.ID, &u.Username, &hash, &u.Role, &subject, &approved, &created, &updated); err != nil {
+	if err := sc.Scan(&u.ID, &u.Username, &hash, &u.Role, &subject, &approved, &allowShares, &created, &updated); err != nil {
 		return User{}, err
 	}
 	u.Approved = approved != 0
+	u.AllowShares = allowShares != 0
 	if hash.Valid {
 		u.PasswordHash = &hash.String
 	}
@@ -199,6 +204,25 @@ func (s *Store) UnlinkOIDCSubject(ctx context.Context, id int64) error {
 	return s.touchUser(ctx, `UPDATE users SET oidc_subject = NULL, updated_at = ? WHERE id = ?`, time.Now().UTC().Format(timeLayout), id)
 }
 
+// SetUserAllowShares sets a user's opt-in for receiving shared tasks.
+func (s *Store) SetUserAllowShares(ctx context.Context, id int64, allow bool) error {
+	return s.touchUser(ctx, `UPDATE users SET allow_shares = ?, updated_at = ? WHERE id = ?`, boolToInt(allow), time.Now().UTC().Format(timeLayout), id)
+}
+
+// GetUserAllowShares reports whether a user accepts shared tasks. A missing user
+// returns ErrNotFound.
+func (s *Store) GetUserAllowShares(ctx context.Context, id int64) (bool, error) {
+	var v int
+	err := s.db.QueryRowContext(ctx, `SELECT allow_shares FROM users WHERE id = ?`, id).Scan(&v)
+	if errors.Is(err, sql.ErrNoRows) {
+		return false, ErrNotFound
+	}
+	if err != nil {
+		return false, err
+	}
+	return v != 0, nil
+}
+
 func (s *Store) touchUser(ctx context.Context, query string, args ...any) error {
 	res, err := s.db.ExecContext(ctx, query, args...)
 	if err != nil {
@@ -212,14 +236,24 @@ func (s *Store) touchUser(ctx context.Context, query string, args ...any) error 
 
 // DeleteUser removes a user (cascading their tasks, completions, and sessions).
 func (s *Store) DeleteUser(ctx context.Context, id int64) error {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return err
+	}
+	defer func() { _ = tx.Rollback() }()
+	// A shared task the user owns transfers to a member instead of being
+	// cascaded away with the account; their solo tasks cascade as before.
+	if err := reassignSharedTasks(ctx, tx, id); err != nil {
+		return err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM users WHERE id = ?`, id)
 	if err != nil {
 		return err
 	}
 	if n, _ := res.RowsAffected(); n == 0 {
 		return ErrNotFound
 	}
-	return nil
+	return tx.Commit()
 }
 
 // --- destructive admin operations -------------------------------------------
@@ -234,11 +268,25 @@ func (s *Store) WipeAllTasks(ctx context.Context) error {
 // DeleteTasksByOwner deletes all of one user's tasks (and, by cascade, their
 // completions), keeping the account and its preferences. Returns the count.
 func (s *Store) DeleteTasksByOwner(ctx context.Context, ownerID int64) (int64, error) {
-	res, err := s.db.ExecContext(ctx, `DELETE FROM tasks WHERE owner_id = ?`, ownerID)
+	tx, err := s.db.BeginTx(ctx, nil)
+	if err != nil {
+		return 0, err
+	}
+	defer func() { _ = tx.Rollback() }()
+	// Shared tasks with other members move to a member rather than being
+	// destroyed (the user effectively leaves); only solo tasks are deleted, so
+	// the returned count is the number actually removed.
+	if err := reassignSharedTasks(ctx, tx, ownerID); err != nil {
+		return 0, err
+	}
+	res, err := tx.ExecContext(ctx, `DELETE FROM tasks WHERE owner_id = ?`, ownerID)
 	if err != nil {
 		return 0, err
 	}
 	n, _ := res.RowsAffected()
+	if err := tx.Commit(); err != nil {
+		return 0, err
+	}
 	return n, nil
 }
 
@@ -320,6 +368,24 @@ func (s *Store) MergeUsers(ctx context.Context, sourceID, targetID int64, moveDa
 	now := time.Now().UTC().Format(timeLayout)
 	if moveData {
 		if _, err := tx.ExecContext(ctx, `UPDATE tasks SET owner_id = ? WHERE owner_id = ?`, targetID, sourceID); err != nil {
+			return err
+		}
+		// Fold the source's completion authorship into the target so "logged by"
+		// survives the merge.
+		if _, err := tx.ExecContext(ctx, `UPDATE completions SET user_id = ? WHERE user_id = ?`, targetID, sourceID); err != nil {
+			return err
+		}
+		// If the target was already a member of a task it now owns, drop the now-
+		// redundant share row (an owner is never also a member).
+		if _, err := tx.ExecContext(ctx,
+			`DELETE FROM task_shares WHERE user_id = ? AND task_id IN (SELECT id FROM tasks WHERE owner_id = ?)`,
+			targetID, targetID); err != nil {
+			return err
+		}
+	} else {
+		// Not moving data: the source's solo tasks cascade away with it, but a
+		// shared task transfers to a member so collaborators keep it.
+		if err := reassignSharedTasks(ctx, tx, sourceID); err != nil {
 			return err
 		}
 	}

@@ -8,6 +8,7 @@ import (
 	"io"
 	"log"
 	"net/http"
+	"sync"
 	"sync/atomic"
 	"time"
 
@@ -32,6 +33,19 @@ type TaskStore interface {
 	DeleteCompletion(ctx context.Context, ownerID, id int64) error
 
 	ListActivity(ctx context.Context, ownerID int64, from, to time.Time) ([]store.Activity, error)
+}
+
+// ShareStore is the task-sharing surface: membership lifecycle plus the per-user
+// opt-out. Sharing keeps a task a single row and attaches members, so these sit
+// alongside the owner-scoped TaskStore rather than replacing it.
+type ShareStore interface {
+	ShareTask(ctx context.Context, ownerID, taskID, recipientID int64) (store.TaskShare, error)
+	RespondToShare(ctx context.Context, userID, taskID int64, accept bool) error
+	LeaveTask(ctx context.Context, userID, taskID int64) error
+	ListIncomingShares(ctx context.Context, userID int64) ([]store.ShareRequest, error)
+	ListTaskMembers(ctx context.Context, taskID int64) ([]store.TaskMember, error)
+	GetUserAllowShares(ctx context.Context, id int64) (bool, error)
+	SetUserAllowShares(ctx context.Context, id int64, allow bool) error
 }
 
 // AuthStore is everything the HTTP layer needs for accounts, sessions, and
@@ -88,6 +102,7 @@ type AuthStore interface {
 type Store interface {
 	TaskStore
 	AuthStore
+	ShareStore
 }
 
 // Options carries server-level settings derived from config.
@@ -115,6 +130,9 @@ type Options struct {
 	// SafetyBackupOnRestore takes a backup of the current DB before a restore
 	// swaps it out (so a mistaken restore is recoverable). Default on.
 	SafetyBackupOnRestore bool
+	// UpdateCheckURL is fetched server-side to report the latest released
+	// version (empty disables the check).
+	UpdateCheckURL string
 }
 
 // Server holds the dependencies shared by all HTTP handlers.
@@ -126,6 +144,12 @@ type Server struct {
 	loginLimiter *rateLimiter // per-username attempts
 	ipLimiter    *rateLimiter // per-source-IP attempts (blunts password-spraying)
 	restoring    atomic.Bool  // true while a restore is staged + restart pending
+
+	// Cache for the update check, so repeated opens of the changelog don't hit
+	// the upstream every time.
+	updateMu  sync.Mutex
+	updateVer string
+	updateAt  time.Time
 }
 
 // NewServer constructs a Server backed by the given store.
@@ -188,6 +212,18 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/tasks/{id}/archive", s.handleArchiveTask)
 	mux.HandleFunc("POST /api/tasks/{id}/unarchive", s.handleUnarchiveTask)
 	mux.HandleFunc("DELETE /api/tasks/{id}", s.handleDeleteTask)
+
+	// Sharing: the owner invites a member; members respond/leave; anyone with
+	// access lists members; a user sees their own incoming requests + opt-out.
+	mux.HandleFunc("POST /api/tasks/{id}/share", s.handleShareTask)
+	mux.HandleFunc("POST /api/tasks/{id}/share/respond", s.handleRespondShare)
+	mux.HandleFunc("POST /api/tasks/{id}/leave", s.handleLeaveTask)
+	mux.HandleFunc("GET /api/tasks/{id}/members", s.handleListMembers)
+	mux.HandleFunc("GET /api/me/shares", s.handleListIncomingShares)
+	mux.HandleFunc("PUT /api/me/allow-shares", s.handleSetAllowShares)
+
+	// Latest released version (informational; no in-app update action).
+	mux.HandleFunc("GET /api/version/latest", s.handleCheckVersion)
 
 	mux.HandleFunc("POST /api/tasks/{id}/complete", s.handleCompleteTask)
 	mux.HandleFunc("GET /api/tasks/{id}/completions", s.handleListCompletions)

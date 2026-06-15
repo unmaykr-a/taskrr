@@ -1,9 +1,20 @@
 import { useEffect, useMemo, useRef, useState } from "react";
 import { useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckSquare, ListTodo, Menu, Plus } from "lucide-react";
+import {
+  CheckSquare,
+  ChevronDown,
+  ChevronRight,
+  FolderTree,
+  ListTodo,
+  Menu,
+  Plus,
+  Search,
+  X,
+} from "lucide-react";
 
-import { api } from "@/lib/api";
-import { type Filter, FILTERS, matchesFilter } from "@/lib/filters";
+import { api, type Task } from "@/lib/api";
+import { type Filter, FILTERS, matchesFilter, SHARE_FILTERS } from "@/lib/filters";
+import { type SortKey, SORT_OPTIONS, sortTasks } from "@/lib/sort";
 import { taskStaleness } from "@/lib/staleness";
 import { usePrefs } from "@/lib/prefs";
 import { useFlip } from "@/lib/useFlip";
@@ -12,12 +23,14 @@ import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { Sidebar } from "@/components/Sidebar";
+import { RequestsView } from "@/components/RequestsView";
 import { TaskCard } from "@/components/TaskCard";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
 import { Calendar } from "@/components/Calendar";
 import { ActivityChart } from "@/components/ActivityChart";
 import { BulkBar } from "@/components/BulkBar";
 import { PreferencesSync } from "@/components/PreferencesSync";
+import { WhatsNew } from "@/components/WhatsNew";
 
 // Human-readable result of an OIDC account-link attempt (see the callback in
 // internal/api/oidc.go, which redirects back here with ?oidcLink=...).
@@ -29,9 +42,11 @@ const OIDC_LINK_MESSAGES: Record<string, string> = {
 
 export default function App() {
   const now = useNow(); // ticking clock so staleness/counts refresh over time
-  const { prefs } = usePrefs();
+  const { prefs, setPrefs } = usePrefs();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
+  const [search, setSearch] = useState("");
+  const [activeTag, setActiveTag] = useState<string | null>(null);
 
   // After returning from an OIDC link attempt, surface the outcome and refresh
   // the cached user so the Settings UI reflects the new link state, then strip
@@ -74,6 +89,17 @@ export default function App() {
   });
   const tasks = data ?? [];
 
+  // Sharing: whether the feature is enabled (gates the Shared/Requests views),
+  // and the current count of incoming invites (drives the Requests pulse).
+  const { data: authConfig } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
+  const shareEnabled = authConfig?.tasksShareable ?? false;
+  const { data: incoming } = useQuery({
+    queryKey: ["incoming-shares"],
+    queryFn: api.listIncomingShares,
+    enabled: shareEnabled,
+  });
+  const requestCount = incoming?.length ?? 0;
+
   // Animate task-grid layout changes: when a quick log / filter change / new
   // task reorders the grid, surviving cards glide to their new spot and
   // appearing ones fade in (see useFlip). Cards opt in via data-flip-key.
@@ -84,26 +110,96 @@ export default function App() {
   // Counts per sidebar view (recomputed as time passes via `now`). Archived
   // tasks are excluded from the active views and counted on their own.
   const counts = useMemo(() => {
-    const c: Record<Filter, number> = { all: 0, "due-soon": 0, overdue: 0, none: 0, archived: 0 };
+    const c: Record<Filter, number> = {
+      all: 0,
+      "due-soon": 0,
+      overdue: 0,
+      none: 0,
+      archived: 0,
+      shared: 0,
+      requests: requestCount,
+    };
     for (const t of tasks) {
       if (t.archivedAt != null) {
         c.archived += 1;
         continue;
       }
       c.all += 1;
+      if (t.shared) c.shared += 1;
       const s = taskStaleness(t, now);
       if (s === "due-soon" || s === "overdue" || s === "none") c[s] += 1;
     }
     return c;
-  }, [tasks, now]);
+  }, [tasks, now, requestCount]);
 
-  const visible = useMemo(
-    () => tasks.filter((t) => matchesFilter(t, filter, now)),
-    [tasks, filter, now],
-  );
+  const visible = useMemo(() => {
+    const q = search.trim().toLowerCase();
+    let list = tasks.filter((t) => matchesFilter(t, filter, now));
+    if (activeTag) {
+      list = list.filter((t) => t.tags.some((tag) => tag.toLowerCase() === activeTag.toLowerCase()));
+    }
+    if (q) {
+      list = list.filter(
+        (t) =>
+          t.name.toLowerCase().includes(q) ||
+          t.description.toLowerCase().includes(q) ||
+          t.tags.some((tag) => tag.toLowerCase().includes(q)),
+      );
+    }
+    return sortTasks(list, prefs.sortBy);
+  }, [tasks, filter, now, search, activeTag, prefs.sortBy]);
 
-  const filterLabel = FILTERS.find((f) => f.key === filter)?.label ?? "Tasks";
+  const filterLabel =
+    [...FILTERS, ...SHARE_FILTERS].find((f) => f.key === filter)?.label ?? "Tasks";
   const archivedView = filter === "archived";
+  const requestsView = filter === "requests";
+
+  // Folder grouping: collapsible sections (named folders A-Z, then "No folder").
+  const grouped = prefs.groupByFolder && !requestsView;
+  const [collapsedFolders, setCollapsedFolders] = useState<Set<string>>(() => new Set());
+  const toggleFolder = (folder: string) =>
+    setCollapsedFolders((prev) => {
+      const next = new Set(prev);
+      if (next.has(folder)) next.delete(folder);
+      else next.add(folder);
+      return next;
+    });
+  const groups = useMemo(() => {
+    const map = new Map<string, Task[]>();
+    for (const t of visible) {
+      const key = t.folder || "";
+      const arr = map.get(key);
+      if (arr) arr.push(t);
+      else map.set(key, [t]);
+    }
+    const named = [...map.keys()]
+      .filter((k) => k !== "")
+      .sort((a, b) => a.localeCompare(b, undefined, { sensitivity: "base" }));
+    const order = map.has("") ? [...named, ""] : named;
+    return order.map((folder) => ({ folder, tasks: map.get(folder)! }));
+  }, [visible]);
+
+  const gridClassName = cn(
+    "grid gap-4",
+    (prefs.taskColumns === 0 || compact) && "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3",
+  );
+  const gridStyle =
+    prefs.taskColumns > 0 && !compact
+      ? { gridTemplateColumns: `repeat(${prefs.taskColumns}, minmax(0, 1fr))` }
+      : undefined;
+  const renderCard = (task: Task) => (
+    <TaskCard
+      key={task.id}
+      task={task}
+      selectable={selectMode}
+      selected={selected.has(task.id)}
+      onToggleSelected={() => toggleSelected(task.id)}
+      onTagClick={(tag) => {
+        setActiveTag(tag);
+        setFilter("all");
+      }}
+    />
+  );
   // Only act on selected tasks that are actually in the current view.
   const selectedIds = useMemo(
     () => visible.filter((t) => selected.has(t.id)).map((t) => t.id),
@@ -114,6 +210,8 @@ export default function App() {
     <>
       {/* Load/save this account's theme + layout prefs server-side. */}
       <PreferencesSync />
+      {/* One-off "what's new" dialog after a version update. */}
+      <WhatsNew />
       <div className={cn("relative z-10 flex", sideBySide ? "h-[100dvh] overflow-hidden" : "min-h-[100dvh]")}>
         {/* Mobile/landscape drawer scrim */}
         {compact && sidebarOpen && (
@@ -142,6 +240,7 @@ export default function App() {
               setSelected(new Set());
             }}
             counts={counts}
+            shareEnabled={shareEnabled}
             onClose={() => setSidebarOpen(false)}
           />
         </aside>
@@ -166,7 +265,9 @@ export default function App() {
             >
               <h2 className="truncate text-sm font-semibold">{filterLabel}</h2>
               <p className="text-xs text-muted-foreground">
-                {visible.length} {visible.length === 1 ? "task" : "tasks"}
+                {requestsView
+                  ? `${requestCount} ${requestCount === 1 ? "request" : "requests"}`
+                  : `${visible.length} ${visible.length === 1 ? "task" : "tasks"}`}
               </p>
             </div>
 
@@ -196,43 +297,109 @@ export default function App() {
             )}
           >
             <div className={cn("min-w-0 flex-1", sideBySide && "overflow-y-auto p-4")}>
-              {isLoading && <GridSkeleton stagger={views} />}
+              {!requestsView && tasks.length > 0 && (
+                <div className="mb-4 flex flex-wrap items-center gap-2">
+                  <div className="relative min-w-[8rem] flex-1">
+                    <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                    <input
+                      value={search}
+                      onChange={(e) => setSearch(e.target.value)}
+                      placeholder="Search tasks"
+                      aria-label="Search tasks"
+                      className="h-9 w-full rounded-md border border-input bg-transparent pl-8 pr-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    />
+                  </div>
+                  {activeTag && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveTag(null)}
+                      className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-1.5 text-xs font-medium text-primary"
+                    >
+                      {activeTag}
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
+                  <select
+                    value={prefs.sortBy}
+                    onChange={(e) => setPrefs({ sortBy: e.target.value as SortKey })}
+                    aria-label="Sort tasks"
+                    className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    {SORT_OPTIONS.map((o) => (
+                      <option key={o.key} value={o.key}>
+                        {o.label}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    variant={prefs.groupByFolder ? "secondary" : "outline"}
+                    size="sm"
+                    className="h-9"
+                    aria-pressed={prefs.groupByFolder}
+                    title="Group by folder"
+                    onClick={() => setPrefs({ groupByFolder: !prefs.groupByFolder })}
+                  >
+                    <FolderTree /> Group
+                  </Button>
+                </div>
+              )}
 
-              {isError && (
+              {requestsView && <RequestsView animate={views} />}
+
+              {!requestsView && isLoading && <GridSkeleton stagger={views} />}
+
+              {!requestsView && isError && (
                 <div className="rounded-lg border border-destructive/50 bg-destructive/10 p-4 text-sm text-destructive">
                   Failed to load tasks: {(error as Error).message}
                 </div>
               )}
 
-              {!isLoading && !isError && visible.length === 0 && (
-                <EmptyState filter={filter} animate={views} />
+              {!requestsView && !isLoading && !isError && visible.length === 0 &&
+                (search.trim() || activeTag ? (
+                  <p className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
+                    No tasks match.
+                  </p>
+                ) : (
+                  <EmptyState filter={filter} animate={views} />
+                ))}
+
+              {/* Flat grid (default). A fixed column count is for roomy screens
+                  only — phones / landscape phones fall back to the responsive
+                  1→2→3 grid so cards don't get crushed into slivers. */}
+              {!requestsView && !grouped && visible.length > 0 && (
+                <div ref={gridRef} className={gridClassName} style={gridStyle}>
+                  {visible.map(renderCard)}
+                </div>
               )}
 
-              {visible.length > 0 && (
-                <div
-                  ref={gridRef}
-                  className={cn(
-                    "grid gap-4",
-                    // A fixed column count is for roomy screens only — on phones /
-                    // landscape phones fall back to the responsive 1→2→3 grid so
-                    // cards don't get crushed into unreadable slivers.
-                    (prefs.taskColumns === 0 || compact) && "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3",
-                  )}
-                  style={
-                    prefs.taskColumns > 0 && !compact
-                      ? { gridTemplateColumns: `repeat(${prefs.taskColumns}, minmax(0, 1fr))` }
-                      : undefined
-                  }
-                >
-                  {visible.map((task) => (
-                    <TaskCard
-                      key={task.id}
-                      task={task}
-                      selectable={selectMode}
-                      selected={selected.has(task.id)}
-                      onToggleSelected={() => toggleSelected(task.id)}
-                    />
-                  ))}
+              {/* Grouped into collapsible folder sections. */}
+              {!requestsView && grouped && visible.length > 0 && (
+                <div className="space-y-5">
+                  {groups.map(({ folder, tasks: folderTasks }) => {
+                    const isCollapsed = collapsedFolders.has(folder);
+                    return (
+                      <section key={folder || "__none"}>
+                        <button
+                          type="button"
+                          onClick={() => toggleFolder(folder)}
+                          className="mb-2 flex w-full items-center gap-1.5 text-sm font-semibold"
+                        >
+                          {isCollapsed ? (
+                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                          ) : (
+                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
+                          )}
+                          <span>{folder || "No folder"}</span>
+                          <span className="text-xs font-normal text-muted-foreground">{folderTasks.length}</span>
+                        </button>
+                        {!isCollapsed && (
+                          <div className={gridClassName} style={gridStyle}>
+                            {folderTasks.map(renderCard)}
+                          </div>
+                        )}
+                      </section>
+                    );
+                  })}
                 </div>
               )}
             </div>

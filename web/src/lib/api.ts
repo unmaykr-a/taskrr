@@ -21,20 +21,58 @@ export interface Task {
   colorOverdue: string | null;
   /** Pin the staleness colour to "fresh" (a visual "stay green" preference). */
   freezeColor: boolean;
+  /** Short user labels for filtering and grouping. */
+  tags: string[];
+  /** Optional single group name; empty means ungrouped. */
+  folder: string;
   /** Non-null when the task is soft-archived (hidden from the normal views). */
   archivedAt: string | null;
   createdAt: string;
   updatedAt: string;
   lastCompletedAt: string | null;
   completionCount: number;
+  /** The account that owns the task; compare to the current user to tell owner
+   *  from member (members may log + leave; the owner edits/archives). */
+  ownerId: number;
+  /** True when the task has members (shared by the owner, or shared with you). */
+  shared: boolean;
+  /** Username of whoever logged the most recent completion, or null. */
+  lastCompletedBy: string | null;
 }
 
 export interface Completion {
   id: number;
   taskId: number;
+  /** Who logged this completion (null only for history whose author was removed). */
+  userId: number | null;
   completedAt: string;
   note: string;
   createdAt: string;
+}
+
+/** A membership row: an extra user attached to a task. */
+export interface TaskShare {
+  taskId: number;
+  userId: number;
+  status: "pending" | "accepted";
+  createdAt: string;
+}
+
+/** A pending incoming share, named for the recipient's Requests view. */
+export interface ShareRequest {
+  taskId: number;
+  taskName: string;
+  ownerId: number;
+  ownerName: string;
+  createdAt: string;
+}
+
+/** One participant in a task: the owner, or a shared member with their status. */
+export interface TaskMember {
+  userId: number;
+  username: string;
+  /** "owner" for the task's owner, else the share status. */
+  status: "owner" | "pending" | "accepted";
 }
 
 /** A completion joined with its task name — the flat feed the calendar uses. */
@@ -57,6 +95,8 @@ export interface User {
   oidcLinked: boolean;
   /** The bootstrap admin — other admins can't edit/delete it. */
   protected: boolean;
+  /** Whether this user accepts having tasks shared with them (opt-out). */
+  allowShares: boolean;
   createdAt: string;
   updatedAt: string;
 }
@@ -92,6 +132,8 @@ export interface AuthConfig {
   themesShareable: boolean;
   /** Regular users (not just admins) may publish themes too. */
   themesShareUsers: boolean;
+  /** Admin gate for the whole shared-tasks feature. */
+  tasksShareable: boolean;
   /** Instance branding (name, title, icon, login toggles). */
   branding: Branding;
 }
@@ -170,6 +212,7 @@ export interface AdminSettings {
   default_theme_enforce: boolean;
   themes_shareable: boolean;
   themes_share_users: boolean;
+  tasks_shareable: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
@@ -194,6 +237,7 @@ export type SettingsPatch = Partial<{
   default_theme_enforce: boolean;
   themes_shareable: boolean;
   themes_share_users: boolean;
+  tasks_shareable: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
@@ -213,6 +257,10 @@ export interface TaskInput {
   colorOverdue?: string | null;
   /** Pin the staleness colour to "fresh". */
   freezeColor?: boolean;
+  /** Short labels for filtering and grouping (server trims/dedupes/caps). */
+  tags?: string[];
+  /** Optional single group name (empty = ungrouped). */
+  folder?: string;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -291,6 +339,42 @@ const httpApi = {
     request<Activity[]>(
       `/api/activity?from=${encodeURIComponent(fromISO)}&to=${encodeURIComponent(toISO)}`,
     ),
+
+  // --- shared tasks ---
+
+  /** Owner invites a user (by username) to a task; creates a pending share. */
+  shareTask: (taskId: number, username: string) =>
+    request<TaskShare>(`/api/tasks/${taskId}/share`, {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    }),
+
+  /** Accept or decline a pending incoming share for the current user. */
+  respondShare: (taskId: number, accept: boolean) =>
+    request<void>(`/api/tasks/${taskId}/share/respond`, {
+      method: "POST",
+      body: JSON.stringify({ accept }),
+    }),
+
+  /** Leave a shared task (a member removes their own membership). */
+  leaveTask: (taskId: number) =>
+    request<void>(`/api/tasks/${taskId}/leave`, { method: "POST" }),
+
+  /** Everyone attached to a task: owner + members. */
+  listMembers: (taskId: number) => request<TaskMember[]>(`/api/tasks/${taskId}/members`),
+
+  /** The current user's pending incoming shares (their Requests view). */
+  listIncomingShares: () => request<ShareRequest[]>("/api/me/shares"),
+
+  /** Set whether others may share tasks with the current user (opt-out). */
+  setAllowShares: (allowShares: boolean) =>
+    request<User>("/api/me/allow-shares", {
+      method: "PUT",
+      body: JSON.stringify({ allowShares }),
+    }),
+
+  /** Latest released version (informational; "" if checking is disabled/unreachable). */
+  checkLatestVersion: () => request<{ latest: string }>("/api/version/latest"),
 
   // --- auth ---
 
