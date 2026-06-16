@@ -37,6 +37,16 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.13.0",
+    date: "2026-06-16",
+    changes: [
+      feat(
+        "Project links",
+        "The changelog now links to the project's GitHub repository and a Ko-fi page for supporting development.",
+      ),
+    ],
+  },
+  {
     version: "1.12.1",
     date: "2026-06-15",
     changes: [
