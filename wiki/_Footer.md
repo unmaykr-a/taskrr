@@ -1,0 +1,1 @@
+[Taskrr](https://github.com/unmaykr-a/taskrr) - a self-hosted tracker for when you last did things - [MIT](https://github.com/unmaykr-a/taskrr/blob/main/LICENSE) - [Support on Ko-fi](https://ko-fi.com/unmaykr)

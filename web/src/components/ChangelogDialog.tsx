@@ -1,5 +1,5 @@
 import { useState } from "react";
-import { Bug, RefreshCw, Sparkles } from "lucide-react";
+import { Bug, Github, Heart, RefreshCw, Sparkles } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { DEMO } from "@/lib/demo";
@@ -7,6 +7,10 @@ import { useAuth } from "@/components/AuthProvider";
 import { compareVersions, CURRENT_VERSION, formatReleaseDate, type Release, RELEASES } from "@/lib/releases";
 import { Button } from "@/components/ui/button";
 import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+
+// Project links surfaced in the changelog footer.
+const REPO_URL = "https://github.com/unmaykr-a/taskrr";
+const KOFI_URL = "https://ko-fi.com/unmaykr";
 
 /** ReleaseEntry renders one version: a tag, its date, and the change list with
  *  a sparkles (feature) or bug (fix) icon per line, plus an optional grey note.
@@ -62,6 +66,26 @@ export function ChangelogDialog({
           ))}
         </div>
         {showUpdateCheck && <UpdateCheck />}
+        <div className="flex flex-wrap items-center gap-4 border-t pt-3 text-xs text-muted-foreground">
+          <a
+            href={REPO_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+          >
+            <Github className="h-3.5 w-3.5" />
+            GitHub
+          </a>
+          <a
+            href={KOFI_URL}
+            target="_blank"
+            rel="noreferrer"
+            className="inline-flex items-center gap-1.5 transition-colors hover:text-foreground"
+          >
+            <Heart className="h-3.5 w-3.5" />
+            Support on Ko-fi
+          </a>
+        </div>
       </DialogContent>
     </Dialog>
   );
