@@ -89,6 +89,9 @@ export interface Prefs {
   smoothScroll: boolean;
   /** Show brief toast notifications for actions (save, delete, log, …). */
   toasts: boolean;
+  /** Use the browser's native confirm/prompt/alert dialogs instead of the
+   *  in-app ones. Off by default (the in-app dialogs match the theme). */
+  nativeDialogs: boolean;
 
   // --- themes ---
   /** The user's saved named themes. Persisted server-side with the rest of
@@ -157,6 +160,7 @@ function defaults(): Prefs {
     animViews: true,
     smoothScroll: true,
     toasts: true,
+    nativeDialogs: false,
     savedThemes: [],
     themeCustom: false,
     draggableWindows: true,

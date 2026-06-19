@@ -70,7 +70,12 @@ export function installSmoothWheel(): () => void {
         return;
       }
       const diff = s.target - el.scrollTop;
-      if (Math.abs(diff) < 0.5) {
+      // Snap home once within a pixel. Below ~1px the per-frame step is so small
+      // that scrollTop's integer value changes only every few frames, so the
+      // scroll events spread out — and anything that debounces "is scrolling"
+      // (e.g. the background pausing on scroll) flickers off/on as the tail
+      // decelerates. Ending here keeps the events dense and the finish crisp.
+      if (Math.abs(diff) < 1) {
         el.scrollTop = s.target;
         states.delete(el);
         return;

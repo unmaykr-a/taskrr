@@ -22,6 +22,7 @@ import { useMediaQuery } from "@/lib/useMediaQuery";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Sidebar } from "@/components/Sidebar";
 import { RequestsView } from "@/components/RequestsView";
 import { TaskCard } from "@/components/TaskCard";
@@ -43,6 +44,7 @@ const OIDC_LINK_MESSAGES: Record<string, string> = {
 export default function App() {
   const now = useNow(); // ticking clock so staleness/counts refresh over time
   const { prefs, setPrefs } = usePrefs();
+  const { alert } = useConfirm();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
@@ -57,8 +59,8 @@ export default function App() {
     const message = OIDC_LINK_MESSAGES[result] ?? OIDC_LINK_MESSAGES.error;
     if (result === "linked") queryClient.invalidateQueries({ queryKey: ["me"] });
     window.history.replaceState({}, "", window.location.pathname);
-    window.alert(message);
-  }, [queryClient]);
+    void alert({ title: "Single sign-on", description: message });
+  }, [queryClient, alert]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
@@ -224,12 +226,16 @@ export default function App() {
         {/* Sidebar: static column on large screens, off-canvas drawer when compact. */}
         <aside
           className={cn(
-            "fixed inset-y-0 left-0 z-50 transition-transform duration-300 ease-in-out will-change-transform",
+            "left-0 will-change-transform",
             compact
-              ? sidebarOpen
-                ? "translate-x-0"
-                : "-translate-x-full"
-              : "static z-auto translate-x-0",
+              ? cn(
+                  "fixed inset-y-0 z-50 transition-transform duration-300 ease-in-out",
+                  sidebarOpen ? "translate-x-0" : "-translate-x-full",
+                )
+              : // Desktop: stick to the top and always fill the viewport height, so
+                // the nav and footer stay in place instead of scrolling away with
+                // the page on shorter layouts.
+                "sticky top-0 z-auto h-[100dvh]",
           )}
         >
           <Sidebar

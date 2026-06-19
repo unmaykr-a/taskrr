@@ -9,6 +9,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { useWindows } from "@/components/windows/WindowManager";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
@@ -377,6 +378,7 @@ function MergeAccounts() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { confirm } = useConfirm();
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: api.listUsers });
   const [sourceId, setSourceId] = useState<number | "">("");
   const [targetId, setTargetId] = useState<number | "">("");
@@ -410,16 +412,20 @@ function MergeAccounts() {
   const targetOptions = users.filter((u) => u.id !== sourceId && !u.protected);
   const ready = source && target && source.id !== target.id;
 
-  const confirmMerge = () => {
+  const confirmMerge = async () => {
     if (!ready) return;
     const kept = keepUsername === "source" ? source!.username : target!.username;
     const dataMsg = moveData ? `move "${source!.username}"'s tasks into "${target!.username}"` : `discard "${source!.username}"'s tasks`;
     if (
-      window.confirm(
-        `Merge "${source!.username}" into "${target!.username}"?\n\nThis will ${dataMsg}, move its sign-in ` +
+      await confirm({
+        title: "Merge accounts",
+        description:
+          `Merge "${source!.username}" into "${target!.username}"?\n\nThis will ${dataMsg}, move its sign-in ` +
           `(including any OIDC link) to "${target!.username}", keep the username "${kept}", and DELETE ` +
           `"${source!.username}". This can't be undone.`,
-      )
+        confirmText: "Merge",
+        destructive: true,
+      })
     ) {
       merge.mutate();
     }
@@ -505,6 +511,7 @@ function MergeAccounts() {
 function BackupsSection() {
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { confirm } = useConfirm();
   const { data: backups } = useQuery({ queryKey: ["backups"], queryFn: api.listBackups });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["backups"] });
   const create = useMutation({
@@ -544,12 +551,16 @@ function BackupsSection() {
     onError: (e) => setErr((e as Error).message),
   });
 
-  const confirmRestore = (label: string, run: () => void) => {
+  const confirmRestore = async (label: string, run: () => void) => {
     if (
-      window.confirm(
-        `Restore from ${label}?\n\nThis REPLACES all current data with the backup and restarts the server. ` +
+      await confirm({
+        title: "Restore backup",
+        description:
+          `Restore from ${label}?\n\nThis REPLACES all current data with the backup and restarts the server. ` +
           `A safety backup of the current data is taken first. Everyone is signed out.\n\nContinue?`,
-      )
+        confirmText: "Restore",
+        destructive: true,
+      })
     ) {
       run();
     }
@@ -625,8 +636,16 @@ function BackupsSection() {
                 type="button"
                 aria-label={`Delete backup ${b.name}`}
                 disabled={del.isPending}
-                onClick={() => {
-                  if (window.confirm(`Delete backup ${b.name}? This can't be undone.`)) del.mutate(b.name);
+                onClick={async () => {
+                  if (
+                    await confirm({
+                      title: "Delete backup",
+                      description: `Delete backup ${b.name}? This can't be undone.`,
+                      confirmText: "Delete",
+                      destructive: true,
+                    })
+                  )
+                    del.mutate(b.name);
                 }}
                 className="shrink-0 rounded p-0.5 text-muted-foreground hover:text-destructive disabled:opacity-50"
               >
@@ -643,6 +662,7 @@ function BackupsSection() {
 /** Advanced: backups + a danger zone of irreversible, instance-wide deletions. */
 function AdvancedSettings() {
   const queryClient = useQueryClient();
+  const { confirm } = useConfirm();
   const [msg, setMsg] = useState<string | null>(null);
   const wipe = useMutation({
     mutationFn: (opts: { tasks?: boolean; users?: boolean; everything?: boolean }) => api.adminWipe(opts),
@@ -659,8 +679,15 @@ function AdvancedSettings() {
     },
     onError: (e) => setMsg((e as Error).message),
   });
-  const confirmWipe = (opts: { tasks?: boolean; users?: boolean; everything?: boolean }, label: string) => {
-    if (window.confirm(`This permanently deletes ${label}.\n\nThis cannot be undone. Continue?`)) {
+  const confirmWipe = async (opts: { tasks?: boolean; users?: boolean; everything?: boolean }, label: string) => {
+    if (
+      await confirm({
+        title: "Confirm deletion",
+        description: `This permanently deletes ${label}.\n\nThis cannot be undone. Continue?`,
+        confirmText: "Delete",
+        destructive: true,
+      })
+    ) {
       setMsg(null);
       wipe.mutate(opts);
     }
@@ -995,6 +1022,7 @@ function Users() {
   const { user: me } = useAuth();
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { prompt } = useConfirm();
   const { data: users } = useQuery({ queryKey: ["users"], queryFn: api.listUsers });
   const invalidate = () => queryClient.invalidateQueries({ queryKey: ["users"] });
 
@@ -1027,8 +1055,14 @@ function Users() {
     },
   });
 
-  const resetPassword = (u: User) => {
-    const next = window.prompt(`New password for ${u.username} (min 8 chars):`);
+  const resetPassword = async (u: User) => {
+    const next = await prompt({
+      title: "Reset password",
+      description: `New password for ${u.username} (min 8 chars):`,
+      inputType: "password",
+      placeholder: "New password",
+      confirmText: "Set password",
+    });
     if (next) update.mutate({ id: u.id, password: next });
   };
 

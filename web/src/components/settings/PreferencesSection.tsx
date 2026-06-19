@@ -190,6 +190,15 @@ export function PreferencesSection() {
           />
         </label>
         <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">Use browser dialogs</span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 accent-primary"
+            checked={prefs.nativeDialogs}
+            onChange={(e) => setPrefs({ nativeDialogs: e.target.checked })}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2 text-sm">
           <span className="text-muted-foreground">Show calendar</span>
           <input
             type="checkbox"

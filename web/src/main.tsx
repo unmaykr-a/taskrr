@@ -8,6 +8,7 @@ import { AuthProvider } from "@/components/AuthProvider";
 import { PrefsProvider } from "@/lib/prefs";
 import { WindowManagerProvider } from "@/components/windows/WindowManager";
 import { ToastProvider } from "@/components/ui/Toast";
+import { ConfirmProvider } from "@/components/ui/ConfirmDialog";
 import "./index.css";
 
 const queryClient = new QueryClient({
@@ -26,9 +27,11 @@ ReactDOM.createRoot(document.getElementById("root")!).render(
         <PrefsProvider>
           <AuthProvider>
             <ToastProvider>
-              <WindowManagerProvider>
-                <Gate />
-              </WindowManagerProvider>
+              <ConfirmProvider>
+                <WindowManagerProvider>
+                  <Gate />
+                </WindowManagerProvider>
+              </ConfirmProvider>
             </ToastProvider>
           </AuthProvider>
         </PrefsProvider>
