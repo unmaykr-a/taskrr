@@ -64,12 +64,23 @@ interface DB {
   completions: StoredCompletion[];
   nextTaskId: number;
   nextCompletionId: number;
+  /** Bumped whenever the seed data changes, so returning visitors get the
+   *  refreshed demo instead of an old cached one. */
+  seedVersion?: number;
 }
+
+// Bump this when SEED below changes so existing visitors are re-seeded. The demo
+// DB is disposable, so re-seeding simply replaces it with the newer sample set.
+const SEED_VERSION = 2;
 
 function loadDB(): DB {
   try {
     const raw = localStorage.getItem(DB_KEY);
-    if (raw) return JSON.parse(raw) as DB;
+    if (raw) {
+      const db = JSON.parse(raw) as DB;
+      if (db.seedVersion === SEED_VERSION) return db;
+      // Older (or unversioned) sample set — fall through to a fresh seed.
+    }
   } catch {
     // corrupt or unavailable — fall through to a fresh seed
   }
@@ -107,50 +118,361 @@ interface SeedTask {
   notes?: Record<number, string>;
 }
 
-// A spread that lands tasks across fresh / due-soon / overdue and keeps the
-// last ~30 days busy so the calendar and activity chart look populated.
+// A broad sample set: many tasks across several folders and tags, landing
+// across fresh / due-soon / overdue / never-done, with dense history over the
+// last ~30 days so the calendar and activity chart look alive. It exercises the
+// per-account features a single demo user can see: cadences, tags, folders,
+// notes, per-task colours, frozen colours, no-cadence streaks, and archiving.
 const SEED: SeedTask[] = [
+  // --- Home ----------------------------------------------------------------
   {
     name: "Water the plants",
     description: "The big ones by the window get thirsty fast.",
     intervalSeconds: 3 * DAY,
     tags: ["plants", "home"],
     folder: "Home",
-    log: [2 * DAY + 4 * HOUR, 5 * DAY, 8 * DAY, 11 * DAY, 15 * DAY, 18 * DAY, 22 * DAY, 27 * DAY],
+    log: [2 * DAY + 8 * HOUR, 5 * DAY, 8 * DAY, 11 * DAY, 15 * DAY, 18 * DAY, 22 * DAY, 27 * DAY, 31 * DAY],
     notes: { 2: "skipped the succulents" },
   },
   {
     name: "Change bed sheets",
     intervalSeconds: 7 * DAY,
+    tags: ["home", "cleaning"],
     folder: "Home",
-    log: [20 * HOUR, 7 * DAY, 14 * DAY, 22 * DAY, 30 * DAY],
+    log: [6 * DAY, 13 * DAY, 21 * DAY, 29 * DAY, 36 * DAY],
   },
+  {
+    name: "Vacuum the apartment",
+    description: "Living room and hallway at least.",
+    intervalSeconds: 5 * DAY,
+    tags: ["cleaning", "home"],
+    folder: "Home",
+    log: [6 * DAY, 11 * DAY, 16 * DAY, 21 * DAY, 26 * DAY, 31 * DAY],
+  },
+  {
+    name: "Clean the bathroom",
+    intervalSeconds: 7 * DAY,
+    tags: ["cleaning", "home"],
+    folder: "Home",
+    log: [9 * DAY, 16 * DAY, 24 * DAY, 32 * DAY],
+    notes: { 0: "ran out of descaler" },
+  },
+  {
+    name: "Mop the floors",
+    intervalSeconds: 10 * DAY,
+    tags: ["cleaning", "home"],
+    folder: "Home",
+    log: [1 * DAY + 4 * HOUR, 11 * DAY, 22 * DAY, 33 * DAY],
+  },
+  {
+    name: "Dust the shelves",
+    intervalSeconds: 14 * DAY,
+    tags: ["cleaning", "home"],
+    folder: "Home",
+    log: [1 * DAY, 15 * DAY, 30 * DAY],
+  },
+  {
+    name: "Take out the recycling",
+    intervalSeconds: 7 * DAY,
+    tags: ["home", "chores"],
+    folder: "Home",
+    log: [1 * DAY + 6 * HOUR, 8 * DAY, 15 * DAY, 22 * DAY, 29 * DAY],
+  },
+  {
+    name: "Water the herb garden",
+    description: "Basil sulks if it dries out.",
+    intervalSeconds: 2 * DAY,
+    tags: ["plants", "kitchen"],
+    folder: "Home",
+    freezeColor: true,
+    colorFresh: "#10b981",
+    log: [20 * HOUR, 2 * DAY + 18 * HOUR, 4 * DAY, 6 * DAY, 9 * DAY, 12 * DAY, 15 * DAY],
+  },
+  {
+    name: "Check the smoke alarms",
+    description: "Press and hold until it chirps.",
+    intervalSeconds: 365 * DAY,
+    tags: ["home", "safety"],
+    folder: "Home",
+    log: [210 * DAY],
+  },
+  {
+    name: "Service the boiler",
+    description: "Annual service — not booked yet.",
+    intervalSeconds: 365 * DAY,
+    tags: ["home", "safety"],
+    folder: "Home",
+    log: [],
+  },
+  {
+    name: "Replace the HVAC filter",
+    intervalSeconds: 90 * DAY,
+    tags: ["home"],
+    folder: "Home",
+    log: [],
+  },
+
+  // --- Kitchen -------------------------------------------------------------
+  {
+    name: "Wipe the kitchen counters",
+    intervalSeconds: 1 * DAY,
+    tags: ["kitchen", "cleaning"],
+    folder: "Kitchen",
+    log: [4 * HOUR, 1 * DAY, 2 * DAY, 3 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 7 * DAY, 8 * DAY, 10 * DAY, 12 * DAY],
+  },
+  {
+    name: "Descale the coffee machine",
+    intervalSeconds: 60 * DAY,
+    tags: ["kitchen", "home"],
+    folder: "Kitchen",
+    log: [70 * DAY, 132 * DAY],
+    notes: { 0: "tasted much better after" },
+  },
+  {
+    name: "Replace the water filter",
+    description: "Brita jug in the fridge.",
+    intervalSeconds: 30 * DAY,
+    tags: ["kitchen", "home"],
+    folder: "Kitchen",
+    log: [28 * DAY, 59 * DAY, 90 * DAY],
+  },
+  {
+    name: "Clean out the fridge",
+    description: "Toss anything past its date.",
+    intervalSeconds: 14 * DAY,
+    tags: ["kitchen", "cleaning"],
+    folder: "Kitchen",
+    log: [13 * DAY, 28 * DAY, 41 * DAY],
+  },
+  {
+    name: "Sharpen the knives",
+    intervalSeconds: 60 * DAY,
+    tags: ["kitchen"],
+    folder: "Kitchen",
+    log: [70 * DAY],
+  },
+  {
+    name: "Feed the sourdough starter",
+    description: "Equal parts flour and water.",
+    intervalSeconds: 1 * DAY,
+    tags: ["kitchen", "hobby"],
+    folder: "Kitchen",
+    freezeColor: true,
+    colorFresh: "#f59e0b",
+    log: [10 * HOUR, 1 * DAY + 2 * HOUR, 2 * DAY, 3 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 7 * DAY, 8 * DAY, 9 * DAY],
+  },
+
+  // --- Pets ----------------------------------------------------------------
   {
     name: "Clean the litter box",
     description: "Scoop daily, full change weekly.",
     intervalSeconds: 1 * DAY,
     tags: ["pets"],
-    log: [2 * DAY + 2 * HOUR, 3 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 7 * DAY, 8 * DAY, 9 * DAY, 10 * DAY],
+    folder: "Pets",
+    log: [20 * HOUR, 2 * DAY, 3 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 7 * DAY, 8 * DAY, 9 * DAY, 10 * DAY, 11 * DAY, 12 * DAY],
   },
+  {
+    name: "Walk the dog",
+    intervalSeconds: 1 * DAY,
+    tags: ["pets", "outdoors"],
+    folder: "Pets",
+    log: [5 * HOUR, 1 * DAY, 2 * DAY, 3 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 7 * DAY, 8 * DAY, 9 * DAY, 10 * DAY, 11 * DAY],
+  },
+  {
+    name: "Refill the cat fountain",
+    intervalSeconds: 3 * DAY,
+    tags: ["pets"],
+    folder: "Pets",
+    log: [12 * HOUR, 3 * DAY, 6 * DAY, 9 * DAY, 12 * DAY],
+  },
+  {
+    name: "Trim the dog's nails",
+    intervalSeconds: 30 * DAY,
+    tags: ["pets", "health"],
+    folder: "Pets",
+    log: [34 * DAY, 66 * DAY],
+    notes: { 0: "used the grinder this time" },
+  },
+  {
+    name: "Buy pet food",
+    intervalSeconds: 21 * DAY,
+    tags: ["pets", "shopping"],
+    folder: "Pets",
+    log: [2 * DAY, 23 * DAY, 45 * DAY],
+  },
+
+  // --- Health --------------------------------------------------------------
+  {
+    name: "Take vitamins",
+    intervalSeconds: 1 * DAY,
+    tags: ["health"],
+    folder: "Health",
+    log: [22 * HOUR, 2 * DAY, 3 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 8 * DAY, 9 * DAY, 10 * DAY, 11 * DAY],
+  },
+  {
+    name: "Go for a run",
+    description: "Even a short one counts.",
+    intervalSeconds: 2 * DAY,
+    tags: ["health", "fitness"],
+    folder: "Health",
+    log: [1 * DAY + 18 * HOUR, 4 * DAY, 6 * DAY, 9 * DAY, 11 * DAY, 14 * DAY, 17 * DAY],
+    notes: { 0: "new 5k best" },
+  },
+  {
+    name: "Replace the toothbrush head",
+    intervalSeconds: 30 * DAY,
+    tags: ["health"],
+    folder: "Health",
+    log: [35 * DAY, 66 * DAY],
+  },
+  {
+    name: "Refill the prescription",
+    intervalSeconds: 30 * DAY,
+    tags: ["health"],
+    folder: "Health",
+    log: [25 * DAY, 55 * DAY],
+  },
+  {
+    name: "Dentist checkup",
+    intervalSeconds: 182 * DAY,
+    tags: ["health", "appointments"],
+    folder: "Health",
+    log: [120 * DAY],
+  },
+
+  // --- Tech ----------------------------------------------------------------
   {
     name: "Back up the NAS",
     description: "Pull a fresh snapshot to the offsite drive.",
     intervalSeconds: 14 * DAY,
-    tags: ["tech"],
+    tags: ["tech", "backup"],
     folder: "Tech",
-    log: [3 * DAY, 17 * DAY, 32 * DAY, 47 * DAY],
+    log: [12 * DAY, 26 * DAY, 41 * DAY, 56 * DAY],
     notes: { 0: "all volumes verified" },
   },
   {
-    name: "Replace the water filter",
+    name: "Update the home server",
+    description: "apt upgrade + reboot if needed.",
     intervalSeconds: 30 * DAY,
-    log: [28 * DAY, 59 * DAY, 90 * DAY],
+    tags: ["tech"],
+    folder: "Tech",
+    log: [5 * DAY, 36 * DAY],
   },
   {
-    name: "Vacuum the apartment",
-    intervalSeconds: 5 * DAY,
-    log: [6 * DAY, 11 * DAY, 16 * DAY, 21 * DAY, 26 * DAY],
+    name: "Rotate API keys",
+    intervalSeconds: 90 * DAY,
+    tags: ["tech", "security"],
+    folder: "Tech",
+    log: [100 * DAY],
+    notes: { 0: "rotated and re-deployed" },
   },
+  {
+    name: "Clean the keyboard",
+    intervalSeconds: 30 * DAY,
+    tags: ["tech", "cleaning"],
+    folder: "Tech",
+    log: [4 * DAY, 35 * DAY],
+  },
+  {
+    name: "Check the UPS battery",
+    intervalSeconds: 180 * DAY,
+    tags: ["tech"],
+    folder: "Tech",
+    log: [60 * DAY],
+  },
+
+  // --- Car -----------------------------------------------------------------
+  {
+    name: "Check tire pressure",
+    intervalSeconds: 30 * DAY,
+    tags: ["car"],
+    folder: "Car",
+    log: [38 * DAY, 71 * DAY],
+  },
+  {
+    name: "Wash the car",
+    intervalSeconds: 21 * DAY,
+    tags: ["car", "cleaning"],
+    folder: "Car",
+    log: [26 * DAY, 50 * DAY],
+  },
+  {
+    name: "Refuel",
+    intervalSeconds: 10 * DAY,
+    tags: ["car"],
+    folder: "Car",
+    log: [9 * DAY, 19 * DAY, 30 * DAY],
+  },
+  {
+    name: "Oil change",
+    description: "Every 6 months or 8,000 km.",
+    intervalSeconds: 180 * DAY,
+    tags: ["car"],
+    folder: "Car",
+    log: [90 * DAY],
+  },
+
+  // --- Finance -------------------------------------------------------------
+  {
+    name: "Pay the rent",
+    intervalSeconds: 30 * DAY,
+    tags: ["finance", "bills"],
+    folder: "Finance",
+    colorOverdue: "#ef4444",
+    log: [4 * DAY, 34 * DAY, 64 * DAY],
+  },
+  {
+    name: "Review subscriptions",
+    description: "Cancel anything unused.",
+    intervalSeconds: 30 * DAY,
+    tags: ["finance"],
+    folder: "Finance",
+    log: [3 * DAY, 33 * DAY],
+    notes: { 0: "dropped two streaming services" },
+  },
+  {
+    name: "Update the budget",
+    intervalSeconds: 7 * DAY,
+    tags: ["finance"],
+    folder: "Finance",
+    log: [6 * DAY, 13 * DAY, 20 * DAY, 27 * DAY],
+  },
+
+  // --- Outdoors ------------------------------------------------------------
+  {
+    name: "Mow the lawn",
+    intervalSeconds: 10 * DAY,
+    tags: ["outdoors", "garden"],
+    folder: "Outdoors",
+    log: [13 * DAY, 24 * DAY, 35 * DAY],
+  },
+  {
+    name: "Water the outdoor plants",
+    intervalSeconds: 2 * DAY,
+    tags: ["outdoors", "plants", "garden"],
+    folder: "Outdoors",
+    log: [1 * DAY + 2 * HOUR, 3 * DAY, 5 * DAY, 7 * DAY, 9 * DAY, 11 * DAY, 13 * DAY],
+  },
+  {
+    name: "Winterize the garden hose",
+    description: "Archived until the cold comes back.",
+    intervalSeconds: 365 * DAY,
+    tags: ["outdoors"],
+    folder: "Outdoors",
+    archived: true,
+    log: [190 * DAY],
+  },
+  {
+    name: "Summer AC tune-up",
+    description: "Archived for the season.",
+    intervalSeconds: 365 * DAY,
+    tags: ["home"],
+    folder: "Outdoors",
+    archived: true,
+    log: [250 * DAY],
+  },
+
+  // --- No folder (personal) ------------------------------------------------
   {
     name: "Call grandma",
     description: "She likes Sunday afternoons.",
@@ -160,38 +482,31 @@ const SEED: SeedTask[] = [
     notes: { 0: "told her about the new job" },
   },
   {
-    name: "Descale the coffee machine",
-    intervalSeconds: 60 * DAY,
-    folder: "Home",
-    log: [70 * DAY, 132 * DAY],
-  },
-  {
-    name: "Water the herb garden",
-    description: "Basil sulks if it dries out.",
-    intervalSeconds: 2 * DAY,
-    tags: ["plants"],
-    folder: "Home",
-    freezeColor: true,
-    colorFresh: "#10b981",
-    log: [18 * HOUR, 2 * DAY + 6 * HOUR, 4 * DAY, 6 * DAY, 9 * DAY, 12 * DAY],
-  },
-  {
-    name: "Check the smoke alarms",
-    intervalSeconds: 365 * DAY,
-    log: [210 * DAY],
+    name: "Journal",
+    description: "A few lines before sleep.",
+    intervalSeconds: 1 * DAY,
+    tags: ["hobby", "mindfulness"],
+    log: [8 * HOUR, 1 * DAY, 2 * DAY, 4 * DAY, 5 * DAY, 6 * DAY, 7 * DAY, 9 * DAY, 10 * DAY],
   },
   {
     name: "Read before bed",
     description: "Just tracking the streak — no schedule.",
     intervalSeconds: null,
-    log: [16 * HOUR, 2 * DAY, 3 * DAY, 5 * DAY, 6 * DAY, 9 * DAY, 12 * DAY, 13 * DAY, 19 * DAY, 25 * DAY],
+    tags: ["hobby"],
+    log: [14 * HOUR, 2 * DAY, 3 * DAY, 5 * DAY, 6 * DAY, 9 * DAY, 12 * DAY, 13 * DAY, 19 * DAY, 25 * DAY],
   },
   {
-    name: "Winterize the garden hose",
-    description: "Archived until the cold comes back.",
-    intervalSeconds: 365 * DAY,
-    archived: true,
-    log: [190 * DAY],
+    name: "Water the office plant",
+    intervalSeconds: 4 * DAY,
+    tags: ["plants", "work"],
+    log: [6 * HOUR, 4 * DAY, 8 * DAY, 12 * DAY, 16 * DAY],
+  },
+  {
+    name: "Water the succulents",
+    description: "Hardly ever — they like it dry.",
+    intervalSeconds: 21 * DAY,
+    tags: ["plants", "home"],
+    log: [],
   },
 ];
 
@@ -231,7 +546,7 @@ function seed(): DB {
     }
   }
 
-  return { tasks, completions, nextTaskId: taskId, nextCompletionId: completionId };
+  return { tasks, completions, nextTaskId: taskId, nextCompletionId: completionId, seedVersion: SEED_VERSION };
 }
 
 // --- derivation -------------------------------------------------------------
