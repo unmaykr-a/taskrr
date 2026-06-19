@@ -37,6 +37,24 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.14.0",
+    date: "2026-06-16",
+    changes: [
+      feat(
+        "In-app dialogs",
+        "Confirmations and prompts now use themed in-app dialogs instead of the browser's pop-ups. Prefer the native ones? Turn on \"Use browser dialogs\" in Preferences.",
+      ),
+      fix(
+        "Sidebar height",
+        "On shorter desktop layouts the sidebar now stays put and fills the viewport instead of scrolling away with the page.",
+      ),
+      fix(
+        "Smooth scrolling",
+        "The end of a smooth scroll no longer flickers the animated background off and on when it pauses on scroll.",
+      ),
+    ],
+  },
+  {
     version: "1.13.0",
     date: "2026-06-16",
     changes: [

@@ -24,6 +24,7 @@ import { ColorField } from "@/components/ui/ColorPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
 
 const SELECT =
   "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
@@ -60,6 +61,7 @@ export function ThemeCustomizer() {
   const isAdmin = user?.role === "admin";
   const queryClient = useQueryClient();
   const toast = useToast();
+  const { alert } = useConfirm();
   const [name, setName] = useState("");
   const [harmony, setHarmony] = useState<Harmony>("complementary");
   const fileRef = useRef<HTMLInputElement>(null);
@@ -137,7 +139,7 @@ export function ThemeCustomizer() {
         applyTheme({ ...DEFAULT_THEME, ...(JSON.parse(text) as Theme) });
         toast("Theme imported", { tone: "success" });
       })
-      .catch(() => alert("That file isn't a valid Taskrr theme."));
+      .catch(() => void alert({ title: "Import failed", description: "That file isn't a valid Taskrr theme." }));
   }
 
   return (
