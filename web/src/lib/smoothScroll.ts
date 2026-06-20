@@ -49,6 +49,21 @@ function scrollableAncestor(from: Element | null, deltaY: number): HTMLElement |
   return null;
 }
 
+// Whether an eased scroll is currently in flight. The animated background reads
+// this so it can stay paused for the whole smooth scroll instead of flickering
+// on the increasingly sparse scroll events the eased tail emits.
+let animating = false;
+function setAnimating(v: boolean) {
+  if (animating === v) return;
+  animating = v;
+  window.dispatchEvent(new Event("taskrr-smoothscroll"));
+}
+
+/** True while a smooth-wheel animation is running. */
+export function isSmoothScrolling(): boolean {
+  return animating;
+}
+
 /** Install the wheel smoother. Returns an uninstall function. */
 export function installSmoothWheel(): () => void {
   const states = new Map<HTMLElement, ScrollState>();
@@ -80,11 +95,21 @@ export function installSmoothWheel(): () => void {
         states.delete(el);
         return;
       }
+      const before = el.scrollTop;
       el.scrollTop += diff * k;
+      // No movement this frame means the step was below the browser's scroll
+      // granularity (some browsers round scrollTop to whole pixels), so easing
+      // further would stall. Snap home and finish.
+      if (el.scrollTop === before) {
+        el.scrollTop = s.target;
+        states.delete(el);
+        return;
+      }
       s.written = el.scrollTop;
       active = true;
     });
     if (active) raf = requestAnimationFrame(tick);
+    else setAnimating(false);
   };
 
   const onWheel = (e: WheelEvent) => {
@@ -109,6 +134,7 @@ export function installSmoothWheel(): () => void {
     const max = el.scrollHeight - el.clientHeight;
     s.target = Math.max(0, Math.min(max, s.target + px));
     states.set(el, s);
+    setAnimating(true);
     if (!raf) {
       last = performance.now();
       raf = requestAnimationFrame(tick);
@@ -120,5 +146,6 @@ export function installSmoothWheel(): () => void {
     window.removeEventListener("wheel", onWheel);
     if (raf) cancelAnimationFrame(raf);
     states.clear();
+    setAnimating(false);
   };
 }

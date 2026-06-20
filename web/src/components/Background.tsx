@@ -2,6 +2,7 @@ import { useEffect, useRef } from "react";
 
 import { useTheme } from "@/components/ThemeProvider";
 import { usePrefs } from "@/lib/prefs";
+import { isSmoothScrolling } from "@/lib/smoothScroll";
 
 /**
  * Background renders the theme's animated effect on a single full-screen canvas
@@ -531,7 +532,7 @@ export function Background() {
       const frostedBusy =
         frosted &&
         pauseBgOnDrag &&
-        (document.body.classList.contains("win-dragging") || scrolling);
+        (document.body.classList.contains("win-dragging") || scrolling || isSmoothScrolling());
       const shouldRun = !document.hidden && !frostedBusy;
       if (shouldRun && !running && !reduce) {
         running = true;
@@ -557,6 +558,10 @@ export function Background() {
     window.addEventListener("resize", resize);
     document.addEventListener("visibilitychange", recompute);
     window.addEventListener("win-dragging-change", recompute);
+    // Re-evaluate when a smooth-scroll animation starts/stops, so the canvas
+    // stays paused for the whole eased scroll (one pause/resume) instead of
+    // flickering as the eased tail's scroll events grow sparse near the end.
+    window.addEventListener("taskrr-smoothscroll", recompute);
     // capture: scrolls of inner containers (task list, windows) don't bubble.
     window.addEventListener("scroll", onScroll, { capture: true, passive: true });
     recompute();
@@ -568,6 +573,7 @@ export function Background() {
       window.removeEventListener("resize", resize);
       document.removeEventListener("visibilitychange", recompute);
       window.removeEventListener("win-dragging-change", recompute);
+      window.removeEventListener("taskrr-smoothscroll", recompute);
       window.removeEventListener("scroll", onScroll, { capture: true });
     };
   }, [effect, intensity, size, animations, animationSpeed, accent, pauseBgOnDrag]);

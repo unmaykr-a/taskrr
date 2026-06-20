@@ -37,6 +37,16 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.14.1",
+    date: "2026-06-16",
+    changes: [
+      fix(
+        "Background pausing",
+        "With smooth scrolling and pause-on-scroll both on, the animated background no longer flickers off and on at the end of a scroll. It now stays paused for the whole smooth scroll and resumes once.",
+      ),
+    ],
+  },
+  {
     version: "1.14.0",
     date: "2026-06-16",
     changes: [
