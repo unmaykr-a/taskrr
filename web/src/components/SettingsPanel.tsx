@@ -31,7 +31,7 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
   const active = visible.some((i) => i.id === section) ? section : "account";
 
   return (
-    <div className="flex flex-col gap-3 sm:flex-row sm:gap-4">
+    <div className="flex min-h-full flex-col gap-3 sm:flex-row sm:gap-4">
       {/* Phone: a horizontal tab strip across the top (the window is full-screen,
           so this frees the whole width for content). Desktop: a vertical side nav. */}
       <nav
