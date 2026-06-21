@@ -44,6 +44,10 @@ export const RELEASES: Release[] = [
         "Background pausing",
         "With smooth scrolling and pause-on-scroll both on, the animated background no longer flickers off and on at the end of a scroll. It now stays paused for the whole smooth scroll and resumes once.",
       ),
+      fix(
+        "Settings divider",
+        "The divider line in the settings window now runs the full height instead of stopping where the section's content ends.",
+      ),
     ],
   },
   {
