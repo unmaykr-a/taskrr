@@ -36,6 +36,18 @@ The **Task sharing** gate (`tasks_shareable`) turns the whole shared-tasks
 feature on or off for the instance. While off, the share UI is hidden and the
 server refuses new shares. See [Shared Tasks](Shared-Tasks).
 
+## API tokens
+
+The **Let users create API tokens** gate (`api_tokens`, on by default) controls
+whether users can mint bearer tokens for automation. A token reaches only tasks,
+completions, activity and that user's own export - never the admin area,
+password changes or account deletion, which all require a real sign-in.
+
+Turning the gate off stops *new* tokens being created. Tokens that already exist
+keep working until their owner revokes them, so flipping the switch never
+silently breaks an automation someone has already set up. See
+[API Reference](API-Reference#api-tokens).
+
 ## Themes (instance-wide)
 
 - **Set as site default** - publish a theme as the instance default, shown even

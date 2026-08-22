@@ -20,6 +20,7 @@ import { usePrefs } from "@/lib/prefs";
 import { useFlip } from "@/lib/useFlip";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { useNow } from "@/lib/useNow";
+import { type Shortcut, useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -32,6 +33,7 @@ import { ActivityChart } from "@/components/ActivityChart";
 import { BulkBar } from "@/components/BulkBar";
 import { PreferencesSync } from "@/components/PreferencesSync";
 import { WhatsNew } from "@/components/WhatsNew";
+import { type ShortcutHelp, ShortcutsDialog } from "@/components/ShortcutsDialog";
 
 // Human-readable result of an OIDC account-link attempt (see the callback in
 // internal/api/oidc.go, which redirects back here with ?oidcLink=...).
@@ -62,6 +64,11 @@ export default function App() {
     void alert({ title: "Single sign-on", description: message });
   }, [queryClient, alert]);
   const [sidebarOpen, setSidebarOpen] = useState(false);
+  // Keyboard-shortcut targets: the search box to focus, and the two dialogs the
+  // shortcuts open without a button to click.
+  const searchRef = useRef<HTMLInputElement>(null);
+  const [createOpen, setCreateOpen] = useState(false);
+  const [shortcutsOpen, setShortcutsOpen] = useState(false);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
 
@@ -151,6 +158,67 @@ export default function App() {
     return sortTasks(list, prefs.sortBy);
   }, [tasks, filter, now, search, activeTag, prefs.sortBy]);
 
+  // --- keyboard shortcuts -----------------------------------------------------
+  // Single unmodified keys, matching the sidebar's own order so "3" lands on
+  // whatever the third view is rather than on a hard-coded filter. Bindings are
+  // rebuilt each render (cheap) so they always close over current state.
+  const navFilters = useMemo(
+    () => (shareEnabled ? [...FILTERS, ...SHARE_FILTERS] : FILTERS),
+    [shareEnabled],
+  );
+  const shortcuts = useMemo<Shortcut[]>(() => {
+    const list: Shortcut[] = [
+      { key: "n", label: "New task", run: () => setCreateOpen(true) },
+      {
+        key: "/",
+        label: "Search tasks",
+        run: () => {
+          setSidebarOpen(false);
+          searchRef.current?.focus();
+          searchRef.current?.select();
+        },
+      },
+      { key: "?", label: "Show this help", run: () => setShortcutsOpen((v) => !v) },
+      {
+        key: "Escape",
+        label: "Clear search and selection",
+        run: () => {
+          setSearch("");
+          setActiveTag(null);
+          clearSelection();
+        },
+      },
+    ];
+    navFilters.forEach((f, i) => {
+      if (i > 8) return; // only single digits get a key
+      list.push({
+        key: String(i + 1),
+        label: `Go to ${f.label}`,
+        run: () => {
+          setFilter(f.key);
+          setSidebarOpen(false);
+          setSelected(new Set());
+        },
+      });
+    });
+    return list;
+    // eslint-disable-next-line react-hooks/exhaustive-deps
+  }, [navFilters]);
+  useKeyboardShortcuts(shortcuts, prefs.keyboardShortcuts);
+
+  // Grouped for the help overlay: the digits collapse into one row so the list
+  // doesn't become seven near-identical lines.
+  const shortcutHelp = useMemo<ShortcutHelp[]>(
+    () => [
+      { keys: ["n"], label: "New task" },
+      { keys: ["/"], label: "Search tasks" },
+      { keys: ["1", "…", String(Math.min(9, navFilters.length))], label: "Switch view" },
+      { keys: ["Esc"], label: "Clear search and selection" },
+      { keys: ["?"], label: "Show this help" },
+    ],
+    [navFilters.length],
+  );
+
   const filterLabel =
     [...FILTERS, ...SHARE_FILTERS].find((f) => f.key === filter)?.label ?? "Tasks";
   const archivedView = filter === "archived";
@@ -214,6 +282,10 @@ export default function App() {
       <PreferencesSync />
       {/* One-off "what's new" dialog after a version update. */}
       <WhatsNew />
+      {/* Opened by the "n" shortcut — trigger-less, since the buttons that
+          normally open this form render their own instances. */}
+      <CreateTaskDialog hideTrigger open={createOpen} onOpenChange={setCreateOpen} />
+      <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} shortcuts={shortcutHelp} />
       <div className={cn("relative z-10 flex", sideBySide ? "h-[100dvh] overflow-hidden" : "min-h-[100dvh]")}>
         {/* Mobile/landscape drawer scrim */}
         {compact && sidebarOpen && (
@@ -308,6 +380,7 @@ export default function App() {
                   <div className="relative min-w-[8rem] flex-1">
                     <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                     <input
+                      ref={searchRef}
                       value={search}
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Search tasks"
@@ -432,7 +505,7 @@ export default function App() {
 
       {/* Bulk-action bar while tasks are selected. */}
       {selectMode && selectedIds.length > 0 && (
-        <BulkBar ids={selectedIds} archivedView={archivedView} onClear={clearSelection} />
+        <BulkBar tasks={visible} ids={selectedIds} archivedView={archivedView} onClear={clearSelection} />
       )}
 
       {/* Optional bottom-right floating "add" button on compact screens. */}

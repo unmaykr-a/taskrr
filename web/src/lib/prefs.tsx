@@ -55,6 +55,10 @@ export interface Prefs {
   addButton: AddButtonPosition;
 
   // --- layout ---
+  /** Show the derived per-task statistics panel in a task's Manage window. */
+  showTaskStats: boolean;
+  /** How many days the activity chart covers. */
+  activityDays: number;
   /** Task card density. */
   cardSize: CardSize;
   /** How the task list is ordered (see lib/sort.ts). */
@@ -89,6 +93,8 @@ export interface Prefs {
   smoothScroll: boolean;
   /** Show brief toast notifications for actions (save, delete, log, …). */
   toasts: boolean;
+  /** Global single-key shortcuts (new task, search, switch view, help). */
+  keyboardShortcuts: boolean;
   /** Use the browser's native confirm/prompt/alert dialogs instead of the
    *  in-app ones. Off by default (the in-app dialogs match the theme). */
   nativeDialogs: boolean;
@@ -145,6 +151,8 @@ function defaults(): Prefs {
     timePicker: true,
     colorFade: true,
     addButton: "top",
+    showTaskStats: true,
+    activityDays: 30,
     cardSize: "comfortable",
     sortBy: "smart",
     groupByFolder: false,
@@ -160,6 +168,7 @@ function defaults(): Prefs {
     animViews: true,
     smoothScroll: true,
     toasts: true,
+    keyboardShortcuts: true,
     nativeDialogs: false,
     savedThemes: [],
     themeCustom: false,

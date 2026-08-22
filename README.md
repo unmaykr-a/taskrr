@@ -58,14 +58,17 @@ documents every option.
 ## Features
 
 - One-tap logging, or pick a time and add a note. History is editable — every
-  logged completion can be changed or undone later.
+  logged completion can be changed or undone later, and you can click a past day
+  on the calendar to record something you did then.
 - Routines with due dates: cards shade continuously from fresh to overdue,
   with a progress bar and "due in 3d" on each card. Colours are customisable
   per task and globally.
-- A month calendar of what you did and what's coming up, plus an activity
-  chart of your last 30 days.
-- Filters with live counts: all, due soon, overdue, never done, archived —
-  and bulk actions (log / archive / delete several at once).
+- A month calendar of what you did and what's coming up, plus an activity chart
+  over 7 days, 30 days, 90 days or a year.
+- Per-task statistics: how often you *actually* do a thing, your longest gap,
+  and how that compares to the routine you set.
+- Filters with live counts: all, due soon, overdue, never done, archived — and
+  bulk actions (log, tag, move to a folder, archive or delete several at once).
 - Keep larger lists tidy: tags (with search and a tag filter), folder grouping,
   and sorting by name or last-done.
 - Multiple users with per-user data, local password login, and optional OIDC
@@ -78,9 +81,15 @@ documents every option.
   restore, and instance settings.
 - Reminders via webhook when a task is due — point it at ntfy, Gotify,
   Apprise, Home Assistant, a Discord webhook, or anything that accepts JSON.
+- API tokens for the other direction: log a task from a shell script, an NFC
+  tag, or a home automation. A token reaches your tasks and history only — never
+  the admin area or your password.
+- Export everything you own as JSON or CSV, whenever you like.
 - A themeable interface: colour customiser with palette generation, light and
   dark modes, animated backgrounds, frosted glass, floating windows, and
   per-animation toggles. Works well on a phone.
+- Keyboard shortcuts for the things you do constantly (press `?` for the list),
+  and a preference to turn off anything above you'd rather not have.
 
 ## Configuration
 

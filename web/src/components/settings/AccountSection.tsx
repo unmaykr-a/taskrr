@@ -1,14 +1,29 @@
 import { useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { AlertTriangle, ChevronRight, KeyRound, Link2, Link2Off, Trash2, UserRound, Users } from "lucide-react";
+import {
+  AlertTriangle,
+  ChevronRight,
+  Copy,
+  Download,
+  KeyRound,
+  Link2,
+  Link2Off,
+  Plus,
+  Terminal,
+  Trash2,
+  UserRound,
+  Users,
+} from "lucide-react";
 
-import { api } from "@/lib/api";
+import { api, type APIToken } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { RemindersSection } from "@/components/settings/RemindersSection";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/Toast";
+import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { formatDateTime } from "@/lib/time";
 
 /** Account self-service: every signed-in user can change their own username + password. */
 export function AccountSection() {
@@ -252,6 +267,10 @@ export function AccountSection() {
 
       <RemindersSection />
 
+      <ExportSection />
+
+      <APITokensSection />
+
       {/* Advanced: the irreversible self-service actions live here (each gated by
           re-typing the account's own username), under a "Danger zone" label.
           Collapsed by default so it's tucked away. */}
@@ -323,5 +342,186 @@ export function AccountSection() {
         </div>
       </details>
     </div>
+  );
+}
+
+// ExportSection: take your own data with you.
+//
+// Admin backups are whole-database and admin-only, so on a shared instance this
+// is the only way an ordinary user can get their history out — and it's the one
+// thing the demo can offer for real, since its data is already in the browser.
+function ExportSection() {
+  const toast = useToast();
+  const [busy, setBusy] = useState<"json" | "csv" | null>(null);
+
+  const download = async (format: "json" | "csv") => {
+    setBusy(format);
+    try {
+      const blob = await api.exportData(format);
+      const url = URL.createObjectURL(blob);
+      const a = document.createElement("a");
+      a.href = url;
+      a.download = `taskrr-export-${new Date().toISOString().slice(0, 10)}.${format}`;
+      document.body.appendChild(a);
+      a.click();
+      a.remove();
+      // Revoke on the next tick — revoking synchronously can cancel the download
+      // in some browsers before it has read the blob.
+      setTimeout(() => URL.revokeObjectURL(url), 1000);
+    } catch (e) {
+      toast((e as Error).message, { tone: "error" });
+    } finally {
+      setBusy(null);
+    }
+  };
+
+  return (
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Download className="h-4 w-4" /> Export your data
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Every task you own or share, with its full history. JSON keeps the structure;
+        CSV opens in a spreadsheet.
+      </p>
+      <div className="flex flex-wrap gap-2">
+        <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => download("json")}>
+          {busy === "json" ? "Preparing…" : "Download JSON"}
+        </Button>
+        <Button size="sm" variant="outline" disabled={busy !== null} onClick={() => download("csv")}>
+          {busy === "csv" ? "Preparing…" : "Download CSV"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
+// APITokensSection: bearer credentials for automation.
+//
+// The plaintext token exists only in this component's state, for as long as the
+// panel is open after minting it — the server keeps a digest and will never show
+// it again, so the copy affordance has to be right there.
+function APITokensSection() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { confirm } = useConfirm();
+  const { data: config } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
+  const enabled = config?.apiTokens ?? false;
+  const { data: tokens } = useQuery({
+    queryKey: ["api-tokens"],
+    queryFn: api.listAPITokens,
+    enabled,
+  });
+  const [name, setName] = useState("");
+  const [fresh, setFresh] = useState<string | null>(null);
+
+  const create = useMutation({
+    mutationFn: () => api.createAPIToken(name.trim() || "API token"),
+    onSuccess: (t) => {
+      setFresh(t.token);
+      setName("");
+      queryClient.invalidateQueries({ queryKey: ["api-tokens"] });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  const revoke = useMutation({
+    mutationFn: (id: number) => api.deleteAPIToken(id),
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["api-tokens"] });
+      toast("Token revoked", { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  const copy = async (text: string) => {
+    try {
+      await navigator.clipboard.writeText(text);
+      toast("Copied", { tone: "success" });
+    } catch {
+      // Clipboard access needs a secure context, which a LAN instance on plain
+      // HTTP won't have — the token stays selectable on screen either way.
+      toast("Copy failed — select the token and copy it manually", { tone: "error" });
+    }
+  };
+
+  if (!enabled) return null;
+
+  return (
+    <section className="space-y-2">
+      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+        <Terminal className="h-4 w-4" /> API tokens
+      </h3>
+      <p className="text-xs text-muted-foreground">
+        Log a task from a script, an NFC tag, or your home automation. A token reaches
+        your tasks and history only — never the admin area or your password.
+      </p>
+
+      {fresh && (
+        <div className="space-y-1.5 rounded-lg border border-primary/40 bg-primary/10 p-2">
+          <p className="text-xs font-medium">Copy this now — it isn't shown again.</p>
+          <div className="flex items-center gap-1.5">
+            <code className="min-w-0 flex-1 select-all break-all rounded bg-background/60 px-1.5 py-1 text-[11px]">
+              {fresh}
+            </code>
+            <Button size="icon" variant="outline" className="h-7 w-7 shrink-0" aria-label="Copy token" onClick={() => copy(fresh)}>
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <p className="break-all text-[11px] text-muted-foreground">
+            curl -H &quot;Authorization: Bearer {fresh.slice(0, 8)}…&quot; {window.location.origin}/api/tasks
+          </p>
+          <Button size="sm" variant="ghost" className="h-7" onClick={() => setFresh(null)}>
+            Done
+          </Button>
+        </div>
+      )}
+
+      <div className="flex flex-wrap items-center gap-2">
+        <Input
+          value={name}
+          onChange={(e) => setName(e.target.value)}
+          placeholder="Where will it live? e.g. kitchen tablet"
+          className="min-w-0 flex-1 basis-48"
+          onKeyDown={(e) => e.key === "Enter" && !create.isPending && create.mutate()}
+        />
+        <Button size="sm" disabled={create.isPending} onClick={() => create.mutate()}>
+          <Plus className="h-3.5 w-3.5" /> {create.isPending ? "Creating…" : "New token"}
+        </Button>
+      </div>
+
+      {tokens && tokens.length > 0 && (
+        <ul className="space-y-1">
+          {tokens.map((t: APIToken) => (
+            <li key={t.id} className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5">
+              <div className="min-w-0">
+                <p className="truncate text-sm">{t.name}</p>
+                <p className="truncate text-[11px] text-muted-foreground">
+                  {t.lastUsedAt ? `Last used ${formatDateTime(t.lastUsedAt)}` : "Never used"}
+                </p>
+              </div>
+              <Button
+                size="icon"
+                variant="ghost"
+                className="h-7 w-7 shrink-0 hover:text-destructive"
+                aria-label={`Revoke ${t.name}`}
+                disabled={revoke.isPending}
+                onClick={async () => {
+                  const ok = await confirm({
+                    title: "Revoke token",
+                    description: `Anything using "${t.name}" stops working immediately. This can't be undone.`,
+                    confirmText: "Revoke",
+                    destructive: true,
+                  });
+                  if (ok) revoke.mutate(t.id);
+                }}
+              >
+                <Trash2 className="h-3.5 w-3.5" />
+              </Button>
+            </li>
+          ))}
+        </ul>
+      )}
+    </section>
   );
 }

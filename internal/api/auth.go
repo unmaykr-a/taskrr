@@ -43,6 +43,11 @@ const (
 	// keyTasksShareable: admin gate for the whole shared-tasks feature. When off,
 	// the share UI is hidden and the share endpoint refuses new shares.
 	keyTasksShareable = "tasks_shareable"
+	// keyAPITokens: admin gate for per-user API tokens. On by default (a solo
+	// instance's owner is its admin); turning it off hides the UI and refuses
+	// new tokens. Existing tokens keep working until revoked, so flipping this
+	// can't silently break an automation someone already set up.
+	keyAPITokens = "api_tokens"
 
 	// --- branding (admin-editable; shown signed-out, so exposed in authConfig) ---
 	keyBrandName     = "brand_name"      // app name in the sidebar + login
@@ -67,6 +72,23 @@ type userCtxKey struct{}
 // a user is required, so the SPA and public auth endpoints stay reachable.
 func (s *Server) withUser(next http.Handler) http.Handler {
 	return http.HandlerFunc(func(w http.ResponseWriter, r *http.Request) {
+		// A bearer token authenticates automation. It's checked first and, when
+		// present, is the only credential considered — so a browser that happens
+		// to hold both never silently upgrades a token request to full session
+		// privileges (tokenScope narrows what a token may reach).
+		if raw := bearerToken(r); raw != "" {
+			hash := auth.HashToken(raw)
+			if u, err := s.store.APITokenUser(r.Context(), hash); err == nil {
+				_ = s.store.TouchAPIToken(r.Context(), hash)
+				ctx := context.WithValue(r.Context(), userCtxKey{}, u)
+				ctx = context.WithValue(ctx, tokenCtxKey{}, true)
+				next.ServeHTTP(w, r.WithContext(ctx))
+				return
+			}
+			// A bad token is simply unauthenticated; the handler decides the code.
+			next.ServeHTTP(w, r)
+			return
+		}
 		if c, err := r.Cookie(sessionCookie); err == nil && c.Value != "" {
 			hash := auth.HashToken(c.Value)
 			if u, err := s.store.SessionUser(r.Context(), hash); err == nil {
@@ -233,6 +255,7 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		"themesShareable":     s.boolSetting(ctx, keyThemesShareable, false),
 		"themesShareUsers":    s.boolSetting(ctx, keyThemesShareUsers, false),
 		"tasksShareable":      s.boolSetting(ctx, keyTasksShareable, false),
+		"apiTokens":           s.boolSetting(ctx, keyAPITokens, true),
 		"branding":            s.branding(ctx),
 	})
 }
@@ -1379,6 +1402,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyThemesShareable:       s.boolSetting(ctx, keyThemesShareable, false),
 		keyThemesShareUsers:      s.boolSetting(ctx, keyThemesShareUsers, false),
 		keyTasksShareable:        s.boolSetting(ctx, keyTasksShareable, false),
+		keyAPITokens:             s.boolSetting(ctx, keyAPITokens, true),
 		keyBrandName:             get(keyBrandName),
 		keyBrandTitle:            get(keyBrandTitle),
 		keyBrandTagline:          get(keyBrandTagline),
@@ -1407,6 +1431,7 @@ type settingsPatch struct {
 	ThemesShareable     *bool   `json:"themes_shareable"`
 	ThemesShareUsers    *bool   `json:"themes_share_users"`
 	TasksShareable      *bool   `json:"tasks_shareable"`
+	APITokens           *bool   `json:"api_tokens"`
 	BrandName           *string `json:"brand_name"`
 	BrandTitle          *string `json:"brand_title"`
 	BrandTagline        *string `json:"brand_tagline"`
@@ -1474,6 +1499,9 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	if req.TasksShareable != nil && !set(keyTasksShareable, boolStr(*req.TasksShareable)) {
+		return
+	}
+	if req.APITokens != nil && !set(keyAPITokens, boolStr(*req.APITokens)) {
 		return
 	}
 	// Branding. The icon is a data URL (or empty to clear); cap its size so it

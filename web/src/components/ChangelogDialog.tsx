@@ -6,7 +6,13 @@ import { DEMO } from "@/lib/demo";
 import { useAuth } from "@/components/AuthProvider";
 import { compareVersions, CURRENT_VERSION, formatReleaseDate, type Release, RELEASES } from "@/lib/releases";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Project links surfaced in the changelog footer.
 const REPO_URL = "https://github.com/unmaykr-a/taskrr";
@@ -59,6 +65,9 @@ export function ChangelogDialog({
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>Changelog</DialogTitle>
+          {/* Radix wires this to aria-describedby, so a screen reader announces
+              what the dialog is rather than just its title. */}
+          <DialogDescription>Every release so far, newest first.</DialogDescription>
         </DialogHeader>
         <div className="-mr-2 max-h-[55vh] space-y-5 overflow-y-auto pr-2">
           {RELEASES.map((r) => (

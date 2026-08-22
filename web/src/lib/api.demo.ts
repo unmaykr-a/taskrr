@@ -642,6 +642,9 @@ const DEMO_AUTH: AuthConfig = {
   themesShareable: false,
   themesShareUsers: false,
   tasksShareable: false,
+  // No server, so nothing could authenticate a bearer token — the section is
+  // hidden rather than shown broken.
+  apiTokens: false,
   branding: {
     name: "Taskrr",
     title: "",
@@ -850,6 +853,55 @@ export const demoApi: Api = {
   },
 
   changePassword: () => tick(undefined),
+
+  // Export works for real in the demo: the data is all in the browser already,
+  // so the same Blob contract is satisfied without a server. It's also the one
+  // way to get your sandbox data out before "Reset demo" clears it.
+  exportData: (format: "json" | "csv") => {
+    const db = loadDB();
+    const tasks = db.tasks.map((t) => ({
+      ...toTask(db, t),
+      completions: db.completions
+        .filter((c) => c.taskId === t.id)
+        .sort((a, b) => b.completedAt.localeCompare(a.completedAt))
+        .map(toCompletion),
+    }));
+
+    if (format === "csv") {
+      const cell = (v: string) => `"${String(v ?? "").replace(/"/g, '""')}"`;
+      const rows = [
+        ["task", "description", "folder", "tags", "routine_seconds", "archived", "completed_at", "note"],
+      ];
+      for (const t of tasks) {
+        const base = [
+          t.name,
+          t.description,
+          t.folder,
+          t.tags.join(" "),
+          t.intervalSeconds == null ? "" : String(t.intervalSeconds),
+          t.archivedAt ? "true" : "false",
+        ];
+        if (t.completions.length === 0) rows.push([...base, "", ""]);
+        else for (const c of t.completions) rows.push([...base, c.completedAt, c.note]);
+      }
+      const csv = rows.map((r) => r.map(cell).join(",")).join("\r\n") + "\r\n";
+      return tick(new Blob([csv], { type: "text/csv;charset=utf-8" }));
+    }
+
+    const doc = {
+      format: "taskrr-export-v1",
+      exportedAt: new Date().toISOString(),
+      username: demoUser().username,
+      tasks,
+    };
+    return tick(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }));
+  },
+
+  // Bearer tokens need a server to authenticate against; the UI is gated off
+  // by authConfig.apiTokens above, so these are never reached.
+  listAPITokens: () => tick([]),
+  createAPIToken: notAvailable,
+  deleteAPIToken: notAvailable,
 
   getPreferences: () => {
     try {
