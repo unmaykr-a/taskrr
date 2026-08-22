@@ -12,6 +12,8 @@
 
 import { createContext } from "react";
 
+import { AA_CONTRAST, contrastRatio, ensureContrast } from "./color";
+
 export type ThemeMode = "light" | "dark";
 export type BackgroundEffect =
   | "none"
@@ -131,6 +133,20 @@ export function hslToHex(h: number, s: number, l: number): string {
   return rgbToHex(r, g, b);
 }
 
+/**
+ * The colour a surface actually ends up being on screen.
+ *
+ * Tokens are written as rounded "h s% l%" triplets, so what gets painted is a
+ * shade or two off the hex the theme stores. That is invisible to the eye but
+ * not to a contrast check: measuring against the stored hex can clear 4.5:1 by
+ * a hair while the painted surface sits just under it. Round-trip through the
+ * same rounding the token write does, and the check matches what is rendered.
+ */
+function asPainted(hex: string): string {
+  const [h, s, l] = hexToHslTriplet(hex).split(" ");
+  return hslToHex(parseFloat(h), parseFloat(s), parseFloat(l));
+}
+
 /** Linear blend between two hex colours, t in 0..1. */
 function mix(a: string, b: string, t: number): string {
   const x = hexToRgb(a);
@@ -194,6 +210,37 @@ const FONT_STACKS: Record<FontChoice, string> = {
   sans: 'ui-sans-serif, system-ui, -apple-system, "Segoe UI", Roboto, Helvetica, Arial, sans-serif',
 };
 
+/**
+ * Secondary text: a softened foreground that still has to be readable.
+ *
+ * Blending the text colour 45% toward the page background is the obvious way to
+ * "dim" it, and it behaves well in dark themes — bright text dimmed against a
+ * dark surface keeps plenty of separation. In light themes the same blend runs
+ * the wrong way: dark text lightened against an already-light surface landed
+ * around 3.5:1, below the 4.5:1 needed for body text, which put every timestamp,
+ * description, and sidebar count under the threshold at once.
+ *
+ * So dim first, then pull back toward the foreground until the result clears AA
+ * on every surface muted text actually sits on (page, panel, sidebar). Dark
+ * themes already pass and come through untouched.
+ */
+function mutedForeground(c: ThemeColors): string {
+  const surfaces = [c.background, c.card, c.sidebar].map(asPainted);
+  let muted = mix(c.foreground, c.background, 0.45);
+
+  // Both sides of the comparison get rounded on their way into a token, so
+  // hitting 4.5:1 on paper can still land at 4.43:1 on screen. Aim at the
+  // target, look at what actually gets painted, and aim a little higher until
+  // the rendered pair clears it — a couple of passes at most.
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const target = AA_CONTRAST + attempt * 0.1;
+    for (const surface of surfaces) muted = ensureContrast(muted, surface, target);
+    const painted = asPainted(muted);
+    if (surfaces.every((s) => contrastRatio(painted, s) >= AA_CONTRAST)) break;
+  }
+  return muted;
+}
+
 /** Write a theme to the document as CSS custom properties. */
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -211,7 +258,7 @@ export function applyTheme(theme: Theme) {
   set("--secondary", mix(c.card, c.foreground, 0.08));
   set("--secondary-foreground", c.foreground);
   set("--muted", mix(c.card, c.foreground, 0.08));
-  set("--muted-foreground", mix(c.foreground, c.background, 0.45));
+  set("--muted-foreground", mutedForeground(c));
   set("--accent", c.border);
   set("--accent-foreground", c.foreground);
   set("--border", c.border);

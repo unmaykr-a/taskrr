@@ -38,10 +38,12 @@ const COLOR_FIELDS: { key: keyof ThemeColors; label: string }[] = [
   { key: "accent", label: "Accent" },
 ];
 
-const EFFECTS: { value: BackgroundEffect; label: string }[] = [
+const EFFECTS = [
   { value: "none", label: "None" },
   { value: "stars", label: "Starfield" },
+  { value: "constellations", label: "Constellations" },
   { value: "synapse", label: "Synapse" },
+  { value: "dots", label: "Drifting dots" },
   { value: "perlin", label: "Flow field" },
   { value: "aurora", label: "Aurora" },
   { value: "waves", label: "Waves" },
@@ -51,7 +53,17 @@ const EFFECTS: { value: BackgroundEffect; label: string }[] = [
   { value: "embers", label: "Embers" },
   { value: "fireflies", label: "Fireflies" },
   { value: "comets", label: "Comets" },
-];
+] as const satisfies readonly { value: BackgroundEffect; label: string }[];
+
+// Compile-time guard that the picker offers every effect the renderer knows.
+// "constellations" and "dots" were both implemented in Background.tsx and one of
+// them shipped as the midnight preset's background, but neither was ever listed
+// here — so the dropdown read "None" while constellations animated behind it,
+// and picking anything else lost the effect for good. A missing entry is now a
+// type error naming the effect instead of a silently unreachable option.
+type UnlistedEffect = Exclude<BackgroundEffect, (typeof EFFECTS)[number]["value"]>;
+const _everyEffectIsListed: [UnlistedEffect] extends [never] ? true : UnlistedEffect = true;
+void _everyEffectIsListed;
 
 /** The visual theme customizer (the "Theme" settings section). */
 export function ThemeCustomizer() {
