@@ -18,6 +18,20 @@ a Raspberry Pi (`arm64`) or any small box.
 In a single SQLite file under `./data` (`TASKRR_DB_PATH`). Backing up or moving
 the instance is copying that folder. See [Backups and Restore](Backups-and-Restore).
 
+### How do I get *my* data out, without being an admin?
+
+**Settings -> Account -> Export your data**, as JSON (keeps the structure) or CSV
+(opens in a spreadsheet). It covers every task you own or share, with its full
+history. Admin backups are whole-database and admin-only; this is the per-user
+equivalent. See [API Reference](API-Reference#data-export).
+
+### Can something else log a task for me - a script, or Home Assistant?
+
+Yes. Create an API token under **Settings -> Account -> API tokens** and send it
+as `Authorization: Bearer <token>`. Tokens reach your tasks and history only, so
+one leaking cannot cost you the instance or your password. Admins can turn the
+feature off instance-wide. See [API Reference](API-Reference#api-tokens).
+
 ## Sign-in and accounts
 
 ### I forgot the admin password.

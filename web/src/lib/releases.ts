@@ -37,6 +37,48 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.15.0",
+    date: "2026-08-22",
+    changes: [
+      feat(
+        "Task statistics",
+        "A task's Manage window now shows how it actually goes: the typical gap between times you did it, the longest gap, and how that compares to its routine. Turn it off under Preferences \u2192 Task statistics.",
+      ),
+      feat(
+        "Activity chart range",
+        "Switch the chart between 7 days, 30 days, 90 days and a year. A year groups into weeks so it stays readable.",
+      ),
+      feat(
+        "Keyboard shortcuts",
+        "Press ? for the list. n for a new task, / to search, 1-9 to switch views, Esc to clear. Turn them off under Preferences \u2192 Keyboard shortcuts.",
+      ),
+      feat(
+        "Bulk tags and folders",
+        "Select several tasks and add a tag or move them to a folder in one go. Tagging adds to what each task already has rather than replacing it.",
+      ),
+      feat(
+        "Log onto a past day",
+        "Click any past day in the calendar to record something you did then, without opening the task first.",
+      ),
+      feat(
+        "Export your data",
+        "Download every task and its full history as JSON or CSV, from Settings \u2192 Account.",
+      ),
+      feat(
+        "API tokens",
+        "Log a task from a script, an NFC tag, or your home automation. A token reaches your tasks and history only \u2014 never the admin area or your password. Admins can switch the feature off instance-wide.",
+      ),
+      feat(
+        "Background effects",
+        "Constellations and drifting dots are now in the background picker. Constellations shipped with the midnight preset but could never be chosen \u2014 and picking anything else lost it for good.",
+      ),
+      fix(
+        "Light theme readability",
+        "Secondary text, task status labels and overdue dates were too faint on light themes to meet the usual contrast standard. They now stay readable while keeping their colour.",
+      ),
+    ],
+  },
+  {
     version: "1.14.1",
     date: "2026-06-16",
     changes: [

@@ -63,8 +63,14 @@ The sidebar offers filter views with live counts:
 - **Never done** - no completions yet.
 - **Archived** - soft-archived tasks (see below).
 
-Select several tasks to run a **bulk action**: log, archive, restore, or delete
-them together, with a confirmation that states the count.
+Select several tasks to run a **bulk action**: log, add a tag, move them to a
+folder, archive, restore, or delete them together, with a confirmation that
+states the count for the destructive one.
+
+Bulk tagging *adds* to whatever each task already has rather than replacing its
+tags, so tagging a mixed selection never quietly wipes the tags on some of them.
+Moving to a folder is a genuine move; leaving the folder box empty takes the
+selection out of any folder.
 
 ## Archiving vs deleting
 
@@ -79,10 +85,50 @@ them together, with a confirmation that states the count.
 
 - A **month calendar** shows what you did on each day and what is coming up
   (upcoming due dates for routine tasks).
-- An **activity chart** summarises your completions over the last 30 days.
+- Clicking any **past day** opens it, and you can log a task straight onto that
+  day without opening the task first - the quickest way to record something you
+  did yesterday. Future days only open when something is scheduled for them.
+- An **activity chart** summarises your completions over 7 days, 30 days, 90
+  days or a year. The range follows your account. A year groups into weeks so
+  the shape stays readable in a narrow panel.
+
+## Task statistics
+
+A task's Manage window shows what its history says about it, once there are at
+least two completions:
+
+- **Typically every** - the median gap between completions. The median rather
+  than the average, so one holiday or one burst of catching up does not redefine
+  what normal looks like for the task.
+- **Logged** - how many times, and since when.
+- **Longest gap** - the worst it has slipped.
+- **On time** - with a routine, the share of gaps that came in within it.
+
+With a routine there is also a one-line verdict: whether you run ahead of it,
+right on it, or behind. A task with exactly two completions has only one gap,
+which is a measurement rather than a pattern, so it shows a reduced panel and no
+verdict.
+
+Turn the whole panel off under **Settings -> Preferences -> Task statistics**.
+
+## Keyboard shortcuts
+
+Press <kbd>?</kbd> for the list. Single keys, no modifiers, and never while you
+are typing in a field:
+
+| Key | Action |
+| --- | --- |
+| <kbd>n</kbd> | New task |
+| <kbd>/</kbd> | Focus the search box |
+| <kbd>1</kbd>-<kbd>9</kbd> | Switch to that sidebar view |
+| <kbd>Esc</kbd> | Clear search, tag filter and selection |
+| <kbd>?</kbd> | Show the shortcut list |
+
+Turn them off under **Settings -> Preferences -> Keyboard shortcuts**.
 
 ## See also
 
 - [Shared Tasks](Shared-Tasks) - sharing a task with another user.
 - [Reminders](Reminders) - a webhook nudge when a task is due.
 - [Theming and Branding](Theming-and-Branding) - colours and the overall look.
+- [API Reference](API-Reference#api-tokens) - API tokens and data export.

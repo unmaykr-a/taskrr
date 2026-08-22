@@ -3,7 +3,14 @@ import { useEffect, useState } from "react";
 import { CURRENT_VERSION, type Release, releasesSince } from "@/lib/releases";
 import { ReleaseEntry } from "@/components/ChangelogDialog";
 import { Button } from "@/components/ui/button";
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from "@/components/ui/dialog";
+import {
+  Dialog,
+  DialogContent,
+  DialogDescription,
+  DialogFooter,
+  DialogHeader,
+  DialogTitle,
+} from "@/components/ui/dialog";
 
 // Per-device record of the last version this browser saw the app at.
 const SEEN_KEY = "taskrr-seen-version";
@@ -60,6 +67,11 @@ export function WhatsNew() {
       <DialogContent className="sm:max-w-2xl">
         <DialogHeader>
           <DialogTitle>What's new in v{CURRENT_VERSION}</DialogTitle>
+          <DialogDescription>
+            {updates.length === 1
+              ? "Everything that changed in this update."
+              : `Everything that changed across the last ${updates.length} updates.`}
+          </DialogDescription>
         </DialogHeader>
         <div className="-mr-2 max-h-[60vh] space-y-5 overflow-y-auto pr-2">
           {updates.map((r) => (
