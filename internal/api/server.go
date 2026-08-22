@@ -25,6 +25,9 @@ type TaskStore interface {
 	CreateTask(ctx context.Context, ownerID int64, in store.TaskInput) (store.Task, error)
 	UpdateTask(ctx context.Context, ownerID, id int64, in store.TaskInput) (store.Task, error)
 	SetTaskArchived(ctx context.Context, ownerID, id int64, archived bool) (store.Task, error)
+	SetTaskSnoozed(ctx context.Context, ownerID, id int64, until *time.Time) (store.Task, error)
+	SetTaskPinned(ctx context.Context, ownerID, id int64, pinned bool) (store.Task, error)
+	DuplicateTask(ctx context.Context, ownerID, id int64, name string) (store.Task, error)
 	DeleteTask(ctx context.Context, ownerID, id int64) error
 
 	AddCompletion(ctx context.Context, ownerID, taskID int64, completedAt time.Time, note string) (store.Completion, error)
@@ -224,6 +227,11 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/tasks/{id}/archive", s.handleArchiveTask)
 	mux.HandleFunc("POST /api/tasks/{id}/unarchive", s.handleUnarchiveTask)
 	mux.HandleFunc("DELETE /api/tasks/{id}", s.handleDeleteTask)
+	// Scheduling and list actions that don't belong in the edit form.
+	mux.HandleFunc("POST /api/tasks/{id}/snooze", s.handleSnoozeTask)
+	mux.HandleFunc("POST /api/tasks/{id}/skip", s.handleSkipTask)
+	mux.HandleFunc("POST /api/tasks/{id}/pin", s.handlePinTask)
+	mux.HandleFunc("POST /api/tasks/{id}/duplicate", s.handleDuplicateTask)
 
 	// Sharing: the owner invites a member; members respond/leave; anyone with
 	// access lists members; a user sees their own incoming requests + opt-out.

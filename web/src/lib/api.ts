@@ -27,6 +27,13 @@ export interface Task {
   folder: string;
   /** Non-null when the task is soft-archived (hidden from the normal views). */
   archivedAt: string | null;
+  /** Holds the task back from being due until this time; null = not snoozed.
+   *  Backs both "snooze until" and "skip this cycle". */
+  snoozedUntil: string | null;
+  /** Keeps the task at the top of the list whatever the sort. */
+  pinned: boolean;
+  /** Per-task override for the reminder lead; null uses the account setting. */
+  reminderLeadSeconds: number | null;
   createdAt: string;
   updatedAt: string;
   lastCompletedAt: string | null;
@@ -276,6 +283,10 @@ export interface TaskInput {
   tags?: string[];
   /** Optional single group name (empty = ungrouped). */
   folder?: string;
+  /** Keep the task at the top of the list. */
+  pinned?: boolean;
+  /** Reminder lead override in seconds, or null to use the account setting. */
+  reminderLeadSeconds?: number | null;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -324,6 +335,26 @@ const httpApi = {
   /** Restore a previously archived task. */
   unarchiveTask: (id: number) =>
     request<Task>(`/api/tasks/${id}/unarchive`, { method: "POST" }),
+
+  /** Hold a task back until `untilISO`, or pass null to clear the snooze. */
+  snoozeTask: (id: number, untilISO: string | null) =>
+    request<Task>(`/api/tasks/${id}/snooze`, {
+      method: "POST",
+      body: JSON.stringify({ until: untilISO ?? "" }),
+    }),
+
+  /** Push a routine task one whole cycle forward without logging anything. */
+  skipTask: (id: number) => request<Task>(`/api/tasks/${id}/skip`, { method: "POST" }),
+
+  pinTask: (id: number, pinned: boolean) =>
+    request<Task>(`/api/tasks/${id}/pin`, { method: "POST", body: JSON.stringify({ pinned }) }),
+
+  /** Copy a task's definition (not its history) into a new task. */
+  duplicateTask: (id: number, name?: string) =>
+    request<Task>(`/api/tasks/${id}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({ name: name ?? "" }),
+    }),
 
   /** Log a completion with an explicit time and/or note (the Advanced dialog). */
   completeTask: (id: number, input: { note?: string; completedAt?: string }) =>

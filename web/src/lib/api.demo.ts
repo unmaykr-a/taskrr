@@ -47,6 +47,11 @@ interface StoredTask {
   tags: string[];
   folder: string;
   archivedAt: string | null;
+  // Optional so a sandbox saved by an older demo build still loads; the
+  // projection below fills in the defaults.
+  snoozedUntil?: string | null;
+  pinned?: boolean;
+  reminderLeadSeconds?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -567,6 +572,9 @@ function toTask(db: DB, t: StoredTask): Task {
     tags: t.tags ?? [],
     folder: t.folder ?? "",
     archivedAt: t.archivedAt,
+    snoozedUntil: t.snoozedUntil ?? null,
+    pinned: t.pinned ?? false,
+    reminderLeadSeconds: t.reminderLeadSeconds ?? null,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
     lastCompletedAt: last,
@@ -684,6 +692,9 @@ export const demoApi: Api = {
       tags: input.tags ?? [],
       folder: input.folder ?? "",
       archivedAt: null,
+      snoozedUntil: null,
+      pinned: input.pinned ?? false,
+      reminderLeadSeconds: input.reminderLeadSeconds ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -703,9 +714,71 @@ export const demoApi: Api = {
     if (input.freezeColor !== undefined) t.freezeColor = input.freezeColor;
     if (input.tags !== undefined) t.tags = input.tags;
     if (input.folder !== undefined) t.folder = input.folder;
+    if (input.pinned !== undefined) t.pinned = input.pinned;
+    if (input.reminderLeadSeconds !== undefined) t.reminderLeadSeconds = input.reminderLeadSeconds;
     t.updatedAt = new Date().toISOString();
     saveDB(db);
     return tick(toTask(db, t));
+  },
+
+  snoozeTask: (id: number, untilISO: string | null) => {
+    const db = loadDB();
+    const t = findTask(db, id);
+    // Same rule as the server: a snooze already in the past is simply over.
+    t.snoozedUntil = untilISO && new Date(untilISO).getTime() > Date.now() ? untilISO : null;
+    t.updatedAt = new Date().toISOString();
+    saveDB(db);
+    return tick(toTask(db, t));
+  },
+
+  skipTask: (id: number) => {
+    const db = loadDB();
+    const t = findTask(db, id);
+    if (!t.intervalSeconds || t.intervalSeconds <= 0) {
+      return Promise.reject(new Error("only a task with a routine has a cycle to skip"));
+    }
+    const projected = toTask(db, t);
+    const interval = t.intervalSeconds * 1000;
+    // Effective due = max(last completion + interval, current snooze).
+    let due = projected.lastCompletedAt
+      ? new Date(projected.lastCompletedAt).getTime() + interval
+      : Date.now();
+    if (t.snoozedUntil) due = Math.max(due, new Date(t.snoozedUntil).getTime());
+    let next = due + interval;
+    // Skipping something several cycles overdue still has to land ahead of now.
+    while (next <= Date.now()) next += interval;
+    t.snoozedUntil = new Date(next).toISOString();
+    t.updatedAt = new Date().toISOString();
+    saveDB(db);
+    return tick(toTask(db, t));
+  },
+
+  pinTask: (id: number, pinned: boolean) => {
+    const db = loadDB();
+    const t = findTask(db, id);
+    t.pinned = pinned;
+    t.updatedAt = new Date().toISOString();
+    saveDB(db);
+    return tick(toTask(db, t));
+  },
+
+  duplicateTask: (id: number, name?: string) => {
+    const db = loadDB();
+    const src = findTask(db, id);
+    const now = new Date().toISOString();
+    // Definition only: no history, no snooze, never archived.
+    const copy: StoredTask = {
+      ...src,
+      id: db.nextTaskId++,
+      name: (name ?? "").trim() || `${src.name} (copy)`,
+      archivedAt: null,
+      snoozedUntil: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.tasks.push(copy);
+    saveDB(db);
+    return tick(toTask(db, copy));
   },
 
   deleteTask: (id: number) => {

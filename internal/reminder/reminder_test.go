@@ -107,6 +107,60 @@ func TestTickHonoursLeadTime(t *testing.T) {
 	}
 }
 
+// A snoozed task must go quiet. Snoozing is how someone says "not now"; a
+// reminder arriving anyway is the exact thing the feature exists to stop.
+func TestTickStaysQuietWhileSnoozed(t *testing.T) {
+	var hits int32
+	srv := countingServer(&hits)
+	defer srv.Close()
+
+	// Overdue by an hour on its own, but snoozed for another two days.
+	fs := &fakeStore{cands: []store.ReminderCandidate{{
+		TaskID: 4, IntervalSecs: 3600, WebhookURL: srv.URL, LeadSeconds: 0,
+		LastCompleted: time.Now().Add(-2 * time.Hour).UTC(),
+		SnoozedUntil:  time.Now().Add(48 * time.Hour).UTC(),
+	}}}
+	testService(fs).Tick(context.Background())
+	if got := atomic.LoadInt32(&hits); got != 0 {
+		t.Fatalf("a snoozed task must not send a reminder, got %d", got)
+	}
+}
+
+// Once the snooze has run out the task is due again and should fire normally.
+func TestTickFiresAgainOnceTheSnoozeHasPassed(t *testing.T) {
+	var hits int32
+	srv := countingServer(&hits)
+	defer srv.Close()
+
+	fs := &fakeStore{cands: []store.ReminderCandidate{{
+		TaskID: 5, IntervalSecs: 3600, WebhookURL: srv.URL, LeadSeconds: 0,
+		LastCompleted: time.Now().Add(-5 * time.Hour).UTC(),
+		SnoozedUntil:  time.Now().Add(-time.Minute).UTC(), // expired
+	}}}
+	testService(fs).Tick(context.Background())
+	if got := atomic.LoadInt32(&hits); got != 1 {
+		t.Fatalf("expected a reminder once the snooze expired, got %d", got)
+	}
+}
+
+// A snooze earlier than the natural due time must not drag the reminder forward.
+func TestTickIgnoresASnoozeBeforeTheDueTime(t *testing.T) {
+	var hits int32
+	srv := countingServer(&hits)
+	defer srv.Close()
+
+	// Due in 50 minutes; a snooze 10 minutes out is irrelevant.
+	fs := &fakeStore{cands: []store.ReminderCandidate{{
+		TaskID: 6, IntervalSecs: 3600, WebhookURL: srv.URL, LeadSeconds: 0,
+		LastCompleted: time.Now().Add(-10 * time.Minute).UTC(),
+		SnoozedUntil:  time.Now().Add(10 * time.Minute).UTC(),
+	}}}
+	testService(fs).Tick(context.Background())
+	if got := atomic.LoadInt32(&hits); got != 0 {
+		t.Fatalf("expected no reminder before the real due time, got %d", got)
+	}
+}
+
 func TestBlockInternalIP(t *testing.T) {
 	blocked := []string{"127.0.0.1", "::1", "169.254.169.254", "0.0.0.0", "224.0.0.1", "fe80::1"}
 	for _, s := range blocked {

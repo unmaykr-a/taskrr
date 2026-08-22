@@ -1,7 +1,7 @@
 import { describe, expect, it } from "vitest";
 
 import type { Task } from "@/lib/api";
-import { NEUTRAL_COLOR, nextDue, stalenessTint, taskStaleness } from "@/lib/staleness";
+import { isSnoozed, NEUTRAL_COLOR, nextDue, stalenessTint, taskStaleness } from "@/lib/staleness";
 
 // A small factory so each test only specifies the fields it cares about.
 function task(partial: Partial<Task>): Task {
@@ -16,6 +16,9 @@ function task(partial: Partial<Task>): Task {
     tags: [],
     folder: "",
     archivedAt: null,
+    snoozedUntil: null,
+    pinned: false,
+    reminderLeadSeconds: null,
     createdAt: "",
     updatedAt: "",
     lastCompletedAt: null,
@@ -134,5 +137,70 @@ describe("nextDue", () => {
       lastCompletedAt: "2026-01-01T00:00:00.000Z",
     });
     expect(nextDue(t)?.toISOString()).toBe("2026-01-02T00:00:00.000Z");
+  });
+});
+
+describe("snooze", () => {
+  const later = new Date(Date.now() + 3 * DAY).toISOString();
+  const earlier = new Date(Date.now() - HOUR).toISOString();
+
+  it("recognises an active snooze and ignores an expired one", () => {
+    expect(isSnoozed(task({ snoozedUntil: later }))).toBe(true);
+    expect(isSnoozed(task({ snoozedUntil: earlier }))).toBe(false);
+    expect(isSnoozed(task({ snoozedUntil: null }))).toBe(false);
+  });
+
+  it("takes precedence over overdue, which is the whole point", () => {
+    const overdue = { lastCompletedAt: new Date(Date.now() - 30 * DAY).toISOString(), intervalSeconds: 7 * 86400 };
+    expect(taskStaleness(task(overdue))).toBe("overdue");
+    expect(taskStaleness(task({ ...overdue, snoozedUntil: later }))).toBe("snoozed");
+  });
+
+  it("does not hide the fact that a task has never been done", () => {
+    // "Never done" is a fact about history; snoozing is about scheduling. A
+    // never-done task that is snoozed reports snoozed, but once the snooze
+    // expires it goes back to never-done rather than to a cadence bucket.
+    expect(taskStaleness(task({ snoozedUntil: later }))).toBe("snoozed");
+    expect(taskStaleness(task({ snoozedUntil: earlier }))).toBe("none");
+  });
+
+  it("reverts to the real bucket once the snooze expires", () => {
+    const overdue = {
+      lastCompletedAt: new Date(Date.now() - 30 * DAY).toISOString(),
+      intervalSeconds: 7 * 86400,
+      snoozedUntil: earlier,
+    };
+    expect(taskStaleness(task(overdue))).toBe("overdue");
+  });
+
+  it("pushes the next due date out, but never pulls it forward", () => {
+    const base = {
+      lastCompletedAt: new Date(Date.now() - DAY).toISOString(),
+      intervalSeconds: 7 * 86400, // due in ~6 days
+    };
+    const natural = nextDue(task(base))!;
+
+    // A snooze beyond the natural due date wins.
+    const pushed = nextDue(task({ ...base, snoozedUntil: new Date(Date.now() + 20 * DAY).toISOString() }))!;
+    expect(pushed.getTime()).toBeGreaterThan(natural.getTime());
+
+    // A snooze before it is irrelevant — snoozing must never make a task due sooner.
+    const notPulled = nextDue(task({ ...base, snoozedUntil: new Date(Date.now() + HOUR).toISOString() }))!;
+    expect(notPulled.getTime()).toBe(natural.getTime());
+  });
+
+  it("gives a snoozed task a due date even with no routine", () => {
+    const due = nextDue(task({ snoozedUntil: later }));
+    expect(due?.toISOString()).toBe(later);
+  });
+
+  it("colours a snoozed task neutrally rather than red", () => {
+    const overdue = {
+      lastCompletedAt: new Date(Date.now() - 30 * DAY).toISOString(),
+      intervalSeconds: 7 * 86400,
+    };
+    const opts = { fresh: "#22c55e", overdue: "#ef4444", noRoutineFadeDays: 7 };
+    expect(stalenessTint(task(overdue), opts).color).not.toBe(NEUTRAL_COLOR);
+    expect(stalenessTint(task({ ...overdue, snoozedUntil: later }), opts).color).toBe(NEUTRAL_COLOR);
   });
 });

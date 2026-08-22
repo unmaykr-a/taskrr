@@ -20,6 +20,11 @@ function lastDone(t: Task): number {
 /**
  * Return a new array ordered by the chosen key. "smart" keeps the server order
  * (most actionable first), so it is a stable copy with no reordering.
+ *
+ * Pinned tasks float to the top of whatever ordering was chosen. That is the
+ * point of pinning — it should survive switching between "Recommended" and
+ * "Name (A-Z)" — so it is applied last, over the top of the sort, rather than
+ * being one more sort key.
  */
 export function sortTasks(tasks: Task[], key: SortKey): Task[] {
   const out = [...tasks];
@@ -40,5 +45,7 @@ export function sortTasks(tasks: Task[], key: SortKey): Task[] {
     default:
       break;
   }
-  return out;
+  // Stable partition, so pinned tasks keep the relative order the sort gave
+  // them instead of being shuffled among themselves.
+  return [...out.filter((t) => t.pinned), ...out.filter((t) => !t.pinned)];
 }

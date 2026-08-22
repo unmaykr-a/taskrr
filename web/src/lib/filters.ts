@@ -3,13 +3,14 @@
 // one-line change here rather than spread across components.
 
 import type { Task } from "./api";
-import { taskStaleness } from "./staleness";
+import { isSnoozed, taskStaleness } from "./staleness";
 
 export type Filter =
   | "all"
   | "due-soon"
   | "overdue"
   | "none"
+  | "snoozed"
   | "archived"
   | "shared"
   | "requests";
@@ -19,6 +20,7 @@ export const FILTERS: { key: Filter; label: string }[] = [
   { key: "due-soon", label: "Due soon" },
   { key: "overdue", label: "Overdue" },
   { key: "none", label: "Never done" },
+  { key: "snoozed", label: "Snoozed" },
   { key: "archived", label: "Archived" },
 ];
 
@@ -41,5 +43,6 @@ export function matchesFilter(task: Task, filter: Filter, now?: number): boolean
   if (task.archivedAt != null) return false;
   if (filter === "all") return true;
   if (filter === "shared") return task.shared;
+  if (filter === "snoozed") return isSnoozed(task, now);
   return taskStaleness(task, now) === filter;
 }

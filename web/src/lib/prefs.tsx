@@ -95,6 +95,9 @@ export interface Prefs {
   toasts: boolean;
   /** Global single-key shortcuts (new task, search, switch view, help). */
   keyboardShortcuts: boolean;
+  /** Right-click (or long-press) a task for its actions. Off gives the
+   *  browser's own menu back, which is what you want for copying text. */
+  contextMenu: boolean;
   /** Use the browser's native confirm/prompt/alert dialogs instead of the
    *  in-app ones. Off by default (the in-app dialogs match the theme). */
   nativeDialogs: boolean;
@@ -169,6 +172,7 @@ function defaults(): Prefs {
     smoothScroll: true,
     toasts: true,
     keyboardShortcuts: true,
+    contextMenu: true,
     nativeDialogs: false,
     savedThemes: [],
     themeCustom: false,

@@ -71,6 +71,9 @@ type ReminderCandidate struct {
 	// LastRemindedDue is the RFC3339 dueAt we last reminded this recipient for,
 	// or "" if never.
 	LastRemindedDue string
+	// SnoozedUntil holds the task back: its effective due time is the later of
+	// (last completion + interval) and this. Zero when not snoozed.
+	SnoozedUntil time.Time
 }
 
 // ListReminderCandidates returns, for every non-archived cadence task completed
@@ -79,7 +82,10 @@ type ReminderCandidate struct {
 // looked up per (task, user) so collaborators are reminded independently.
 func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT t.id, t.owner_id, rs.user_id, t.name, t.interval_seconds, rs.webhook_url, rs.lead_seconds,
+		SELECT t.id, t.owner_id, rs.user_id, t.name, t.interval_seconds, rs.webhook_url,
+		       -- A per-task lead wins over the recipient's account-wide default.
+		       COALESCE(t.reminder_lead_seconds, rs.lead_seconds) AS lead_seconds,
+		       COALESCE(t.snoozed_until, '') AS snoozed_until,
 		       (SELECT MAX(completed_at) FROM completions c WHERE c.task_id = t.id) AS last_completed_at,
 		       COALESCE((SELECT due_at FROM task_reminders tr
 		                  WHERE tr.task_id = t.id AND tr.user_id = rs.user_id), '') AS last_reminded_due
@@ -100,15 +106,19 @@ func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate
 		var (
 			c        ReminderCandidate
 			lastComp sql.NullString
+			snoozed  string
 		)
 		if err := rows.Scan(&c.TaskID, &c.OwnerID, &c.UserID, &c.TaskName, &c.IntervalSecs,
-			&c.WebhookURL, &c.LeadSeconds, &lastComp, &c.LastRemindedDue); err != nil {
+			&c.WebhookURL, &c.LeadSeconds, &snoozed, &lastComp, &c.LastRemindedDue); err != nil {
 			return nil, err
 		}
 		if !lastComp.Valid {
 			continue // never completed → not due yet
 		}
 		c.LastCompleted = parseTime(lastComp.String)
+		if snoozed != "" {
+			c.SnoozedUntil = parseTime(snoozed)
+		}
 		out = append(out, c)
 	}
 	return out, rows.Err()

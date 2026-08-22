@@ -124,6 +124,7 @@ export default function App() {
       "due-soon": 0,
       overdue: 0,
       none: 0,
+      snoozed: 0,
       archived: 0,
       shared: 0,
       requests: requestCount,
@@ -136,7 +137,7 @@ export default function App() {
       c.all += 1;
       if (t.shared) c.shared += 1;
       const s = taskStaleness(t, now);
-      if (s === "due-soon" || s === "overdue" || s === "none") c[s] += 1;
+      if (s === "due-soon" || s === "overdue" || s === "none" || s === "snoozed") c[s] += 1;
     }
     return c;
   }, [tasks, now, requestCount]);

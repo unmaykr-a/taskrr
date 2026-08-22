@@ -232,6 +232,21 @@ export function PreferencesSection() {
         </label>
         <label className="flex items-center justify-between gap-2 text-sm">
           <span className="text-muted-foreground">
+            Right-click menu
+            <span className="block text-xs">
+              Right-click a task (or long-press on a touchscreen) for its actions. Off restores your
+              browser's own menu.
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={prefs.contextMenu}
+            onChange={(e) => setPrefs({ contextMenu: e.target.checked })}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
             Keyboard shortcuts
             <span className="block text-xs">
               Single keys for new task, search, and switching views — press ? for the list

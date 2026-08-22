@@ -27,6 +27,16 @@ type Task struct {
 	// ArchivedAt is non-nil when the task has been soft-archived (hidden from the
 	// normal views but kept, with its history, so it can be restored).
 	ArchivedAt *time.Time `json:"archivedAt"`
+	// SnoozedUntil holds the task back from being "due" until the given time.
+	// It backs both snoozing to a date and skipping a cycle; the effective due
+	// time is the later of (last completion + interval) and this. nil = not
+	// snoozed.
+	SnoozedUntil *time.Time `json:"snoozedUntil"`
+	// Pinned keeps the task at the top of the list whatever the chosen sort.
+	Pinned bool `json:"pinned"`
+	// ReminderLeadSeconds overrides how far ahead of due this task's reminder
+	// fires. nil falls back to the account-wide reminder setting.
+	ReminderLeadSeconds *int64 `json:"reminderLeadSeconds"`
 	CreatedAt  time.Time  `json:"createdAt"`
 	UpdatedAt  time.Time  `json:"updatedAt"`
 	// OwnerID is the account that owns the task. With shared tasks a viewer may
@@ -56,6 +66,10 @@ type TaskInput struct {
 	FreezeColor     bool    // pin the staleness colour to "fresh"
 	Tags            []string
 	Folder          string
+	Pinned          bool
+	// ReminderLeadSeconds overrides the account-wide reminder lead; nil clears
+	// the override.
+	ReminderLeadSeconds *int64
 }
 
 // Completion is a single logged occurrence of a task being done.
