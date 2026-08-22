@@ -9,6 +9,7 @@ import {
   Menu,
   Plus,
   Search,
+  Share2,
   X,
 } from "lucide-react";
 
@@ -34,6 +35,9 @@ import { BulkBar } from "@/components/BulkBar";
 import { PreferencesSync } from "@/components/PreferencesSync";
 import { WhatsNew } from "@/components/WhatsNew";
 import { type ShortcutHelp, ShortcutsDialog } from "@/components/ShortcutsDialog";
+import { FolderShareDialog } from "@/components/FolderShareDialog";
+import { ContextMenu, type ContextMenuEntry } from "@/components/ui/ContextMenu";
+import { useAuth } from "@/components/AuthProvider";
 
 // Human-readable result of an OIDC account-link attempt (see the callback in
 // internal/api/oidc.go, which redirects back here with ?oidcLink=...).
@@ -46,6 +50,7 @@ const OIDC_LINK_MESSAGES: Record<string, string> = {
 export default function App() {
   const now = useNow(); // ticking clock so staleness/counts refresh over time
   const { prefs, setPrefs } = usePrefs();
+  const { user } = useAuth();
   const { alert } = useConfirm();
   const queryClient = useQueryClient();
   const [filter, setFilter] = useState<Filter>("all");
@@ -69,6 +74,8 @@ export default function App() {
   const searchRef = useRef<HTMLInputElement>(null);
   const [createOpen, setCreateOpen] = useState(false);
   const [shortcutsOpen, setShortcutsOpen] = useState(false);
+  // Which folder the share dialog is for (null = closed).
+  const [shareFolder, setShareFolder] = useState<{ folder: string; taskCount: number } | null>(null);
   const [selectMode, setSelectMode] = useState(false);
   const [selected, setSelected] = useState<Set<number>>(() => new Set());
 
@@ -107,7 +114,13 @@ export default function App() {
     queryFn: api.listIncomingShares,
     enabled: shareEnabled,
   });
-  const requestCount = incoming?.length ?? 0;
+  const { data: folderInvites } = useQuery({
+    queryKey: ["folder-invites"],
+    queryFn: api.listFolderInvites,
+    enabled: shareEnabled,
+  });
+  // Both kinds of invitation land in the same view, so the badge counts both.
+  const requestCount = (incoming?.length ?? 0) + (folderInvites?.length ?? 0);
 
   // Animate task-grid layout changes: when a quick log / filter change / new
   // task reorders the grid, surviving cards glide to their new spot and
@@ -287,6 +300,14 @@ export default function App() {
           normally open this form render their own instances. */}
       <CreateTaskDialog hideTrigger open={createOpen} onOpenChange={setCreateOpen} />
       <ShortcutsDialog open={shortcutsOpen} onOpenChange={setShortcutsOpen} shortcuts={shortcutHelp} />
+      {shareFolder && (
+        <FolderShareDialog
+          folder={shareFolder.folder}
+          taskCount={shareFolder.taskCount}
+          open
+          onOpenChange={(o) => !o && setShareFolder(null)}
+        />
+      )}
       <div className={cn("relative z-10 flex", sideBySide ? "h-[100dvh] overflow-hidden" : "min-h-[100dvh]")}>
         {/* Mobile/landscape drawer scrim */}
         {compact && sidebarOpen && (
@@ -457,21 +478,52 @@ export default function App() {
                 <div className="space-y-5">
                   {groups.map(({ folder, tasks: folderTasks }) => {
                     const isCollapsed = collapsedFolders.has(folder);
+                    // Only a named folder of your own can be shared: "No folder"
+                    // is not a folder, and sharing someone else's grouping is
+                    // theirs to do.
+                    const canShare =
+                      shareEnabled && folder !== "" && folderTasks.some((t) => !user || t.ownerId === user.id);
+                    const folderMenu = (): ContextMenuEntry[] =>
+                      canShare
+                        ? [
+                            {
+                              label: "Share this folder…",
+                              icon: <Share2 />,
+                              onSelect: () => setShareFolder({ folder, taskCount: folderTasks.length }),
+                            },
+                          ]
+                        : [];
                     return (
                       <section key={folder || "__none"}>
-                        <button
-                          type="button"
-                          onClick={() => toggleFolder(folder)}
-                          className="mb-2 flex w-full items-center gap-1.5 text-sm font-semibold"
-                        >
-                          {isCollapsed ? (
-                            <ChevronRight className="h-4 w-4 text-muted-foreground" />
-                          ) : (
-                            <ChevronDown className="h-4 w-4 text-muted-foreground" />
-                          )}
-                          <span>{folder || "No folder"}</span>
-                          <span className="text-xs font-normal text-muted-foreground">{folderTasks.length}</span>
-                        </button>
+                        <ContextMenu entries={folderMenu} disabled={!canShare}>
+                          <div className="mb-2 flex items-center gap-1.5">
+                            <button
+                              type="button"
+                              onClick={() => toggleFolder(folder)}
+                              className="flex min-w-0 flex-1 items-center gap-1.5 text-left text-sm font-semibold"
+                            >
+                              {isCollapsed ? (
+                                <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              ) : (
+                                <ChevronDown className="h-4 w-4 shrink-0 text-muted-foreground" />
+                              )}
+                              <span className="truncate">{folder || "No folder"}</span>
+                              <span className="text-xs font-normal text-muted-foreground">{folderTasks.length}</span>
+                            </button>
+                            {canShare && (
+                              <Button
+                                variant="ghost"
+                                size="icon"
+                                className="h-6 w-6 shrink-0 text-muted-foreground hover:text-foreground"
+                                aria-label={`Share the ${folder} folder`}
+                                title="Share this folder"
+                                onClick={() => setShareFolder({ folder, taskCount: folderTasks.length })}
+                              >
+                                <Share2 className="h-3.5 w-3.5" />
+                              </Button>
+                            )}
+                          </div>
+                        </ContextMenu>
                         {!isCollapsed && (
                           <div className={gridClassName} style={gridStyle}>
                             {folderTasks.map(renderCard)}

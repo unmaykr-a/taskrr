@@ -34,17 +34,44 @@ const taskSelect = `
 		t.snoozed_until, t.pinned, t.reminder_lead_seconds, t.created_at, t.updated_at, t.owner_id,
 		(SELECT MAX(completed_at) FROM completions c WHERE c.task_id = t.id) AS last_completed_at,
 		(SELECT COUNT(*)          FROM completions c WHERE c.task_id = t.id) AS completion_count,
-		EXISTS (SELECT 1 FROM task_shares sh WHERE sh.task_id = t.id AND sh.status = 'accepted') AS shared,
+		` + sharedFlagExpr + ` AS shared,
 		(SELECT u.username FROM completions c JOIN users u ON u.id = c.user_id
 		 WHERE c.task_id = t.id ORDER BY c.completed_at DESC, c.id DESC LIMIT 1) AS last_completed_by
 	FROM tasks t`
 
-// visibleTaskCond is a WHERE fragment matching tasks the given user may see: the
-// ones they own, plus those shared with them and accepted. Bind the user id
-// twice (once per "?"). Relies on the alias `t` for the tasks table.
-const visibleTaskCond = `(t.owner_id = ? OR EXISTS (
-		SELECT 1 FROM task_shares sh
-		WHERE sh.task_id = t.id AND sh.user_id = ? AND sh.status = 'accepted'))`
+// visibleTaskCond is a WHERE fragment matching tasks the given user may see:
+// the ones they own, those shared with them directly and accepted, and those
+// sitting in a folder of someone else's that they've accepted a share of.
+//
+// Relies on the alias `t` for the tasks table. It takes the user id several
+// times, so never hand-write the arguments — use visibleArgs(), which keeps the
+// count in one place. Getting that count wrong would not be a compile error
+// (every parameter is an int64), it would silently shift which rows a query
+// returns, which is the worst possible failure mode for a visibility rule.
+const visibleTaskCond = `(t.owner_id = ?
+		OR EXISTS (
+			SELECT 1 FROM task_shares sh
+			WHERE sh.task_id = t.id AND sh.user_id = ? AND sh.status = 'accepted')
+		OR (t.folder <> '' AND EXISTS (
+			SELECT 1 FROM folder_shares fs
+			WHERE fs.user_id = ? AND fs.status = 'accepted'
+			  AND fs.owner_id = t.owner_id AND fs.folder = t.folder)))`
+
+// visibleArgs returns the bind arguments visibleTaskCond expects, in order.
+// Call sites splice it in with append(), so adding a clause to the condition is
+// a one-place change.
+func visibleArgs(userID int64) []any {
+	return []any{userID, userID, userID}
+}
+
+// sharedFlagExpr reports whether a task has anyone else on it — through a
+// direct share or through a share of its folder. Used for the `shared` column
+// and for the Shared view; the union matters because a task can be reachable
+// both ways at once.
+const sharedFlagExpr = `(EXISTS (SELECT 1 FROM task_shares sh WHERE sh.task_id = t.id AND sh.status = 'accepted')
+		OR (t.folder <> '' AND EXISTS (
+			SELECT 1 FROM folder_shares fs
+			WHERE fs.owner_id = t.owner_id AND fs.folder = t.folder AND fs.status = 'accepted')))`
 
 // ListTasks returns all tasks. Ordering surfaces the most "actionable" first:
 // never-completed tasks, then those whose last completion is furthest in the
@@ -56,7 +83,8 @@ const visibleTaskCond = `(t.owner_id = ? OR EXISTS (
 func (s *Store) ListTasks(ctx context.Context, ownerID int64) ([]Task, error) {
 	rows, err := s.db.QueryContext(ctx, taskSelect+`
 		WHERE `+visibleTaskCond+`
-		ORDER BY last_completed_at IS NOT NULL, last_completed_at ASC, t.name COLLATE NOCASE ASC`, ownerID, ownerID)
+		ORDER BY last_completed_at IS NOT NULL, last_completed_at ASC, t.name COLLATE NOCASE ASC`,
+		visibleArgs(ownerID)...)
 	if err != nil {
 		return nil, err
 	}
@@ -76,7 +104,8 @@ func (s *Store) ListTasks(ctx context.Context, ownerID int64) ([]Task, error) {
 // GetTask returns a single task visible to ownerID (owned or shared+accepted),
 // or ErrNotFound.
 func (s *Store) GetTask(ctx context.Context, ownerID, id int64) (Task, error) {
-	row := s.db.QueryRowContext(ctx, taskSelect+` WHERE t.id = ? AND `+visibleTaskCond, id, ownerID, ownerID)
+	row := s.db.QueryRowContext(ctx, taskSelect+` WHERE t.id = ? AND `+visibleTaskCond,
+		append([]any{id}, visibleArgs(ownerID)...)...)
 	t, err := scanTask(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Task{}, ErrNotFound

@@ -57,6 +57,25 @@ export interface Completion {
   createdAt: string;
 }
 
+/** A folder-level membership row. */
+export interface FolderShare {
+  ownerId: number;
+  folder: string;
+  userId: number;
+  status: "pending" | "accepted";
+  createdAt: string;
+}
+
+/** A pending folder invitation, described well enough to decide on. */
+export interface FolderShareRequest {
+  ownerId: number;
+  ownerName: string;
+  folder: string;
+  /** How many tasks are currently in the folder. */
+  taskCount: number;
+  createdAt: string;
+}
+
 /** What an import actually did, so a partial restore is visible. */
 export interface ImportResult {
   mode: string;
@@ -345,6 +364,39 @@ const httpApi = {
   /** Restore a previously archived task. */
   unarchiveTask: (id: number) =>
     request<Task>(`/api/tasks/${id}/unarchive`, { method: "POST" }),
+
+  // --- folder sharing (the coarser grain of task sharing) ---
+
+  shareFolder: (folder: string, username: string) =>
+    request<FolderShare>(`/api/folders/${encodeURIComponent(folder)}/share`, {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    }),
+
+  respondFolderShare: (folder: string, ownerId: number, accept: boolean) =>
+    request<void>(`/api/folders/${encodeURIComponent(folder)}/share/respond`, {
+      method: "POST",
+      body: JSON.stringify({ ownerId, accept }),
+    }),
+
+  leaveFolder: (folder: string, ownerId: number) =>
+    request<void>(`/api/folders/${encodeURIComponent(folder)}/leave`, {
+      method: "POST",
+      body: JSON.stringify({ ownerId }),
+    }),
+
+  unshareFolder: (folder: string, userId: number) =>
+    request<void>(`/api/folders/${encodeURIComponent(folder)}/share`, {
+      method: "DELETE",
+      body: JSON.stringify({ userId }),
+    }),
+
+  listFolderMembers: (folder: string) =>
+    request<TaskMember[]>(`/api/folders/${encodeURIComponent(folder)}/members`),
+
+  listMyFolderShares: () => request<FolderShare[]>("/api/me/folder-shares"),
+
+  listFolderInvites: () => request<FolderShareRequest[]>("/api/me/folder-invites"),
 
   /** Hold a task back until `untilISO`, or pass null to clear the snooze. */
   snoozeTask: (id: number, untilISO: string | null) =>

@@ -46,6 +46,15 @@ type ShareStore interface {
 	RespondToShare(ctx context.Context, userID, taskID int64, accept bool) error
 	LeaveTask(ctx context.Context, userID, taskID int64) error
 	ListIncomingShares(ctx context.Context, userID int64) ([]store.ShareRequest, error)
+
+	// Folder-level sharing.
+	ShareFolder(ctx context.Context, ownerID int64, folder string, recipientID int64) (store.FolderShare, error)
+	RespondToFolderShare(ctx context.Context, userID, ownerID int64, folder string, accept bool) error
+	LeaveFolder(ctx context.Context, userID, ownerID int64, folder string) error
+	UnshareFolder(ctx context.Context, ownerID int64, folder string, memberID int64) error
+	ListFolderMembers(ctx context.Context, ownerID int64, folder string) ([]store.TaskMember, error)
+	ListFolderSharesByOwner(ctx context.Context, ownerID int64) ([]store.FolderShare, error)
+	ListIncomingFolderShares(ctx context.Context, userID int64) ([]store.FolderShareRequest, error)
 	ListTaskMembers(ctx context.Context, taskID int64) ([]store.TaskMember, error)
 	GetUserAllowShares(ctx context.Context, id int64) (bool, error)
 	SetUserAllowShares(ctx context.Context, id int64, allow bool) error
@@ -241,6 +250,15 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/tasks/{id}/leave", s.handleLeaveTask)
 	mux.HandleFunc("GET /api/tasks/{id}/members", s.handleListMembers)
 	mux.HandleFunc("GET /api/me/shares", s.handleListIncomingShares)
+
+	// Folder sharing: the same lifecycle at a coarser grain.
+	mux.HandleFunc("POST /api/folders/{folder}/share", s.handleShareFolder)
+	mux.HandleFunc("POST /api/folders/{folder}/share/respond", s.handleRespondFolderShare)
+	mux.HandleFunc("POST /api/folders/{folder}/leave", s.handleLeaveFolder)
+	mux.HandleFunc("DELETE /api/folders/{folder}/share", s.handleUnshareFolder)
+	mux.HandleFunc("GET /api/folders/{folder}/members", s.handleListFolderMembers)
+	mux.HandleFunc("GET /api/me/folder-shares", s.handleListMyFolderShares)
+	mux.HandleFunc("GET /api/me/folder-invites", s.handleListIncomingFolderShares)
 	mux.HandleFunc("PUT /api/me/allow-shares", s.handleSetAllowShares)
 
 	// Latest released version (informational; no in-app update action).

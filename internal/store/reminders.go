@@ -77,8 +77,9 @@ type ReminderCandidate struct {
 }
 
 // ListReminderCandidates returns, for every non-archived cadence task completed
-// at least once, one row per recipient (the owner or an accepted member) who has
-// reminders enabled with a webhook. Each recipient's last-reminded due-time is
+// at least once, one row per recipient — the owner, an accepted member of the
+// task, or an accepted member of its folder — who has reminders enabled with a
+// webhook. Each recipient's last-reminded due-time is
 // looked up per (task, user) so collaborators are reminded independently.
 func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate, error) {
 	rows, err := s.db.QueryContext(ctx, `
@@ -94,7 +95,12 @@ func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate
 		  ON rs.enabled = 1 AND TRIM(rs.webhook_url) <> ''
 		 AND (rs.user_id = t.owner_id
 		      OR EXISTS (SELECT 1 FROM task_shares sh
-		                  WHERE sh.task_id = t.id AND sh.user_id = rs.user_id AND sh.status = 'accepted'))
+		                  WHERE sh.task_id = t.id AND sh.user_id = rs.user_id AND sh.status = 'accepted')
+		      -- Folder members are recipients too: sharing a folder is meant to
+		      -- be equivalent to sharing each task in it, reminders included.
+		      OR (t.folder <> '' AND EXISTS (SELECT 1 FROM folder_shares fs
+		                  WHERE fs.owner_id = t.owner_id AND fs.folder = t.folder
+		                    AND fs.user_id = rs.user_id AND fs.status = 'accepted')))
 		WHERE t.archived_at IS NULL
 		  AND t.interval_seconds IS NOT NULL AND t.interval_seconds > 0`)
 	if err != nil {

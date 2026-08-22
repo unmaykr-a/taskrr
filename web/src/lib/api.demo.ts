@@ -866,6 +866,16 @@ export const demoApi: Api = {
   },
 
   // --- shared tasks (the demo is single-user, so sharing is hidden/empty) ---
+  // The demo is single-user, so there is nobody to share with. authConfig
+  // reports tasksShareable: false, which hides all of this in the UI.
+  shareFolder: notAvailable,
+  respondFolderShare: notAvailable,
+  leaveFolder: notAvailable,
+  unshareFolder: notAvailable,
+  listFolderMembers: () => tick([]),
+  listMyFolderShares: () => tick([]),
+  listFolderInvites: () => tick([]),
+
   shareTask: notAvailable,
   respondShare: notAvailable,
   leaveTask: notAvailable,
