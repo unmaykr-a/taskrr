@@ -213,6 +213,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PUT /api/me/reminders", s.handlePutReminders)
 	mux.HandleFunc("POST /api/me/reminders/test", s.handleTestReminder)
 	mux.HandleFunc("GET /api/me/export", s.handleExport)
+	mux.HandleFunc("POST /api/me/import", s.handleImport)
 	mux.HandleFunc("GET /api/me/tokens", s.handleListAPITokens)
 	mux.HandleFunc("POST /api/me/tokens", s.handleCreateAPIToken)
 	mux.HandleFunc("DELETE /api/me/tokens/{id}", s.handleDeleteAPIToken)

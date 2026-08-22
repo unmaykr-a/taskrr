@@ -57,6 +57,16 @@ export interface Completion {
   createdAt: string;
 }
 
+/** What an import actually did, so a partial restore is visible. */
+export interface ImportResult {
+  mode: string;
+  tasksCreated: number;
+  completionsAdded: number;
+  tasksDeleted: number;
+  /** Anything that could not be restored, with the reason. */
+  skipped: string[];
+}
+
 /** A bearer credential a user minted for automation. The token itself is only
  *  ever returned once, by createAPIToken — afterwards only this metadata is. */
 export interface APIToken {
@@ -498,6 +508,10 @@ const httpApi = {
     if (!res.ok) throw new Error(`Export failed (${res.status})`);
     return res.blob();
   },
+
+  /** Restore an exported JSON document into the signed-in account. */
+  importData: (json: string, mode: "merge" | "replace") =>
+    request<ImportResult>(`/api/me/import?mode=${mode}`, { method: "POST", body: json }),
 
   listAPITokens: () => request<APIToken[]>("/api/me/tokens"),
 

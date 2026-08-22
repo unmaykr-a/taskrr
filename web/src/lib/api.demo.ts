@@ -970,6 +970,80 @@ export const demoApi: Api = {
     return tick(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }));
   },
 
+  // Import works in the demo for the same reason export does: the sandbox is
+  // in the browser, so a file can be restored straight into it.
+  importData: (json: string, mode: "merge" | "replace") => {
+    let doc: { format?: string; tasks?: unknown[] };
+    try {
+      doc = JSON.parse(json);
+    } catch {
+      return Promise.reject(new Error("could not read that file as JSON"));
+    }
+    if (doc.format !== "taskrr-export-v1") {
+      return Promise.reject(new Error("unrecognised file (expected a taskrr-export-v1 export)"));
+    }
+    const incoming = Array.isArray(doc.tasks) ? doc.tasks : [];
+    if (incoming.length === 0) return Promise.reject(new Error("the file contains no tasks"));
+
+    const db = loadDB();
+    let tasksDeleted = 0;
+    if (mode === "replace") {
+      tasksDeleted = db.tasks.length;
+      db.tasks = [];
+      db.completions = [];
+    }
+    const now = new Date().toISOString();
+    const skipped: string[] = [];
+    let tasksCreated = 0;
+    let completionsAdded = 0;
+
+    for (const raw of incoming as Record<string, unknown>[]) {
+      const name = String(raw.name ?? "").trim();
+      if (!name) {
+        skipped.push("a task with no name");
+        continue;
+      }
+      // Ids and owners in the file are ignored, exactly as the server does.
+      const t: StoredTask = {
+        id: db.nextTaskId++,
+        name,
+        description: String(raw.description ?? ""),
+        intervalSeconds: typeof raw.intervalSeconds === "number" ? raw.intervalSeconds : null,
+        colorFresh: typeof raw.colorFresh === "string" ? raw.colorFresh : null,
+        colorOverdue: typeof raw.colorOverdue === "string" ? raw.colorOverdue : null,
+        freezeColor: raw.freezeColor === true,
+        tags: Array.isArray(raw.tags) ? (raw.tags as string[]).map(String) : [],
+        folder: String(raw.folder ?? ""),
+        archivedAt: null,
+        snoozedUntil: null,
+        pinned: raw.pinned === true,
+        reminderLeadSeconds: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      db.tasks.push(t);
+      tasksCreated++;
+      const completions = Array.isArray(raw.completions) ? raw.completions : [];
+      for (const c of completions as Record<string, unknown>[]) {
+        const at = typeof c.completedAt === "string" ? c.completedAt : "";
+        if (!at || Number.isNaN(Date.parse(at))) {
+          skipped.push(`a completion of ${name} had no timestamp`);
+          continue;
+        }
+        db.completions.push({
+          id: db.nextCompletionId++,
+          taskId: t.id,
+          completedAt: new Date(at).toISOString(),
+          note: String(c.note ?? ""),
+          createdAt: now,
+        });
+        completionsAdded++;
+      }
+    }
+    saveDB(db);
+    return tick({ mode, tasksCreated, completionsAdded, tasksDeleted, skipped });
+  },
+
   // Bearer tokens need a server to authenticate against; the UI is gated off
   // by authConfig.apiTokens above, so these are never reached.
   listAPITokens: () => tick([]),

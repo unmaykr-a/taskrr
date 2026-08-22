@@ -1,4 +1,4 @@
-import { useState } from "react";
+import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
@@ -6,6 +6,7 @@ import {
   Copy,
   Download,
   KeyRound,
+  Upload,
   Link2,
   Link2Off,
   Plus,
@@ -15,7 +16,7 @@ import {
   Users,
 } from "lucide-react";
 
-import { api, type APIToken } from "@/lib/api";
+import { api, type APIToken, type ImportResult } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { RemindersSection } from "@/components/settings/RemindersSection";
@@ -392,7 +393,109 @@ function ExportSection() {
           {busy === "csv" ? "Preparing…" : "Download CSV"}
         </Button>
       </div>
+
+      <ImportControls />
     </section>
+  );
+}
+
+// ImportControls: restore a JSON export.
+//
+// Merge is the default and the safe one. Replace wipes the account's tasks
+// first, so it sits behind the same explicit confirmation as the other
+// irreversible actions — and the file is read and checked before anything is
+// deleted, so a bad file can never cost you what you already had.
+function ImportControls() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { confirm } = useConfirm();
+  const fileRef = useRef<HTMLInputElement>(null);
+  const [mode, setMode] = useState<"merge" | "replace">("merge");
+  const [result, setResult] = useState<ImportResult | null>(null);
+
+  const run = useMutation({
+    mutationFn: ({ json, mode: m }: { json: string; mode: "merge" | "replace" }) => api.importData(json, m),
+    onSuccess: (res) => {
+      setResult(res);
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["activity"] });
+      toast(
+        `Imported ${res.tasksCreated} ${res.tasksCreated === 1 ? "task" : "tasks"}`,
+        { tone: "success" },
+      );
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  const pick = async (file: File) => {
+    const json = await file.text();
+    if (mode === "replace") {
+      const ok = await confirm({
+        title: "Replace everything?",
+        description:
+          "This deletes all of your current tasks and their history first, then restores the file. This can't be undone.",
+        confirmText: "Delete and restore",
+        destructive: true,
+      });
+      if (!ok) return;
+    }
+    run.mutate({ json, mode });
+  };
+
+  return (
+    <div className="space-y-2 pt-1">
+      <h4 className="flex items-center gap-1.5 text-sm font-medium">
+        <Upload className="h-3.5 w-3.5" /> Restore from a JSON export
+      </h4>
+      <div className="flex flex-wrap items-center gap-2">
+        <select
+          value={mode}
+          onChange={(e) => setMode(e.target.value as "merge" | "replace")}
+          aria-label="Import mode"
+          className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+        >
+          <option value="merge" className="bg-background">Add to my tasks</option>
+          <option value="replace" className="bg-background">Replace everything</option>
+        </select>
+        <input
+          ref={fileRef}
+          type="file"
+          accept="application/json,.json"
+          className="hidden"
+          onChange={(e) => {
+            const file = e.target.files?.[0];
+            // Reset first, so picking the same file twice still fires a change.
+            e.target.value = "";
+            if (file) void pick(file);
+          }}
+        />
+        <Button size="sm" variant="outline" disabled={run.isPending} onClick={() => fileRef.current?.click()}>
+          {run.isPending ? "Importing…" : "Choose a file…"}
+        </Button>
+      </div>
+
+      {result && (
+        <div className="space-y-1 rounded-md border p-2 text-xs">
+          <p className="text-foreground">
+            Restored {result.tasksCreated} {result.tasksCreated === 1 ? "task" : "tasks"} and{" "}
+            {result.completionsAdded} {result.completionsAdded === 1 ? "completion" : "completions"}
+            {result.tasksDeleted > 0 && `, after removing ${result.tasksDeleted}`}.
+          </p>
+          {result.skipped.length > 0 && (
+            <>
+              <p className="text-muted-foreground">
+                {result.skipped.length} {result.skipped.length === 1 ? "entry" : "entries"} couldn't be restored:
+              </p>
+              <ul className="max-h-24 list-disc space-y-0.5 overflow-y-auto pl-4 text-muted-foreground">
+                {result.skipped.slice(0, 20).map((m, i) => (
+                  <li key={i}>{m}</li>
+                ))}
+              </ul>
+            </>
+          )}
+        </div>
+      )}
+    </div>
   );
 }
 
