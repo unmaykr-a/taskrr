@@ -5,6 +5,7 @@ import { Check, Clock, Settings2, Users, Zap } from "lucide-react";
 import { api, type Task } from "@/lib/api";
 import { formatDateTime, formatDue, formatInterval, timeSince } from "@/lib/time";
 import { nextDue, stalenessTint } from "@/lib/staleness";
+import { ensureContrast } from "@/lib/color";
 import { usePrefs } from "@/lib/prefs";
 import { useNow } from "@/lib/useNow";
 import { cn } from "@/lib/utils";
@@ -19,6 +20,7 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useTaskWindows } from "@/components/useTaskWindows";
+import { useTheme } from "@/components/ThemeProvider";
 
 export function TaskCard({
   task,
@@ -49,6 +51,18 @@ export function TaskCard({
   const due = nextDue(task);
   const progress = status.progress;
   const compact = prefs.cardSize === "compact";
+
+  // The staleness tint is picked to look good as a *block* — the accent bar, the
+  // dot, the progress fill — and those keep it exactly. The same colour set as
+  // small text is a different problem: mid-gradient olives and ambers, and the
+  // neutral grey of a never-done task, sit at ~2.5:1 on a white panel. So the
+  // labels get the nearest readable version of the very same colour, which
+  // leaves the hue (and the meaning it carries) intact on dark themes, where it
+  // already passed and is returned untouched.
+  const { theme } = useTheme();
+  const surface = theme.colors.card;
+  const labelColor = ensureContrast(status.color, surface);
+  const overdueColor = ensureContrast(status.overdue, surface);
   const queryClient = useQueryClient();
   const { openManage, openComplete } = useTaskWindows();
 
@@ -134,7 +148,7 @@ export function TaskCard({
             style={{ backgroundColor: status.color }}
           />
           <span className="text-sm font-medium">{timeSince(task.lastCompletedAt)}</span>
-          <span className="ml-auto text-xs font-medium transition-colors duration-700" style={{ color: status.color }}>
+          <span className="ml-auto text-xs font-medium transition-colors duration-700" style={{ color: labelColor }}>
             {status.label}
           </span>
         </div>
@@ -169,7 +183,15 @@ export function TaskCard({
                 {due && (
                   <>
                     {" · "}
-                    <span className={cn(formatDue(due, now).overdue && !task.freezeColor && prefs.colorFade && "text-rose-400")}>
+                    {/* Tinted with the task's own overdue colour (a fixed rose
+                        ignored a per-task palette) at a readable strength. */}
+                    <span
+                      style={
+                        formatDue(due, now).overdue && !task.freezeColor && prefs.colorFade
+                          ? { color: overdueColor }
+                          : undefined
+                      }
+                    >
                       {formatDue(due, now).text}
                     </span>
                   </>

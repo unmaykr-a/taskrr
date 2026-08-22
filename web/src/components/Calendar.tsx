@@ -5,11 +5,13 @@ import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
 import { api, type Activity, type Task } from "@/lib/api";
 import { formatDue, formatTime } from "@/lib/time";
 import { nextDue } from "@/lib/staleness";
+import { ensureContrast } from "@/lib/color";
 import { usePrefs } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { useTaskWindows } from "@/components/useTaskWindows";
+import { useTheme } from "@/components/ThemeProvider";
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 // Localised short month names for the month/year picker.
@@ -53,6 +55,10 @@ export function Calendar({
   const [pickerOpen, setPickerOpen] = useState(false);
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const { prefs } = usePrefs();
+  const { theme } = useTheme();
+  // The "next up" line borrows the task cards' overdue tint, kept readable
+  // against the panel it sits on (see TaskCard for the reasoning).
+  const overdueColor = ensureContrast(prefs.taskColorOverdue, theme.colors.card);
   const gridRef = useRef<HTMLDivElement>(null);
 
   const { openManage } = useTaskWindows();
@@ -359,7 +365,9 @@ export function Calendar({
             title="Open task"
           >
             <span className="font-medium text-foreground">Next up:</span> {nextUp.task.name}{" "}
-            <span className={cn(formatDue(nextUp.due).overdue && "text-rose-400")}>
+            {/* Matches the task cards: the user's own overdue colour, nudged to
+                stay readable on the panel rather than a fixed pale rose. */}
+            <span style={formatDue(nextUp.due).overdue ? { color: overdueColor } : undefined}>
               ({formatDue(nextUp.due).text})
             </span>
           </button>
