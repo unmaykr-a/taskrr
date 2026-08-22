@@ -26,9 +26,30 @@ import { folderNames } from "@/lib/folders";
  * CreateTaskDialog owns the "new task" form. `trigger` lets callers supply their
  * own button (e.g. the sidebar vs. the empty-state), defaulting to a standard
  * "New task" button.
+ *
+ * Open state is internal by default, but can be lifted by passing `open` +
+ * `onOpenChange` — that's how the "n" keyboard shortcut opens the form without
+ * a button to click. A lifted instance usually wants `hideTrigger` too, so the
+ * shortcut doesn't also plant a stray button on the page.
  */
-export function CreateTaskDialog({ trigger }: { trigger?: React.ReactNode }) {
-  const [open, setOpen] = useState(false);
+export function CreateTaskDialog({
+  trigger,
+  open: openProp,
+  onOpenChange,
+  hideTrigger = false,
+}: {
+  trigger?: React.ReactNode;
+  open?: boolean;
+  onOpenChange?: (open: boolean) => void;
+  hideTrigger?: boolean;
+}) {
+  const [openState, setOpenState] = useState(false);
+  const controlled = openProp !== undefined;
+  const open = controlled ? openProp : openState;
+  const setOpen = (next: boolean) => {
+    if (!controlled) setOpenState(next);
+    onOpenChange?.(next);
+  };
   const [name, setName] = useState("");
   const [description, setDescription] = useState("");
   const [intervalSeconds, setIntervalSeconds] = useState<number | null>(null);
@@ -61,13 +82,15 @@ export function CreateTaskDialog({ trigger }: { trigger?: React.ReactNode }) {
 
   return (
     <Dialog open={open} onOpenChange={setOpen}>
-      <DialogTrigger asChild>
-        {trigger ?? (
-          <Button>
-            <Plus /> New task
-          </Button>
-        )}
-      </DialogTrigger>
+      {!hideTrigger && (
+        <DialogTrigger asChild>
+          {trigger ?? (
+            <Button>
+              <Plus /> New task
+            </Button>
+          )}
+        </DialogTrigger>
+      )}
       <DialogContent>
         <DialogHeader>
           <DialogTitle>Create a task</DialogTitle>

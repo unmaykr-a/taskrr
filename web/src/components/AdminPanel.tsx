@@ -814,6 +814,22 @@ function SharingSettings() {
           onChange={(e) => save.mutate({ tasks_shareable: e.target.checked })}
         />
       </label>
+
+      <label className="flex items-center justify-between gap-2 text-sm">
+        <span className="text-muted-foreground">
+          Let users create API tokens
+          <span className="block text-xs">
+            For scripts and home automation. A token reaches tasks and history only — never the
+            admin area. Turning this off stops new tokens; existing ones keep working until revoked.
+          </span>
+        </span>
+        <input
+          type="checkbox"
+          className="h-4 w-4 shrink-0 accent-primary"
+          checked={data?.api_tokens ?? true}
+          onChange={(e) => save.mutate({ api_tokens: e.target.checked })}
+        />
+      </label>
     </section>
   );
 }

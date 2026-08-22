@@ -93,6 +93,14 @@ type AuthStore interface {
 	GetUserPreferences(ctx context.Context, userID int64) (string, error)
 	SetUserPreferences(ctx context.Context, userID int64, data string) error
 
+	// API tokens: bearer credentials a user mints for automation. Only the
+	// digest is ever passed here, mirroring the session methods above.
+	CreateAPIToken(ctx context.Context, userID int64, name, tokenHash string) (store.APIToken, error)
+	ListAPITokens(ctx context.Context, userID int64) ([]store.APIToken, error)
+	DeleteAPIToken(ctx context.Context, userID, id int64) error
+	APITokenUser(ctx context.Context, tokenHash string) (store.User, error)
+	TouchAPIToken(ctx context.Context, tokenHash string) error
+
 	GetReminderSettings(ctx context.Context, userID int64) (store.ReminderSettings, error)
 	SetReminderSettings(ctx context.Context, userID int64, rs store.ReminderSettings) error
 }
@@ -201,6 +209,10 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/me/reminders", s.handleGetReminders)
 	mux.HandleFunc("PUT /api/me/reminders", s.handlePutReminders)
 	mux.HandleFunc("POST /api/me/reminders/test", s.handleTestReminder)
+	mux.HandleFunc("GET /api/me/export", s.handleExport)
+	mux.HandleFunc("GET /api/me/tokens", s.handleListAPITokens)
+	mux.HandleFunc("POST /api/me/tokens", s.handleCreateAPIToken)
+	mux.HandleFunc("DELETE /api/me/tokens/{id}", s.handleDeleteAPIToken)
 	mux.HandleFunc("POST /api/me/wipe", s.handleWipeMyData)
 	mux.HandleFunc("DELETE /api/me", s.handleDeleteAccount)
 
@@ -260,7 +272,10 @@ func (s *Server) Handler() http.Handler {
 	// Anything not matched above is served from the embedded SPA.
 	mux.Handle("/", s.staticHandler())
 
-	return s.secureHeaders(logging(s.withUser(mux)))
+	// tokenScope sits inside withUser (so it can see how the request was
+	// authenticated) and outside the mux (so it guards every route by path,
+	// including ones added later).
+	return s.secureHeaders(logging(s.withUser(tokenScope(mux))))
 }
 
 // contentSecurityPolicy is a defense-in-depth CSP tuned to what the SPA actually

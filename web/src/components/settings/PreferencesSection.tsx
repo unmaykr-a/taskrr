@@ -217,6 +217,34 @@ export function PreferencesSection() {
           />
         </label>
         <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            Task statistics
+            <span className="block text-xs">
+              A task's typical gap, longest gap, and how it tracks against its routine, in its Manage window
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={prefs.showTaskStats}
+            onChange={(e) => setPrefs({ showTaskStats: e.target.checked })}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            Keyboard shortcuts
+            <span className="block text-xs">
+              Single keys for new task, search, and switching views — press ? for the list
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={prefs.keyboardShortcuts}
+            onChange={(e) => setPrefs({ keyboardShortcuts: e.target.checked })}
+          />
+        </label>
+        <label className="flex items-center justify-between gap-2 text-sm">
           <span className="text-muted-foreground">Draggable windows</span>
           <input
             type="checkbox"

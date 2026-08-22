@@ -1,6 +1,6 @@
 import { useEffect, useMemo, useRef, useState } from "react";
-import { useQuery } from "@tanstack/react-query";
-import { ChevronDown, ChevronLeft, ChevronRight } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import { ChevronDown, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
 import { api, type Activity, type Task } from "@/lib/api";
 import { formatDue, formatTime } from "@/lib/time";
@@ -9,6 +9,7 @@ import { ensureContrast } from "@/lib/color";
 import { usePrefs } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { useToast } from "@/components/ui/Toast";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { useTaskWindows } from "@/components/useTaskWindows";
 import { useTheme } from "@/components/ThemeProvider";
@@ -56,6 +57,10 @@ export function Calendar({
   const [pickerYear, setPickerYear] = useState(() => new Date().getFullYear());
   const { prefs } = usePrefs();
   const { theme } = useTheme();
+  // Backdating: the day detail can log a completion straight onto the day
+  // you're looking at, which is the whole reason to click a past date.
+  const [logOpen, setLogOpen] = useState(false);
+  const [logTaskId, setLogTaskId] = useState<number | "">("");
   // The "next up" line borrows the task cards' overdue tint, kept readable
   // against the panel it sits on (see TaskCard for the reasoning).
   const overdueColor = ensureContrast(prefs.taskColorOverdue, theme.colors.card);
@@ -78,6 +83,39 @@ export function Calendar({
     const t = byId.get(id);
     if (t) openManage(t);
   };
+
+  // Log a completion onto the day being viewed. Past days get noon local rather
+  // than midnight, so a timezone shift can never slide the entry onto the day
+  // before; today keeps the actual current time.
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const backdate = useMutation({
+    mutationFn: ({ taskId, day }: { taskId: number; day: string }) => {
+      const [y, m, d] = day.split("-").map(Number);
+      const now = new Date();
+      const when =
+        day === dayKey(now) ? now : new Date(y, m - 1, d, 12, 0, 0, 0);
+      return api.completeTask(taskId, { completedAt: when.toISOString() });
+    },
+    onSuccess: () => {
+      queryClient.invalidateQueries({ queryKey: ["tasks"] });
+      queryClient.invalidateQueries({ queryKey: ["activity"] });
+      setLogOpen(false);
+      setLogTaskId("");
+      toast("Logged", { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  // Only active tasks are offered — backdating an archived task would quietly
+  // resurrect it in the activity feed without bringing it back into any view.
+  const loggable = useMemo(
+    () =>
+      tasks
+        .filter((t) => t.archivedAt == null)
+        .sort((a, b) => a.name.localeCompare(b.name, undefined, { sensitivity: "base" })),
+    [tasks],
+  );
 
   const year = view.getFullYear();
   const month = view.getMonth();
@@ -138,23 +176,42 @@ export function Calendar({
   const monthLabel = view.toLocaleDateString(undefined, { month: "long", year: "numeric" });
   const selectedActivities = selected ? (byDay.get(selected) ?? []) : [];
   const selectedDue = selected ? (dueByDay.get(selected) ?? []) : [];
-  const hasDetail = selectedActivities.length > 0 || selectedDue.length > 0;
+  // A past or present day can always be opened, even with nothing on it, so
+  // there's somewhere to record "I actually did this on Tuesday". Future days
+  // stay closed unless something is genuinely scheduled for them — you can't
+  // have done a thing yet.
+  const canBackdate = selected != null && selected <= dayKey(new Date());
+  const hasDetail = selectedActivities.length > 0 || selectedDue.length > 0 || canBackdate;
 
   // Keep the selected-day detail mounted (as a snapshot) through its close
   // transition, so it animates *out* as well as in — collapsing unmounts it
   // instantly otherwise, which is the "no closing animation" the day list had.
-  const [detail, setDetail] = useState<{ acts: Activity[]; dues: Task[] } | null>(null);
+  const [detail, setDetail] = useState<
+    { acts: Activity[]; dues: Task[]; day: string; canBackdate: boolean } | null
+  >(null);
   const [open, setOpen] = useState(false);
   useEffect(() => {
     if (selected && hasDetail) {
-      setDetail({ acts: byDay.get(selected) ?? [], dues: dueByDay.get(selected) ?? [] });
+      setDetail({
+        acts: byDay.get(selected) ?? [],
+        dues: dueByDay.get(selected) ?? [],
+        day: selected,
+        canBackdate,
+      });
       const raf = requestAnimationFrame(() => setOpen(true)); // mount closed → open
       return () => cancelAnimationFrame(raf);
     }
     setOpen(false);
     const id = setTimeout(() => setDetail(null), 220);
     return () => clearTimeout(id);
-  }, [selected, hasDetail, byDay, dueByDay]);
+  }, [selected, hasDetail, byDay, dueByDay, canBackdate]);
+
+  // Close the backdating row whenever the selected day changes, so it never
+  // carries a half-finished choice from one day to another.
+  useEffect(() => {
+    setLogOpen(false);
+    setLogTaskId("");
+  }, [selected]);
 
   return (
     <div
@@ -430,6 +487,54 @@ export function Calendar({
               <span className="text-muted-foreground">due</span>
             </button>
           ))}
+
+          {/* Backdating. Collapsed to a single line until asked for, so the day
+              list stays a list; the control is full-width and comfortably tall
+              rather than a tiny inline affordance, which matters on a phone. */}
+          {detail.canBackdate && loggable.length > 0 && (
+            <div className="pt-0.5">
+              {logOpen ? (
+                <div className="flex flex-wrap items-center gap-1.5">
+                  <select
+                    value={logTaskId}
+                    autoFocus
+                    onChange={(e) => setLogTaskId(e.target.value ? Number(e.target.value) : "")}
+                    aria-label="Task to log"
+                    className="h-8 min-w-0 flex-1 basis-32 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                  >
+                    <option value="" className="bg-background">
+                      Pick a task…
+                    </option>
+                    {loggable.map((t) => (
+                      <option key={t.id} value={t.id} className="bg-background">
+                        {t.name}
+                      </option>
+                    ))}
+                  </select>
+                  <Button
+                    size="sm"
+                    className="h-8"
+                    disabled={logTaskId === "" || backdate.isPending}
+                    onClick={() => backdate.mutate({ taskId: Number(logTaskId), day: detail.day })}
+                  >
+                    {backdate.isPending ? "Logging…" : "Log"}
+                  </Button>
+                  <Button size="sm" variant="ghost" className="h-8" onClick={() => setLogOpen(false)}>
+                    Cancel
+                  </Button>
+                </div>
+              ) : (
+                <button
+                  type="button"
+                  onClick={() => setLogOpen(true)}
+                  className="flex w-full items-center gap-1.5 rounded-md p-1.5 text-left text-muted-foreground transition-colors hover:bg-accent hover:text-foreground"
+                >
+                  <Plus className="h-3.5 w-3.5 shrink-0" />
+                  Log a task on this day
+                </button>
+              )}
+            </div>
+          )}
         </div>
       )}
     </div>

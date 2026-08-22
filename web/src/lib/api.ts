@@ -50,6 +50,17 @@ export interface Completion {
   createdAt: string;
 }
 
+/** A bearer credential a user minted for automation. The token itself is only
+ *  ever returned once, by createAPIToken — afterwards only this metadata is. */
+export interface APIToken {
+  id: number;
+  userId: number;
+  name: string;
+  /** Null until the token has authenticated a request. */
+  lastUsedAt: string | null;
+  createdAt: string;
+}
+
 /** A membership row: an extra user attached to a task. */
 export interface TaskShare {
   taskId: number;
@@ -134,6 +145,8 @@ export interface AuthConfig {
   themesShareUsers: boolean;
   /** Admin gate for the whole shared-tasks feature. */
   tasksShareable: boolean;
+  /** Admin gate for per-user API tokens (on by default). */
+  apiTokens: boolean;
   /** Instance branding (name, title, icon, login toggles). */
   branding: Branding;
 }
@@ -213,6 +226,7 @@ export interface AdminSettings {
   themes_shareable: boolean;
   themes_share_users: boolean;
   tasks_shareable: boolean;
+  api_tokens: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
@@ -238,6 +252,7 @@ export type SettingsPatch = Partial<{
   themes_shareable: boolean;
   themes_share_users: boolean;
   tasks_shareable: boolean;
+  api_tokens: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
@@ -443,6 +458,26 @@ const httpApi = {
       method: "POST",
       body: JSON.stringify({ currentPassword, newPassword }),
     }),
+
+  /** Download the signed-in account's own data. Returns a Blob rather than a
+   *  URL so the demo (which has no server) can satisfy the same contract by
+   *  building the file in the browser. */
+  exportData: async (format: "json" | "csv"): Promise<Blob> => {
+    const res = await fetch(`/api/me/export?format=${format}`);
+    if (!res.ok) throw new Error(`Export failed (${res.status})`);
+    return res.blob();
+  },
+
+  listAPITokens: () => request<APIToken[]>("/api/me/tokens"),
+
+  /** The response carries the plaintext token — the only time it is ever sent. */
+  createAPIToken: (name: string) =>
+    request<APIToken & { token: string }>("/api/me/tokens", {
+      method: "POST",
+      body: JSON.stringify({ name }),
+    }),
+
+  deleteAPIToken: (id: number) => request<void>(`/api/me/tokens/${id}`, { method: "DELETE" }),
 
   getPreferences: () => request<Record<string, unknown>>("/api/me/preferences"),
 

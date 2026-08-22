@@ -1,9 +1,10 @@
 import { useId, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, LogOut, Pencil, Trash2, UserPlus, Users } from "lucide-react";
+import { Archive, ArchiveRestore, BarChart3, LogOut, Pencil, Trash2, UserPlus, Users } from "lucide-react";
 
 import { api, type Completion, type Task } from "@/lib/api";
-import { formatDateTime } from "@/lib/time";
+import { formatDate, formatDateTime, formatGap } from "@/lib/time";
+import { PACE_LABELS, paceVerdict, taskStats } from "@/lib/stats";
 import { usePrefs } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
@@ -53,6 +54,7 @@ export function ManageTaskPanel({ task, onClose }: { task: Task; onClose: () => 
       <ShareSection task={task} isOwner={isOwner} onLeft={onClose} />
 
       <hr className="border-border/60" />
+      <StatsSection task={task} />
       <HistorySection task={task} />
 
       {isOwner && (
@@ -274,6 +276,84 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
         </Button>
       </div>
     </form>
+  );
+}
+
+// StatsSection turns the completion history into the numbers the app is really
+// about: not "when did I last do this" (the card already answers that) but "am I
+// keeping up". Everything here is derived client-side from the history the
+// Manage window already fetches — no extra request, no stored aggregates — and
+// the whole panel is behind a preference, since plenty of people just want the
+// list. Two columns on a phone, four once there's room.
+function StatsSection({ task }: { task: Task }) {
+  const { prefs } = usePrefs();
+  const { data: completions } = useQuery({
+    queryKey: ["completions", task.id],
+    queryFn: () => api.listCompletions(task.id),
+    enabled: prefs.showTaskStats,
+  });
+  const stats = useMemo(
+    () => taskStats(completions, task.intervalSeconds),
+    [completions, task.intervalSeconds],
+  );
+
+  if (!prefs.showTaskStats) return null;
+  // Below two completions there is no gap to measure at all, and a panel of
+  // dashes is worse than no panel — the history list already says everything.
+  if (stats.count < 2) return null;
+
+  // One gap is a measurement, not a pattern: "typical" and "longest" would be
+  // the same number and an on-time rate would be 0% or 100% off a sample of
+  // one. So a two-completion task gets the honest reduced version, and the
+  // trend language only appears once there are at least two gaps to compare.
+  const trend = stats.gaps.length >= 2;
+  const tiles: { label: string; value: string; hint?: string }[] = [
+    {
+      label: trend ? "Typically every" : "Last gap",
+      value: formatGap(stats.typicalGapMs!),
+      hint: trend
+        ? "The median gap between completions — one holiday won't skew it"
+        : "The single gap so far; a pattern needs one more completion",
+    },
+    {
+      label: "Logged",
+      value: `${stats.count}×`,
+      hint: `First logged ${formatDate(stats.first!)}`,
+    },
+  ];
+  if (trend) {
+    tiles.push({ label: "Longest gap", value: formatGap(stats.longestGapMs!) });
+    if (stats.onTimeRate != null) {
+      tiles.push({
+        label: "On time",
+        value: `${Math.round(stats.onTimeRate * 100)}%`,
+        hint: "Share of gaps that came in within the routine",
+      });
+    }
+  }
+
+  const verdict = trend ? paceVerdict(stats.paceRatio) : null;
+
+  return (
+    <div className="space-y-2">
+      <p className="flex items-center gap-1.5 text-sm font-medium">
+        <BarChart3 className="h-4 w-4" /> Stats
+      </p>
+      <div className="grid grid-cols-2 gap-2 sm:grid-cols-4">
+        {tiles.map((t) => (
+          <div key={t.label} className="rounded-lg border p-2" title={t.hint}>
+            <p className="text-[10px] uppercase tracking-wide text-muted-foreground">{t.label}</p>
+            <p className="truncate text-sm font-semibold tabular-nums">{t.value}</p>
+          </div>
+        ))}
+      </div>
+      {verdict && task.intervalSeconds && (
+        <p className="text-xs text-muted-foreground">
+          You do this <span className="font-medium text-foreground">{PACE_LABELS[verdict]}</span> — every{" "}
+          {formatGap(stats.typicalGapMs!)}, against a routine of {formatGap(task.intervalSeconds * 1000)}.
+        </p>
+      )}
+    </div>
   );
 }
 

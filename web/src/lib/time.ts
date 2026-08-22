@@ -120,6 +120,29 @@ export function humanizeDuration(ms: number): string {
   return "moments";
 }
 
+/**
+ * formatGap renders a span between two completions.
+ *
+ * humanizeDuration deliberately collapses to the largest whole unit, which is
+ * right for "due in 2 weeks" but wrong when two spans are shown side by side:
+ * 18 days and 14 days both render as "2 weeks", so "behind your routine (every
+ * 2 weeks against a 2 weeks routine)" reads as a contradiction. This keeps days
+ * as the unit well past a fortnight, so spans that differ actually look
+ * different.
+ */
+export function formatGap(ms: number): string {
+  const sec = Math.max(0, Math.round(Math.abs(ms) / 1000));
+  const plural = (v: number, name: string) => `${v} ${name}${v === 1 ? "" : "s"}`;
+
+  if (sec < 3_600) return plural(Math.max(1, Math.round(sec / 60)), "minute");
+  if (sec < 129_600) return plural(Math.round(sec / 3_600), "hour"); // under 36h
+  const days = Math.round(sec / 86_400);
+  if (days < 60) return plural(days, "day");
+  const months = Math.round(days / 30.44);
+  if (months < 24) return plural(months, "month");
+  return plural(Math.round(days / 365.25), "year");
+}
+
 /** formatDue describes a due date relative to now ("due in 3 days" / "overdue by …"). */
 export function formatDue(
   due: Date,

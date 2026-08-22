@@ -1,14 +1,15 @@
 # API Reference
 
 Taskrr is a single Go binary that serves a JSON API under `/api` and the embedded
-single-page app for everything else. This page lists the HTTP endpoints. There is
-no separate API token scheme - the API uses the same session cookie as the web UI.
+single-page app for everything else. This page lists the HTTP endpoints. Calls
+authenticate either with the web UI's session cookie or with an API token (see
+[API tokens](#api-tokens) below).
 
 ## Conventions
 
 - **Base path:** all endpoints are under `/api`.
-- **Auth:** a session cookie established by sign-in. Endpoints are grouped below
-  by who may call them.
+- **Auth:** a session cookie established by sign-in, or `Authorization: Bearer
+  <token>` for an API token. Endpoints are grouped below by who may call them.
 - **JSON:** request and response bodies are JSON, camelCase (matching
   `web/src/lib/api.ts`). Timestamps are RFC 3339 in UTC.
 - **Ownership:** task and completion endpoints are scoped to the signed-in user;
@@ -45,6 +46,54 @@ no separate API token scheme - the API uses the same session cookie as the web U
 | PUT | `/api/me/allow-shares` | Set the share opt-in/out. |
 | POST | `/api/me/wipe` | Delete the user's own tasks and history. |
 | DELETE | `/api/me` | Delete the account. |
+| GET | `/api/me/export` | Download your own data. `?format=csv` for CSV, JSON by default. |
+| GET | `/api/me/tokens` | List your API tokens (metadata only). |
+| POST | `/api/me/tokens` | Mint a token. The response is the only time the value is returned. |
+| DELETE | `/api/me/tokens/{id}` | Revoke a token. |
+
+## API tokens
+
+A token is a long-lived bearer credential for automation - a shell script, an
+NFC tag, a Home Assistant automation. Create one under **Settings -> Account ->
+API tokens**; the value is shown once and only its SHA-256 digest is stored, so
+a database or backup leak yields nothing usable.
+
+```bash
+curl -H "Authorization: Bearer $TASKRR_TOKEN" https://taskrr.example.com/api/tasks
+curl -H "Authorization: Bearer $TASKRR_TOKEN" -X POST \
+     https://taskrr.example.com/api/tasks/7/complete
+```
+
+Tokens are deliberately narrower than a session. They reach only:
+
+- `/api/tasks/...` and `/api/completions/...`
+- `/api/activity`, `/api/auth/me`, `/api/me/shares`, `/api/me/export`, `/api/health`
+
+Anything else - the admin area, changing your password or username, deleting the
+account, minting further tokens - returns `403` and needs a real sign-in. A
+leaked token can therefore log and edit tasks, but cannot take over the instance
+or lock its owner out.
+
+Administrators can turn the feature off for the whole instance under **Settings
+-> Admin -> Accounts and sharing**. Doing so stops new tokens being created;
+tokens that already exist keep working until they are revoked, so flipping the
+switch never silently breaks a live automation.
+
+## Data export
+
+`GET /api/me/export` returns every task you own or share, each with its full
+history, scoped to the signed-in account:
+
+- **JSON** (default) - `{"format":"taskrr-export-v1","exportedAt":...,"username":...,"tasks":[...]}`,
+  each task carrying a `completions` array. Keeps the structure for moving an
+  account elsewhere.
+- **CSV** (`?format=csv`) - one row per completion, with the task's name,
+  description, folder, tags, routine and archived flag repeated on each row. A
+  task with no history still gets a row, so nothing is silently dropped.
+
+Both are sent as downloads with a dated filename. Admin backups (whole-database,
+admin-only) remain the right tool for restoring an instance; this is the
+per-user equivalent for taking your own data with you.
 
 ## Tasks and completions (authenticated)
 
