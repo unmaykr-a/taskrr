@@ -1,3 +1,4 @@
+import { useQueryClient } from "@tanstack/react-query";
 import {
   CalendarClock,
   Keyboard,
@@ -5,6 +6,7 @@ import {
   Palette,
   Sparkles,
   SlidersHorizontal,
+  Tag as TagIcon,
 } from "lucide-react";
 
 import {
@@ -14,13 +16,15 @@ import {
   type DateOrder,
   usePrefs,
 } from "@/lib/prefs";
+import { type Task } from "@/lib/api";
+import { setTagColor, tagColor } from "@/lib/tagColors";
+import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/Segmented";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { Label } from "@/components/ui/label";
-import { SettingsGroup, ToggleRow } from "@/components/settings/SettingsGroup";
-
-const SELECT =
-  "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
+import { Select } from "@/components/ui/select";
+import { SettingsGroup } from "@/components/settings/SettingsGroup";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 
 /**
  * Per-user preferences that aren't strictly "theme".
@@ -123,6 +127,8 @@ export function PreferencesSection() {
         )}
       </SettingsGroup>
 
+      <TagColoursGroup />
+
       <SettingsGroup
         id="prefs.layout"
         title="Layout"
@@ -132,42 +138,39 @@ export function PreferencesSection() {
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Card size</Label>
-            <select
-              className={SELECT}
+            <Select
               value={prefs.cardSize}
               onChange={(e) => setPrefs({ cardSize: e.target.value as CardSize })}
             >
-              <option value="comfortable" className="bg-background">Comfortable</option>
-              <option value="compact" className="bg-background">Compact</option>
-            </select>
+              <option value="comfortable">Comfortable</option>
+              <option value="compact">Compact</option>
+            </Select>
           </div>
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Columns</Label>
-            <select
-              className={SELECT}
+            <Select
               value={prefs.taskColumns}
               onChange={(e) => setPrefs({ taskColumns: Number(e.target.value) })}
             >
-              <option value={0} className="bg-background">Auto</option>
+              <option value={0}>Auto</option>
               {[1, 2, 3, 4].map((n) => (
-                <option key={n} value={n} className="bg-background">
+                <option key={n} value={n}>
                   {n}
                 </option>
               ))}
-            </select>
+            </Select>
           </div>
         </div>
         {/* Lived under Task colours until now, which is nobody's first guess. */}
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Add button (mobile)</Label>
-          <select
-            className={SELECT}
+          <Select
             value={prefs.addButton}
             onChange={(e) => setPrefs({ addButton: e.target.value as AddButtonPosition })}
           >
-            <option value="top" className="bg-background">Top right</option>
-            <option value="bottom" className="bg-background">Bottom (FAB)</option>
-          </select>
+            <option value="top">Top right</option>
+            <option value="bottom">Bottom (FAB)</option>
+          </Select>
         </div>
         <ToggleRow
           label="Show calendar"
@@ -267,6 +270,76 @@ export function PreferencesSection() {
 
       <AnimationsGroup />
     </div>
+  );
+}
+
+/**
+ * A colour per tag, for lists that have outgrown one colour for all of them.
+ *
+ * Only tags in use are offered, and only tags somebody coloured are stored, so
+ * the group is empty (and says so) until there are tags to colour.
+ */
+function TagColoursGroup() {
+  const { prefs, setPrefs } = usePrefs();
+  const queryClient = useQueryClient();
+  const tasks = queryClient.getQueryData<Task[]>(["tasks"]) ?? [];
+  // First spelling wins, matching how tags are de-duplicated elsewhere.
+  const seen = new Map<string, string>();
+  for (const t of tasks) for (const tag of t.tags) if (!seen.has(tag.toLowerCase())) seen.set(tag.toLowerCase(), tag);
+  const tags = [...seen.values()].sort((a, b) => a.localeCompare(b));
+  const coloured = Object.keys(prefs.tagColors ?? {}).length;
+
+  return (
+    <SettingsGroup
+      id="prefs.tagColours"
+      title="Tag colours"
+      icon={<TagIcon />}
+      summary={coloured > 0 ? `${coloured} coloured` : "All one colour"}
+    >
+      {tags.length === 0 ? (
+        <p className="text-xs text-muted-foreground">No tags yet. Add one to a task and it'll show up here.</p>
+      ) : (
+        <>
+          <p className="text-xs text-muted-foreground">
+            Tags you don't colour keep the plain chip.
+          </p>
+          {tags.map((tag) => {
+            const hex = tagColor(prefs.tagColors, tag);
+            return (
+              <div key={tag} className="flex items-center justify-between gap-2 text-sm">
+                <span className="min-w-0 truncate text-muted-foreground">{tag}</span>
+                <div className="flex shrink-0 items-center gap-1.5">
+                  {hex && (
+                    <button
+                      type="button"
+                      onClick={() => setPrefs({ tagColors: setTagColor(prefs.tagColors, tag, null) })}
+                      className="text-xs text-muted-foreground hover:text-foreground"
+                    >
+                      clear
+                    </button>
+                  )}
+                  <ColorField
+                    label=""
+                    value={hex ?? prefs.taskColorFresh}
+                    onChange={(v) => setPrefs({ tagColors: setTagColor(prefs.tagColors, tag, v) })}
+                  />
+                </div>
+              </div>
+            );
+          })}
+          {coloured > 0 && (
+            <Button
+              size="sm"
+              variant="outline"
+              className="w-full"
+              onClick={() => setPrefs({ tagColors: {} })}
+            >
+              Clear all tag colours
+            </Button>
+          )}
+        </>
+      )}
+    </SettingsGroup>
   );
 }
 

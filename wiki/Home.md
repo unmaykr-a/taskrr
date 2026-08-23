@@ -36,29 +36,45 @@ server, so they aren't part of the demo.
 
 ## Feature overview
 
-- One-tap logging, or pick a time and add a note. History is editable - every
-  logged completion can be changed or undone later.
+- One-tap logging, or pick a time and add a note. History is editable, a stray
+  log has an Undo on the confirmation, and you can backdate straight from the
+  calendar.
+- Right-click any task (long-press on a phone) for everything you can do to it.
+- Snooze a task until later, or skip a cycle - which moves the next due date on
+  without recording that you did it. Both work on a whole selection.
 - Routines with due dates: cards shade continuously from fresh to overdue, with
   a progress bar and "due in 3d" on each card. Colours are customisable per task
   and globally.
 - A month calendar of what you did and what's coming up, plus an activity chart
-  of your last 30 days.
-- Filters with live counts (all, due soon, overdue, never done, archived) and
-  bulk actions.
+  over 7 days, 30 days, 90 days or a year.
+- Per-task statistics: how often you actually do a thing, your longest gap, and
+  how that compares to the routine you set.
+- Filters with live counts - all, due soon, overdue, never done, snoozed,
+  archived - bulk actions over a selection, and pinning for the ones that should
+  stay at the top.
 - Tags with search and a tag filter, folder grouping, and sorting by name or
   last-done.
 - Multiple users with per-user data, local password login, and optional OIDC
   single sign-on with group-to-admin-role mapping. A lite mode turns the
   multi-user surface off for solo use.
-- Share a task with another user so you both see and log it.
+- Share a single task, or a whole folder so anything you add to it later is
+  included. Optional "whose turn is it" rota.
 - An admin area: user management, registration controls with an approval queue,
-  active sessions, live server logs, backups with one-click restore, and
-  instance settings.
+  active sessions, live server logs, backups with one-click restore, branding
+  including the sign-in page layout, and instance settings.
 - Reminders via webhook when a task is due - ntfy, Gotify, Apprise, Home
-  Assistant, a Discord webhook, or anything that accepts JSON.
+  Assistant, a Discord webhook, or anything that accepts JSON. Lead time is
+  global with a per-task override.
+- API tokens so a script, an NFC tag or a home automation can log a task. A
+  token reaches tasks and history only.
+- Export everything as JSON or CSV, restore a JSON export, or bring a CSV from
+  another tracker and match up the columns.
 - A themeable interface: colour customiser with palette generation, light and
-  dark modes, animated backgrounds, frosted glass, floating windows, and
-  per-animation toggles. Works well on a phone.
+  dark modes, animated backgrounds, frosted glass, and per-animation toggles.
+  Panels float as windows by default and can be switched to plain full-screen
+  menus. Works well on a phone.
+- Keyboard shortcuts with rebindable keys, quick-add syntax
+  ("water plants every 2 weeks #home"), and installable to a phone home screen.
 
 ## License
 

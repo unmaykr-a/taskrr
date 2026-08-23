@@ -87,7 +87,8 @@ single static `bin/taskrr` with everything inside it.
 - Filters with live counts — all, due soon, overdue, never done, snoozed,
   archived — bulk actions over a selection, and pinning for the ones that should
   stay at the top whatever the sort.
-- Tags with search and filtering, folders, and sorting by name or last-done.
+- Tags with search, filtering and an optional colour each, folders, and sorting
+  by name or last-done.
 - Multiple users with per-user data, local passwords, and optional OIDC SSO
   (tested against Authentik and Pocket ID) including group-to-admin mapping.
   `TASKRR_LITE=true` hides the whole multi-user surface if you're the only one.
@@ -106,9 +107,9 @@ single static `bin/taskrr` with everything inside it.
 - Export everything as JSON or CSV. Import a JSON export back, or bring a CSV
   from another tracker and match up the columns.
 - Themeable: colour customiser with palette generation, light and dark, animated
-  backgrounds, frosted glass, floating windows, per-animation toggles. Every
-  contrast pair clears WCAG AA in all five presets, including whatever accent
-  you pick.
+  backgrounds, frosted glass, per-animation toggles, and panels that either
+  float as windows or behave as plain full-screen menus. Every contrast pair
+  clears WCAG AA in all five presets, including whatever accent you pick.
 - Keyboard shortcuts (`?` for the list) with rebindable keys, quick-add syntax
   (`water plants every 2 weeks #home`), installable to a phone home screen, and
   a preference to switch off anything above that isn't for you.

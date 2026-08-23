@@ -104,6 +104,14 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
   );
 
   const topId = order[order.length - 1];
+
+  // Panel mode: a phone, or windows switched off. Panels are modal sheets, so
+  // only the top one is shown and there is no taskbar — stacking and switching
+  // are window ideas, and the whole point of turning windows off is not having
+  // them. Closing the top one reveals whatever was under it, which reads as
+  // going back.
+  const phone = useMediaQuery("(max-width: 640px)");
+  const panelMode = phone || !prefs.draggableWindows;
   // When everything is already minimised, the bulk button flips to "bring all up".
   const allMinimized = windows.length > 0 && windows.every((w) => minimized.includes(w.id));
 
@@ -116,7 +124,21 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
   return (
     <Ctx.Provider value={value}>
       {children}
-      {windows.map((w, i) => (
+      {panelMode && windows.length > 0 && (
+        // A backdrop is what makes a panel read as modal rather than as a
+        // window that happens to fill the screen.
+        <div
+          className={cn(
+            "fixed inset-0 z-[49] bg-black/50",
+            prefs.animWindows && "animate-in fade-in-0 duration-150",
+          )}
+          onPointerDown={() => close(topId)}
+          aria-hidden
+        />
+      )}
+      {windows
+        .filter((w) => !panelMode || w.id === topId)
+        .map((w, i) => (
         <FloatingWindow
           key={w.id}
           title={w.title}
@@ -129,13 +151,14 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
           onClose={() => close(w.id)}
           onMinimize={() => minimize(w.id)}
           onFocus={() => focus(w.id)}
+          panel={panelMode}
         >
           {w.content}
         </FloatingWindow>
       ))}
 
-      {/* Taskbar / tab strip for every open window. */}
-      {windows.length > 0 && (
+      {/* Taskbar / tab strip for every open window — windows only. */}
+      {!panelMode && windows.length > 0 && (
         <div
           className="fixed bottom-0 z-[45] flex flex-wrap gap-1 p-2"
           style={{ left: taskbarLeft, right: 0 }}

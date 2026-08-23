@@ -14,6 +14,7 @@ import {
 import { api, type Task } from "@/lib/api";
 import { formatDate, formatDateTime, formatDue, formatInterval, timeSince } from "@/lib/time";
 import { isSnoozed, nextDue, stalenessTint } from "@/lib/staleness";
+import { tagChipStyle, tagColor } from "@/lib/tagColors";
 import { isMyTurn, nextUp, rotationOrder } from "@/lib/rotation";
 import { ensureContrast } from "@/lib/color";
 import { usePrefs } from "@/lib/prefs";
@@ -267,19 +268,29 @@ export function TaskCard({
 
         {task.tags.length > 0 && (
           <div className="flex flex-wrap gap-1 pt-1">
-            {task.tags.map((tag) => (
-              <button
-                key={tag}
-                type="button"
-                onClick={(e) => {
-                  e.stopPropagation();
-                  onTagClick?.(tag);
-                }}
-                className="rounded bg-secondary px-1.5 py-0.5 text-[10px] text-secondary-foreground transition-colors hover:bg-secondary/70"
-              >
-                {tag}
-              </button>
-            ))}
+            {task.tags.map((tag) => {
+              const hex = tagColor(prefs.tagColors, tag);
+              return (
+                <button
+                  key={tag}
+                  type="button"
+                  onClick={(e) => {
+                    e.stopPropagation();
+                    onTagClick?.(tag);
+                  }}
+                  // Uncoloured tags keep the neutral chip, so a list nobody has
+                  // customised looks exactly as it always did.
+                  style={hex ? tagChipStyle(hex, surface) : undefined}
+                  className={cn(
+                    "rounded px-1.5 py-0.5 text-[10px] transition-colors",
+                    !hex && "bg-secondary text-secondary-foreground hover:bg-secondary/70",
+                    hex && "hover:opacity-80",
+                  )}
+                >
+                  {tag}
+                </button>
+              );
+            })}
           </div>
         )}
       </CardContent>

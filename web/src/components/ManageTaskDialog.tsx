@@ -18,6 +18,7 @@ import { formatDate, formatDateTime, formatGap } from "@/lib/time";
 import { PACE_LABELS, paceVerdict, taskStats } from "@/lib/stats";
 import { isSnoozed } from "@/lib/staleness";
 import { useNow } from "@/lib/useNow";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useTaskActions } from "@/components/useTaskActions";
 import { usePrefs } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
@@ -338,34 +339,20 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
       {/* A rota only means anything once more than one person can log the task,
           so it appears on shared tasks and nowhere else. */}
       {task.shared && (
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Take turns
-            <span className="block text-xs">
-              Shows whose turn it is, moving to the next person each time someone logs it
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={rotate}
-            onChange={(e) => setRotate(e.target.checked)}
-          />
-        </label>
+        <ToggleRow
+          label="Take turns"
+          hint="Shows whose turn it is, moving to the next person each time someone logs it"
+          checked={rotate}
+          onChange={(v) => setRotate(v)}
+        />
       )}
 
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">
-          Pin to top
-          <span className="block text-xs">Keeps this task first, whatever the list is sorted by</span>
-        </span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 shrink-0 accent-primary"
+      <ToggleRow
+          label="Pin to top"
+          hint="Keeps this task first, whatever the list is sorted by"
           checked={pinned}
-          onChange={(e) => setPinned(e.target.checked)}
+          onChange={(v) => setPinned(v)}
         />
-      </label>
 
       <div className="space-y-2">
         <Label>Tags</Label>
@@ -405,18 +392,12 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
                 })`,
           }}
         />
-        <label className="flex items-center justify-between gap-2 pt-1 text-sm">
-          <span className="text-muted-foreground">
-            Freeze colour
-            <span className="block text-xs">Stay at the recent colour — never fades to overdue</span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={freezeColor}
-            onChange={(e) => setFreezeColor(e.target.checked)}
-          />
-        </label>
+        <ToggleRow
+          label="Freeze colour"
+          hint="Stay at the recent colour — never fades to overdue"
+          checked={freezeColor}
+          onChange={(v) => setFreezeColor(v)}
+        />
       </div>
 
       {mutation.isError && (

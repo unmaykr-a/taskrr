@@ -95,6 +95,9 @@ export interface Prefs {
   toasts: boolean;
   /** Global single-key shortcuts (new task, search, switch view, help). */
   keyboardShortcuts: boolean;
+  /** An optional colour per tag, keyed by the lowercased tag. Only tags
+   *  somebody picked a colour for appear here. */
+  tagColors: Record<string, string>;
   /** Rebound keys, by action id. Only what differs from the default is stored,
    *  so a changed default reaches anyone who never touched that action. */
   shortcutKeys: Record<string, string>;
@@ -180,6 +183,7 @@ function defaults(): Prefs {
     toasts: true,
     keyboardShortcuts: true,
     shortcutKeys: {},
+    tagColors: {},
     contextMenu: true,
     quickAdd: true,
     tabBadge: false,

@@ -37,6 +37,28 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.19.0",
+    date: "2026-08-23",
+    changes: [
+      feat(
+        "A colour per tag",
+        "Give the tags you use most their own colour under Preferences \u2192 Tag colours. Anything you don't colour keeps the plain chip.",
+      ),
+      feat(
+        "Panels instead of windows",
+        "Turn off draggable windows and settings become plain full-screen menus with a title and a close button \u2014 no taskbar, no minimising. Phones always get this now.",
+      ),
+      fix(
+        "The login page layout always showing \"Centred card\"",
+        "The setting saved correctly but the dropdown reset itself every time the admin page opened, so it looked like it hadn't stuck.",
+      ),
+      fix(
+        "Registration and single sign-on hidden behind a drawer",
+        "They're the first thing you set up, so they now sit open on the admin page like the rest of the first-run settings.",
+      ),
+    ],
+  },
+  {
     version: "1.18.0",
     date: "2026-08-23",
     changes: [

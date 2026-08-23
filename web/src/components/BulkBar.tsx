@@ -18,6 +18,7 @@ import { usePrefs } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { FolderInput } from "@/components/ui/FolderInput";
 import { TagInput } from "@/components/ui/TagInput";
 import { SNOOZE_PRESETS } from "@/components/useTaskActions";
@@ -199,19 +200,19 @@ export function BulkBar({
       {panel === "snooze" && (
         <>
           <span className="px-1 text-xs text-muted-foreground">Snooze until</span>
-          <select
+          <Select
             value={snoozeHours}
             autoFocus
             onChange={(e) => setSnoozeHours(Number(e.target.value))}
             aria-label="Snooze for"
-            className="h-8 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            className="h-8 text-xs"
           >
             {SNOOZE_PRESETS.map((p) => (
-              <option key={p.hours} value={p.hours} className="bg-background">
+              <option key={p.hours} value={p.hours}>
                 {p.label}
               </option>
             ))}
-          </select>
+          </Select>
           <Button size="sm" disabled={busy} onClick={() => run.mutate("snooze")}>
             Snooze
           </Button>

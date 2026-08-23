@@ -31,7 +31,19 @@ function useIsMobile() {
 }
 
 /**
- * FloatingWindow is a draggable, non-modal panel. On desktop you move it by its
+ * FloatingWindow has two shapes.
+ *
+ * As a window (the default on a desktop) it is draggable, resizable, non-modal,
+ * minimises to the taskbar, and several can be open at once.
+ *
+ * As a *panel* — on a phone, or whenever draggable windows are switched off —
+ * it is a plain full-screen sheet over a backdrop, with a title and a close
+ * button and nothing else. Someone who has turned windows off, or is holding a
+ * phone, does not want a desktop metaphor with the dragging removed: they want
+ * a menu that opens, does its job, and closes. So peek, maximise and minimise
+ * all go with it, and the taskbar goes with them (see WindowManager).
+ *
+ * On desktop you move it by its
  * title bar, resize it from the bottom-right grip, and maximise it; it comes to
  * the front when touched (onFocus). Minimising sends it to the taskbar (the
  * window manager owns that state), and several can be open at once.
@@ -58,6 +70,7 @@ export function FloatingWindow({
   onClose,
   onMinimize,
   onFocus,
+  panel,
 }: {
   title: string;
   children: ReactNode;
@@ -72,6 +85,8 @@ export function FloatingWindow({
   onClose: () => void;
   onMinimize: () => void;
   onFocus: () => void;
+  /** Render as a plain sheet rather than a window (see the note above). */
+  panel?: boolean;
 }) {
   const isMobile = useIsMobile();
   const { prefs } = usePrefs();
@@ -98,9 +113,23 @@ export function FloatingWindow({
   });
   const size = useRef<{ w: number; h: number | null }>({ w: initialW, h: initialH });
 
-  const floating = !isMobile && !maximized;
-  // Static-panel mode: keep the window non-modal but not draggable/resizable.
+  // Panel mode wins over everything: no floating, no dragging, no chrome.
+  const asPanel = panel || isMobile;
+  const floating = !asPanel && !maximized;
   const draggable = floating && prefs.draggableWindows;
+
+  // A panel is modal, so Escape closes it — the thing every menu does, and the
+  // only way off it on a phone besides the button.
+  useEffect(() => {
+    if (!asPanel || minimized) return;
+    const onKey = (e: KeyboardEvent) => {
+      if (e.key !== "Escape") return;
+      e.stopPropagation();
+      onClose();
+    };
+    document.addEventListener("keydown", onKey);
+    return () => document.removeEventListener("keydown", onKey);
+  }, [asPanel, minimized, onClose]);
 
   function startDrag(e: React.PointerEvent) {
     onFocus();
@@ -239,33 +268,38 @@ export function FloatingWindow({
       >
         <span className="truncate text-sm font-semibold">{title}</span>
         <div className="flex items-center gap-1">
-          <button
-            type="button"
-            onClick={() => setPeek((p) => !p)}
-            aria-label={peek ? "Unpeek" : "Peek (make translucent)"}
-            title="Peek — make the window translucent to see behind it"
-            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            {peek ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
-          </button>
-          {!isMobile && (
-            <button
-              type="button"
-              onClick={() => setMaximized((m) => !m)}
-              aria-label={maximized ? "Restore" : "Maximize"}
-              className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-            >
-              {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
-            </button>
+          {/* Peek, maximise and minimise are window verbs. A panel has none of
+              them — there is nothing to peek behind, nothing to maximise into,
+              and nowhere to minimise to. */}
+          {!asPanel && (
+            <>
+              <button
+                type="button"
+                onClick={() => setPeek((p) => !p)}
+                aria-label={peek ? "Unpeek" : "Peek (make translucent)"}
+                title="Peek — make the window translucent to see behind it"
+                className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {peek ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={() => setMaximized((m) => !m)}
+                aria-label={maximized ? "Restore" : "Maximize"}
+                className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                {maximized ? <Minimize2 className="h-4 w-4" /> : <Maximize2 className="h-4 w-4" />}
+              </button>
+              <button
+                type="button"
+                onClick={onMinimize}
+                aria-label="Minimize"
+                className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+              >
+                <Minus className="h-4 w-4" />
+              </button>
+            </>
           )}
-          <button
-            type="button"
-            onClick={onMinimize}
-            aria-label="Minimize"
-            className="rounded p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
-          >
-            <Minus className="h-4 w-4" />
-          </button>
           <button
             type="button"
             onClick={onClose}

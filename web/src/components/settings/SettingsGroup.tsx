@@ -42,6 +42,7 @@ export function SettingsGroup({
   icon,
   defaultOpen = false,
   flat = false,
+  badge,
   onOpenChange,
   children,
 }: {
@@ -52,6 +53,9 @@ export function SettingsGroup({
    *  A node rather than a string, so a count badge can live here too. */
   summary?: ReactNode;
   icon?: ReactNode;
+  /** A status shown beside the title, open or shut — unlike `summary`, which is
+   *  a description of what's inside and only useful while the group is closed. */
+  badge?: ReactNode;
   defaultOpen?: boolean;
   /**
    * Render as a plain section rather than a drawer.
@@ -83,7 +87,8 @@ export function SettingsGroup({
       <section className="space-y-2.5 rounded-lg border p-3">
         <h3 className="flex items-center gap-1.5 text-sm font-semibold">
           {icon && <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{icon}</span>}
-          {title}
+          <span className="min-w-0 flex-1 truncate">{title}</span>
+          {badge && <span className="shrink-0 text-xs font-normal">{badge}</span>}
         </h3>
         {children}
       </section>
@@ -96,6 +101,7 @@ export function SettingsGroup({
         <ChevronRight className="h-4 w-4 shrink-0 text-muted-foreground transition-transform group-open:rotate-90" />
         {icon && <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{icon}</span>}
         <span className="min-w-0 flex-1 truncate">{title}</span>
+        {badge && <span className="shrink-0 text-xs font-normal">{badge}</span>}
         {/* Only while shut: once it's open the controls say it better, and a
             summary line alongside them is just noise. Driven from state rather
             than a group-open: variant, which would collide with the sm: one. */}
@@ -107,36 +113,5 @@ export function SettingsGroup({
       </summary>
       <div className={cn("space-y-2.5 border-t p-3")}>{children}</div>
     </details>
-  );
-}
-
-/** A labelled on/off row — the shape almost every setting takes. */
-export function ToggleRow({
-  label,
-  hint,
-  checked,
-  onChange,
-  disabled,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  onChange: (v: boolean) => void;
-  disabled?: boolean;
-}) {
-  return (
-    <label className={cn("flex items-center justify-between gap-2 text-sm", disabled && "opacity-50")}>
-      <span className="text-muted-foreground">
-        {label}
-        {hint && <span className="block text-xs">{hint}</span>}
-      </span>
-      <input
-        type="checkbox"
-        className="h-4 w-4 shrink-0 accent-primary"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-    </label>
   );
 }
