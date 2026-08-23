@@ -21,6 +21,9 @@
 #
 # Prerequisite: the wiki must be initialised once (repo -> Wiki -> create any
 # first page) so that taskrr.wiki.git exists.
+#
+# CI runs this same script (see .github/workflows/wiki.yml) rather than a second
+# copy of the logic, so what a push publishes is exactly what a local run does.
 set -euo pipefail
 
 OWNER_REPO="unmaykr-a/taskrr"
@@ -32,7 +35,9 @@ trap 'rm -rf "$TMP_DIR"' EXIT
 if [ -n "${WIKI_REMOTE:-}" ]; then
   REMOTE="$WIKI_REMOTE"                                            # explicit (e.g. SSH)
 elif [ -n "${WIKI_TOKEN:-}" ]; then
-  REMOTE="https://${WIKI_TOKEN}@github.com/${OWNER_REPO}.wiki.git" # token in URL
+  # x-access-token as the username works for a personal access token and for the
+  # GITHUB_TOKEN a workflow gets, so CI and a laptop take the same path.
+  REMOTE="https://x-access-token:${WIKI_TOKEN}@github.com/${OWNER_REPO}.wiki.git"
 else
   REMOTE="https://github.com/${OWNER_REPO}.wiki.git"              # rely on a credential helper
   if command -v gh >/dev/null 2>&1; then
@@ -44,9 +49,17 @@ echo "Cloning wiki"
 git clone "$REMOTE" "$TMP_DIR/wiki"
 
 echo "Copying pages"
+# Clear the clone's pages first so a page deleted from wiki/ is deleted from the
+# published wiki too. Copying over the top would leave it behind for ever.
+find "$TMP_DIR/wiki" -maxdepth 1 -name '*.md' -delete
 cp "$SRC_DIR"/*.md "$TMP_DIR/wiki"/
 
 cd "$TMP_DIR/wiki"
+
+# CI has no global git identity; a laptop does, and keeps it.
+git config user.name >/dev/null 2>&1 || git config user.name "${WIKI_AUTHOR_NAME:-taskrr-ci}"
+git config user.email >/dev/null 2>&1 || git config user.email "${WIKI_AUTHOR_EMAIL:-taskrr-ci@users.noreply.github.com}"
+
 git add -A
 if git diff --cached --quiet; then
   echo "No changes to publish."
