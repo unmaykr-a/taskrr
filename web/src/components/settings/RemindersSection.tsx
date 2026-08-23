@@ -1,9 +1,10 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Bell, ChevronRight } from "lucide-react";
+import { Bell } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { Button } from "@/components/ui/button";
+import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/Toast";
 
@@ -60,12 +61,7 @@ export function RemindersSection() {
   const canSave = !enabled || webhookUrl.trim() !== "";
 
   return (
-    <details className="group rounded-lg border">
-      <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-sm font-semibold list-none [&::-webkit-details-marker]:hidden">
-        <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
-        <Bell className="h-3.5 w-3.5" /> Reminders
-      </summary>
-      <div className="space-y-2 border-t p-3">
+    <SettingsGroup id="account.reminders" title="Reminders" icon={<Bell />} summary="Webhook when due">
         <label className="flex items-center justify-between gap-2 text-sm">
           <span>Send a webhook when a task is due</span>
           <input
@@ -117,7 +113,6 @@ export function RemindersSection() {
           {test.isSuccess && <span className="text-xs text-emerald-500">Test sent.</span>}
           {test.isError && <span className="text-xs text-destructive">{(test.error as Error).message}</span>}
         </div>
-      </div>
-    </details>
+    </SettingsGroup>
   );
 }

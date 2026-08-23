@@ -89,8 +89,8 @@ Right-click any task card (or long-press on a touchscreen) for everything you
 can do to it: log it, snooze or skip, pin, duplicate, archive, delete. The same
 menu is on the tasks listed under an open day in the calendar. It is
 keyboard-navigable, and turning it off under **Settings -> Preferences ->
-Right-click menu** gives you your browser's own menu back - which is what you
-want for copying a task name.
+Shortcuts & input -> Right-click menu** gives you your browser's own menu back -
+which is what you want for copying a task name.
 
 ## Quick add
 
@@ -105,7 +105,7 @@ interpretation under the box; one click fills the fields in. It never applies
 silently, and a plain name is left completely alone. Folders with spaces need
 quoting: `/"Front Garden"`.
 
-Turn it off under **Settings -> Preferences -> Quick add**.
+Turn it off under **Settings -> Preferences -> Shortcuts & input -> Quick add**.
 
 ## Filters and bulk actions
 
@@ -168,7 +168,7 @@ right on it, or behind. A task with exactly two completions has only one gap,
 which is a measurement rather than a pattern, so it shows a reduced panel and no
 verdict.
 
-Turn the whole panel off under **Settings -> Preferences -> Task statistics**.
+Turn the whole panel off under **Settings -> Preferences -> Layout -> Task statistics**.
 
 ## Keyboard shortcuts
 
@@ -183,7 +183,7 @@ are typing in a field:
 | <kbd>Esc</kbd> | Clear search, tag filter and selection |
 | <kbd>?</kbd> | Show the shortcut list |
 
-Turn them off under **Settings -> Preferences -> Keyboard shortcuts**.
+Turn them off under **Settings -> Preferences -> Shortcuts & input -> Keyboard shortcuts**.
 
 ## See also
 

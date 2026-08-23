@@ -37,6 +37,16 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.17.1",
+    date: "2026-08-23",
+    changes: [
+      feat(
+        "Settings, tidied up",
+        "All three settings pages are now short lists of groups you open rather than one long scroll of switches. Nothing has gone \u2014 Task statistics is under Layout, the right-click, keyboard and quick-add switches are under Shortcuts & input, and whichever group you leave open stays open next time.",
+      ),
+    ],
+  },
+  {
     version: "1.17.0",
     date: "2026-08-23",
     changes: [

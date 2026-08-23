@@ -1,6 +1,21 @@
 import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Download, Globe, Moon, RotateCcw, Share2, Sparkles, Sun, Upload, X } from "lucide-react";
+import {
+  Download,
+  Droplet,
+  Globe,
+  Image as ImageIcon,
+  Moon,
+  Palette,
+  RotateCcw,
+  Save,
+  Share2,
+  Sparkles,
+  Sun,
+  Upload,
+  Users,
+  X,
+} from "lucide-react";
 
 import { api } from "@/lib/api";
 import { usePrefs } from "@/lib/prefs";
@@ -23,6 +38,7 @@ import { Button } from "@/components/ui/button";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 
@@ -178,9 +194,9 @@ export function ThemeCustomizer() {
         </div>
       </section>
 
-      {/* Presets */}
+      {/* Presets: open by default — it's what most visits to this pane are for. */}
+      <SettingsGroup id="theme.presets" title="Presets" icon={<Palette />} defaultOpen>
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Presets</h3>
         <div className="grid grid-cols-3 gap-2">
           {PRESETS.map((p) => (
             <button
@@ -206,10 +222,12 @@ export function ThemeCustomizer() {
         </div>
       </section>
 
+      </SettingsGroup>
+
       {/* Shared themes — admin-published, available to everyone. */}
       {shared && shared.length > 0 && (
+        <SettingsGroup id="theme.shared" title="Shared themes" icon={<Users />}>
         <section className="space-y-2">
-          <h3 className="text-sm font-semibold">Shared themes</h3>
           <div className="grid grid-cols-3 gap-2">
             {shared.map((p) => (
               <div
@@ -246,11 +264,11 @@ export function ThemeCustomizer() {
             ))}
           </div>
         </section>
+        </SettingsGroup>
       )}
 
-      {/* Colors */}
+      <SettingsGroup id="theme.colors" title="Colors" icon={<Droplet />} summary="Surfaces and accent">
       <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Colors</h3>
         <div className="grid grid-cols-2 gap-2">
           {COLOR_FIELDS.map((f) => (
             <ColorField
@@ -330,11 +348,10 @@ export function ThemeCustomizer() {
           ))}
         </div>
       </section>
+      </SettingsGroup>
 
       {/* Background effect */}
-      <details className="rounded-lg border">
-        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Background</summary>
-        <div className="space-y-2 border-t p-3">
+      <SettingsGroup id="theme.background" title="Background" icon={<ImageIcon />} summary="Effect, intensity, motion">
         <select
           className={SELECT}
           value={theme.background}
@@ -436,13 +453,10 @@ export function ThemeCustomizer() {
             />
           </div>
         )}
-        </div>
-      </details>
+      </SettingsGroup>
 
       {/* Save / share */}
-      <details className="rounded-lg border">
-        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Save &amp; share</summary>
-        <div className="space-y-2 border-t p-3">
+      <SettingsGroup id="theme.save" title="Save &amp; share" icon={<Save />} summary="Your saved themes">
         <div className="flex gap-2">
           <Input
             value={name}
@@ -575,8 +589,7 @@ export function ThemeCustomizer() {
             )}
           </div>
         )}
-        </div>
-      </details>
+      </SettingsGroup>
 
       <Button
         type="button"

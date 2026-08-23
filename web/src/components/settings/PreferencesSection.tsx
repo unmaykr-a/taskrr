@@ -1,4 +1,13 @@
 import {
+  CalendarClock,
+  Keyboard,
+  LayoutGrid,
+  Palette,
+  Sparkles,
+  SlidersHorizontal,
+} from "lucide-react";
+
+import {
   type AddButtonPosition,
   type CardSize,
   type ClockChoice,
@@ -8,20 +17,30 @@ import {
 import { Segmented } from "@/components/ui/Segmented";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { Label } from "@/components/ui/label";
+import { SettingsGroup, ToggleRow } from "@/components/settings/SettingsGroup";
 
 const SELECT =
   "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
-/** Per-user preferences that aren't strictly "theme": clock, task colours,
- *  layout density, panels, and motion. */
+/**
+ * Per-user preferences that aren't strictly "theme".
+ *
+ * Grouped rather than listed: this pane had grown to two dozen switches in one
+ * column, where finding "keyboard shortcuts" meant scrolling past every colour
+ * and animation setting. Each group is shut until you want it, and remembers
+ * that per device.
+ */
 export function PreferencesSection() {
   const { prefs, setPrefs } = usePrefs();
 
   return (
-    <div className="space-y-5">
-      {/* Time & date */}
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Time &amp; date</h3>
+    <div className="space-y-2">
+      <SettingsGroup
+        id="prefs.time"
+        title="Time &amp; date"
+        icon={<CalendarClock />}
+        summary="Clock, date format"
+      >
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Clock</Label>
           <Segmented
@@ -50,11 +69,14 @@ export function PreferencesSection() {
         <p className="text-[11px] text-muted-foreground">
           Auto follows each device's own system settings.
         </p>
-      </section>
+      </SettingsGroup>
 
-      {/* Task staleness colours + gradient */}
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Task colours</h3>
+      <SettingsGroup
+        id="prefs.colours"
+        title="Task colours"
+        icon={<Palette />}
+        summary="Fresh to overdue, fading"
+      >
         <p className="text-xs text-muted-foreground">
           Defaults for every task — each task can override these in its Manage window.
         </p>
@@ -76,20 +98,12 @@ export function PreferencesSection() {
             background: `linear-gradient(90deg, ${prefs.taskColorFresh}, ${prefs.taskColorOverdue})`,
           }}
         />
-        <label className="flex items-center justify-between gap-2 pt-1 text-sm">
-          <span className="text-muted-foreground">
-            Fade colours over time
-            <span className="block text-xs">
-              Off keeps every task at its recent colour — no need for per-task freeze.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={prefs.colorFade}
-            onChange={(e) => setPrefs({ colorFade: e.target.checked })}
-          />
-        </label>
+        <ToggleRow
+          label="Fade colours over time"
+          hint="Off keeps every task at its recent colour — no need for per-task freeze."
+          checked={prefs.colorFade}
+          onChange={(v) => setPrefs({ colorFade: v })}
+        />
         {prefs.colorFade && (
           <div className="flex items-center justify-between gap-2">
             <Label className="text-xs text-muted-foreground">
@@ -107,51 +121,14 @@ export function PreferencesSection() {
             />
           </div>
         )}
-        <div className="space-y-1">
-          <Label className="text-xs text-muted-foreground">Add button (mobile)</Label>
-          <select
-            className={SELECT}
-            value={prefs.addButton}
-            onChange={(e) => setPrefs({ addButton: e.target.value as AddButtonPosition })}
-          >
-            <option value="top" className="bg-background">Top right</option>
-            <option value="bottom" className="bg-background">Bottom (FAB)</option>
-          </select>
-        </div>
-      </section>
+      </SettingsGroup>
 
-      {/* Pickers: Taskrr's own controls on by default; turn one off for the
-          device's native input. */}
-      <details className="rounded-lg border">
-        <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Pickers</summary>
-        <div className="space-y-2.5 border-t p-3">
-          <p className="text-[11px] text-muted-foreground">
-            Taskrr's own pickers are on by default; turn one off to use your device's native control.
-          </p>
-          <AnimToggle
-            label="Custom colour picker"
-            hint="A colour wheel instead of the system picker"
-            checked={prefs.colorPicker === "wheel"}
-            onChange={(v) => setPrefs({ colorPicker: v ? "wheel" : "native" })}
-          />
-          <AnimToggle
-            label="Custom date picker"
-            hint="A calendar instead of the system date input"
-            checked={prefs.datePicker}
-            onChange={(v) => setPrefs({ datePicker: v })}
-          />
-          <AnimToggle
-            label="Custom time picker"
-            hint="An analog clock instead of the system time input"
-            checked={prefs.timePicker}
-            onChange={(v) => setPrefs({ timePicker: v })}
-          />
-        </div>
-      </details>
-
-      {/* Layout & motion */}
-      <section className="space-y-2">
-        <h3 className="text-sm font-semibold">Layout &amp; motion</h3>
+      <SettingsGroup
+        id="prefs.layout"
+        title="Layout"
+        icon={<LayoutGrid />}
+        summary="Cards, columns, panels"
+      >
         <div className="grid grid-cols-2 gap-3">
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Card size</Label>
@@ -180,248 +157,203 @@ export function PreferencesSection() {
             </select>
           </div>
         </div>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Toast notifications</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={prefs.toasts}
-            onChange={(e) => setPrefs({ toasts: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Use browser dialogs</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={prefs.nativeDialogs}
-            onChange={(e) => setPrefs({ nativeDialogs: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Show calendar</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={prefs.showCalendar}
-            onChange={(e) => setPrefs({ showCalendar: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Show activity chart</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={prefs.showActivity}
-            onChange={(e) => setPrefs({ showActivity: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Task statistics
-            <span className="block text-xs">
-              A task's typical gap, longest gap, and how it tracks against its routine, in its Manage window
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={prefs.showTaskStats}
-            onChange={(e) => setPrefs({ showTaskStats: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Quick add
-            <span className="block text-xs">
-              Offer to read "every 2 weeks #home /Kitchen" out of a new task's name
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={prefs.quickAdd}
-            onChange={(e) => setPrefs({ quickAdd: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Count in the browser tab
-            <span className="block text-xs">
-              Puts the number of overdue and due-soon tasks in the tab title, for a pinned tab
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={prefs.tabBadge}
-            onChange={(e) => setPrefs({ tabBadge: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Right-click menu
-            <span className="block text-xs">
-              Right-click a task (or long-press on a touchscreen) for its actions. Off restores your
-              browser's own menu.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={prefs.contextMenu}
-            onChange={(e) => setPrefs({ contextMenu: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Keyboard shortcuts
-            <span className="block text-xs">
-              Single keys for new task, search, and switching views — press ? for the list
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={prefs.keyboardShortcuts}
-            onChange={(e) => setPrefs({ keyboardShortcuts: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Draggable windows</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={prefs.draggableWindows}
-            onChange={(e) => setPrefs({ draggableWindows: e.target.checked })}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Pause background while dragging or scrolling
-            <span className="block text-xs">Only kicks in with frosted glass, where the blur is the cost</span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={prefs.pauseBgOnDrag}
-            onChange={(e) => setPrefs({ pauseBgOnDrag: e.target.checked })}
-          />
-        </label>
-      </section>
+        {/* Lived under Task colours until now, which is nobody's first guess. */}
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Add button (mobile)</Label>
+          <select
+            className={SELECT}
+            value={prefs.addButton}
+            onChange={(e) => setPrefs({ addButton: e.target.value as AddButtonPosition })}
+          >
+            <option value="top" className="bg-background">Top right</option>
+            <option value="bottom" className="bg-background">Bottom (FAB)</option>
+          </select>
+        </div>
+        <ToggleRow
+          label="Show calendar"
+          checked={prefs.showCalendar}
+          onChange={(v) => setPrefs({ showCalendar: v })}
+        />
+        <ToggleRow
+          label="Show activity chart"
+          checked={prefs.showActivity}
+          onChange={(v) => setPrefs({ showActivity: v })}
+        />
+        <ToggleRow
+          label="Task statistics"
+          hint="A task's typical gap, longest gap, and how it tracks against its routine, in its Manage window"
+          checked={prefs.showTaskStats}
+          onChange={(v) => setPrefs({ showTaskStats: v })}
+        />
+        <ToggleRow
+          label="Count in the browser tab"
+          hint="Puts the number of overdue and due-soon tasks in the tab title, for a pinned tab"
+          checked={prefs.tabBadge}
+          onChange={(v) => setPrefs({ tabBadge: v })}
+        />
+        <ToggleRow
+          label="Draggable windows"
+          checked={prefs.draggableWindows}
+          onChange={(v) => setPrefs({ draggableWindows: v })}
+        />
+      </SettingsGroup>
 
-      <AnimationsSection />
+      <SettingsGroup
+        id="prefs.behaviour"
+        title="Shortcuts &amp; input"
+        icon={<Keyboard />}
+        summary="Right-click, keys, quick add"
+      >
+        <ToggleRow
+          label="Right-click menu"
+          hint="Right-click a task (or long-press on a touchscreen) for its actions. Off restores your browser's own menu."
+          checked={prefs.contextMenu}
+          onChange={(v) => setPrefs({ contextMenu: v })}
+        />
+        <ToggleRow
+          label="Keyboard shortcuts"
+          hint="Single keys for new task, search, and switching views — press ? for the list"
+          checked={prefs.keyboardShortcuts}
+          onChange={(v) => setPrefs({ keyboardShortcuts: v })}
+        />
+        <ToggleRow
+          label="Quick add"
+          hint={'Offer to read "every 2 weeks #home /Kitchen" out of a new task\'s name'}
+          checked={prefs.quickAdd}
+          onChange={(v) => setPrefs({ quickAdd: v })}
+        />
+        <ToggleRow
+          label="Toast notifications"
+          hint="Brief confirmations after an action — this is also where Undo appears after a log"
+          checked={prefs.toasts}
+          onChange={(v) => setPrefs({ toasts: v })}
+        />
+        <ToggleRow
+          label="Use browser dialogs"
+          hint="System confirm boxes instead of Taskrr's own"
+          checked={prefs.nativeDialogs}
+          onChange={(v) => setPrefs({ nativeDialogs: v })}
+        />
+      </SettingsGroup>
+
+      <SettingsGroup
+        id="prefs.pickers"
+        title="Pickers"
+        icon={<SlidersHorizontal />}
+        summary="Colour, date, time inputs"
+      >
+        <p className="text-[11px] text-muted-foreground">
+          Taskrr's own pickers are on by default; turn one off to use your device's native control.
+        </p>
+        <ToggleRow
+          label="Custom colour picker"
+          hint="A colour wheel instead of the system picker"
+          checked={prefs.colorPicker === "wheel"}
+          onChange={(v) => setPrefs({ colorPicker: v ? "wheel" : "native" })}
+        />
+        <ToggleRow
+          label="Custom date picker"
+          hint="A calendar instead of the system date input"
+          checked={prefs.datePicker}
+          onChange={(v) => setPrefs({ datePicker: v })}
+        />
+        <ToggleRow
+          label="Custom time picker"
+          hint="An analog clock instead of the system time input"
+          checked={prefs.timePicker}
+          onChange={(v) => setPrefs({ timePicker: v })}
+        />
+      </SettingsGroup>
+
+      <AnimationsGroup />
     </div>
   );
 }
 
-/** One labelled on/off row of the Animations list. */
-function AnimToggle({
-  label,
-  hint,
-  checked,
-  disabled,
-  onChange,
-}: {
-  label: string;
-  hint?: string;
-  checked: boolean;
-  disabled?: boolean;
-  onChange: (v: boolean) => void;
-}) {
-  return (
-    <label className={`flex items-center justify-between gap-2 text-sm ${disabled ? "opacity-50" : ""}`}>
-      <span className="text-muted-foreground">
-        {label}
-        {hint && <span className="block text-xs">{hint}</span>}
-      </span>
-      <input
-        type="checkbox"
-        className="h-4 w-4 shrink-0 accent-primary"
-        checked={checked}
-        disabled={disabled}
-        onChange={(e) => onChange(e.target.checked)}
-      />
-    </label>
-  );
-}
-
-/** Collapsible per-animation switches. The master toggle + speed mirror the
- *  ones in Theme (same preference, two homes); the granular switches let a
- *  single kind of motion be turned off while the rest keep animating. */
-function AnimationsSection() {
+/** The per-animation switches. The master toggle and speed mirror the ones in
+ *  Theme (same preference, two homes); the granular switches let one kind of
+ *  motion be turned off while the rest keep animating. */
+function AnimationsGroup() {
   const { prefs, setPrefs } = usePrefs();
   const off = !prefs.animations; // granular toggles are moot with the master off
 
   return (
-    <details className="rounded-lg border">
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Animations</summary>
-      <div className="space-y-2.5 border-t p-3">
-        <AnimToggle
-          label="All animations"
-          hint="Master switch — off disables everything below plus the background"
-          checked={prefs.animations}
-          onChange={(v) => setPrefs({ animations: v })}
-        />
-        {prefs.animations && (
-          <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Animation speed: {prefs.animationSpeed}×</Label>
-            <input
-              type="range"
-              min={0.25}
-              max={2}
-              step={0.25}
-              value={prefs.animationSpeed}
-              onChange={(e) => setPrefs({ animationSpeed: Number(e.target.value) })}
-              className="w-full accent-primary"
-              aria-label="Animation speed"
-            />
-          </div>
-        )}
-        <hr className="border-border/60" />
-        <AnimToggle
-          label="Task cards moving"
-          hint="Cards glide to their new spot and fade in"
-          checked={prefs.animGrid}
-          disabled={off}
-          onChange={(v) => setPrefs({ animGrid: v })}
-        />
-        <AnimToggle
-          label="Action feedback"
-          hint="Quick-log pulse, count pops, button press-down"
-          checked={prefs.animFeedback}
-          disabled={off}
-          onChange={(v) => setPrefs({ animFeedback: v })}
-        />
-        <AnimToggle
-          label="Sliding selection highlight"
-          hint="The bubble that slides between tabs, views, and calendar days"
-          checked={prefs.animIndicators}
-          disabled={off}
-          onChange={(v) => setPrefs({ animIndicators: v })}
-        />
-        <AnimToggle
-          label="Windows and dialogs"
-          hint="Open, close, and minimise motion"
-          checked={prefs.animWindows}
-          disabled={off}
-          onChange={(v) => setPrefs({ animWindows: v })}
-        />
-        <AnimToggle
-          label="View transitions"
-          hint="Header crossfade, calendar month slide, list entrances"
-          checked={prefs.animViews}
-          disabled={off}
-          onChange={(v) => setPrefs({ animViews: v })}
-        />
-        <hr className="border-border/60" />
-        <AnimToggle
-          label="Smooth wheel scrolling"
-          hint="Eases mouse-wheel steps at your display's refresh rate (touchpads and touch stay native)"
-          checked={prefs.smoothScroll}
-          onChange={(v) => setPrefs({ smoothScroll: v })}
-        />
-      </div>
-    </details>
+    <SettingsGroup
+      id="prefs.animations"
+      title="Animations"
+      icon={<Sparkles />}
+      summary={prefs.animations ? "Motion, speed" : "All off"}
+    >
+      <ToggleRow
+        label="All animations"
+        hint="Master switch — off disables everything below plus the background"
+        checked={prefs.animations}
+        onChange={(v) => setPrefs({ animations: v })}
+      />
+      {prefs.animations && (
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Animation speed: {prefs.animationSpeed}×</Label>
+          <input
+            type="range"
+            min={0.25}
+            max={2}
+            step={0.25}
+            value={prefs.animationSpeed}
+            onChange={(e) => setPrefs({ animationSpeed: Number(e.target.value) })}
+            className="w-full accent-primary"
+            aria-label="Animation speed"
+          />
+        </div>
+      )}
+      <ToggleRow
+        label="Task cards moving"
+        hint="Cards glide to their new spot and fade in"
+        checked={prefs.animGrid}
+        disabled={off}
+        onChange={(v) => setPrefs({ animGrid: v })}
+      />
+      <ToggleRow
+        label="Action feedback"
+        hint="Quick-log pulse, count pops, button press-down"
+        checked={prefs.animFeedback}
+        disabled={off}
+        onChange={(v) => setPrefs({ animFeedback: v })}
+      />
+      <ToggleRow
+        label="Sliding selection highlight"
+        hint="The bubble that slides between tabs, views, and calendar days"
+        checked={prefs.animIndicators}
+        disabled={off}
+        onChange={(v) => setPrefs({ animIndicators: v })}
+      />
+      <ToggleRow
+        label="Windows and dialogs"
+        hint="Open, close, and minimise motion"
+        checked={prefs.animWindows}
+        disabled={off}
+        onChange={(v) => setPrefs({ animWindows: v })}
+      />
+      <ToggleRow
+        label="View transitions"
+        hint="Header crossfade, calendar month slide, list entrances"
+        checked={prefs.animViews}
+        disabled={off}
+        onChange={(v) => setPrefs({ animViews: v })}
+      />
+      <ToggleRow
+        label="Smooth wheel scrolling"
+        hint="Eases mouse-wheel steps at your display's refresh rate (touchpads and touch stay native)"
+        checked={prefs.smoothScroll}
+        disabled={off}
+        onChange={(v) => setPrefs({ smoothScroll: v })}
+      />
+      <ToggleRow
+        label="Pause background while dragging or scrolling"
+        hint="Only kicks in with frosted glass, where the blur is the cost"
+        checked={prefs.pauseBgOnDrag}
+        disabled={off}
+        onChange={(v) => setPrefs({ pauseBgOnDrag: v })}
+      />
+    </SettingsGroup>
   );
 }
