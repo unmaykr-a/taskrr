@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, LogOut, Settings, X } from "lucide-react";
+import { Check, Folder as FolderIcon, LogOut, Settings, X } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
@@ -76,8 +76,13 @@ export function Sidebar({
   });
 
   return (
-    <div className="flex h-full w-60 flex-col overflow-y-auto border-r border-border/60 bg-sidebar p-4">
-      <div className="mb-6 flex items-center justify-between">
+    // Only the views and folders scroll. The branding above and the account and
+    // Settings below are how you get out of wherever you are, so they stay put
+    // rather than being scrolled off by a long folder list. Padding moved onto
+    // the three bands so the scrollbar runs inside the list, not down the edge
+    // of the whole sidebar.
+    <div className="flex h-full w-60 flex-col overflow-hidden border-r border-border/60 bg-sidebar">
+      <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex min-w-0 items-center gap-2.5">
           {branding.icon ? (
             <img src={branding.icon} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover shadow" />
@@ -101,8 +106,13 @@ export function Sidebar({
         )}
       </div>
 
-      <CreateTaskDialog />
+      <div className="px-4 pt-6">
+        <CreateTaskDialog />
+      </div>
 
+      {/* The scrolling band. min-h-0 is what lets it actually shrink inside the
+          flex column instead of pushing the footer off the bottom. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4">
       {/* flex+gap (not space-y) so the absolutely-positioned highlight doesn't
           pick up a sibling margin; the bubble glides to the selected view. */}
       <nav ref={navRef} className="relative mt-6 flex flex-col gap-1">
@@ -158,34 +168,55 @@ export function Sidebar({
 
       {/* Folders narrow whichever view is open rather than being a view of their
           own — the same thing clicking a tag on a card does. Only shown when
-          there are folders to pick between. */}
+          there are folders to pick between.
+
+          Set apart from the views above with a rule and a labelled heading: the
+          rows are the same shape as the view rows, so without a break the list
+          just looked like more views with odd names. */}
       {folders.length > 0 && (
-        <div className="mt-4 space-y-1">
-          <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Folders
-          </p>
-          {folders.map((f) => {
-            const active = activeFolder?.toLowerCase() === f.name.toLowerCase();
-            return (
+        <div className="mt-4 border-t border-border/60 pt-4">
+          <div className="mb-1 flex items-center justify-between gap-2 px-3">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <FolderIcon className="h-3 w-3" />
+              Folders
+            </span>
+            {/* Only while one is picked: says the list is narrowed, and undoes it
+                without having to remember which folder is on. */}
+            {activeFolder && (
               <button
-                key={f.name}
-                onClick={() => onFolderChange?.(active ? null : f.name)}
-                className={cn(
-                  "flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
-                  active
-                    ? "bg-primary/15 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                )}
+                type="button"
+                onClick={() => onFolderChange?.(null)}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
               >
-                <span className="min-w-0 truncate">{f.name}</span>
-                <span className="shrink-0 text-xs tabular-nums">{f.count}</span>
+                clear
               </button>
-            );
-          })}
+            )}
+          </div>
+          <div className="space-y-1">
+            {folders.map((f) => {
+              const active = activeFolder?.toLowerCase() === f.name.toLowerCase();
+              return (
+                <button
+                  key={f.name}
+                  onClick={() => onFolderChange?.(active ? null : f.name)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
+                    active
+                      ? "bg-primary/15 font-medium text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )}
+                >
+                  <span className="min-w-0 truncate">{f.name}</span>
+                  <span className="shrink-0 text-xs tabular-nums">{f.count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
+      </div>
 
-      <div className="mt-auto space-y-2 pt-4">
+      <div className="space-y-2 border-t border-border/60 p-4">
         {/* Current account + sign out */}
         <div className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5">
           <div className="min-w-0">
