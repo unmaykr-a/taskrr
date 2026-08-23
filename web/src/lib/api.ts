@@ -190,6 +190,8 @@ export interface AuthConfig {
 }
 
 /** Customisable instance identity, shown signed-out and signed-in. */
+export type LoginLayout = "centered" | "left" | "right";
+
 export interface Branding {
   /** App name in the sidebar + login (defaults to "Taskrr"). */
   name: string;
@@ -203,6 +205,9 @@ export interface Branding {
   loginHideIcon: boolean;
   /** Hide the name/tagline on the login card. */
   loginHideText: boolean;
+  /** How the sign-in page is laid out: a centred card, or a full-height panel
+   *  down one side with the background filling the rest. */
+  loginLayout: LoginLayout;
 }
 
 /** Registration may complete (User) or be queued for approval. */
@@ -271,6 +276,7 @@ export interface AdminSettings {
   brand_icon: string;
   login_hide_icon: boolean;
   login_hide_text: boolean;
+  login_layout: string;
   oidc_client_secret_set: boolean;
   oidc_enabled: boolean;
 }
@@ -297,6 +303,7 @@ export type SettingsPatch = Partial<{
   brand_icon: string;
   login_hide_icon: boolean;
   login_hide_text: boolean;
+  login_layout: string;
 }>;
 
 /** Fields a user can set when creating or editing a task. */

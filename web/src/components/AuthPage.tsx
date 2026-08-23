@@ -97,10 +97,42 @@ export function AuthPage() {
         ? "Create account"
         : "Sign in";
 
+  // Three layouts, all the same form.
+  //
+  // "centered" is the card the app has always had. "left" and "right" put the
+  // form in a full-height panel down one side and let the animated background
+  // have the rest — the split that identity providers tend to use, and the one
+  // that actually shows off a background effect instead of hiding it behind a
+  // small card. On a phone every layout collapses to the same full-width panel,
+  // because there is no room for a split and nothing to show beside it.
+  const split = branding.loginLayout === "left" || branding.loginLayout === "right";
+
   return (
-    <div className="relative z-10 h-[100dvh] overflow-y-auto">
-      <div className="flex min-h-full items-center justify-center p-4">
-        <div className="w-full max-w-sm rounded-2xl border bg-card/95 p-6 shadow-2xl backdrop-blur">
+    <div
+      className={cn(
+        "relative z-10 h-[100dvh] overflow-y-auto",
+        split && "sm:flex sm:overflow-hidden",
+        branding.loginLayout === "right" && "sm:flex-row-reverse",
+      )}
+    >
+      <div
+        className={cn(
+          "flex min-h-full items-center justify-center p-4",
+          split &&
+            "sm:min-h-0 sm:h-full sm:w-[26rem] sm:shrink-0 sm:overflow-y-auto sm:border-r sm:bg-card/95 sm:p-8 sm:backdrop-blur",
+          branding.loginLayout === "right" && "sm:border-l sm:border-r-0",
+        )}
+      >
+        <div
+          className={cn(
+            "w-full max-w-sm",
+            // The panel already provides the surface in a split layout, so the
+            // card loses its own border and shadow rather than nesting two.
+            split
+              ? "rounded-2xl border bg-card/95 p-6 shadow-2xl backdrop-blur sm:rounded-none sm:border-0 sm:bg-transparent sm:p-0 sm:shadow-none sm:backdrop-blur-none"
+              : "rounded-2xl border bg-card/95 p-6 shadow-2xl backdrop-blur",
+          )}
+        >
         {(!branding.loginHideIcon || !branding.loginHideText) && (
           <div className="mb-6 flex flex-col items-center gap-2 text-center">
             {!branding.loginHideIcon &&

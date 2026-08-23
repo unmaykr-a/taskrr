@@ -1046,6 +1046,7 @@ const DEMO_AUTH: AuthConfig = {
     icon: "",
     loginHideIcon: false,
     loginHideText: false,
+    loginLayout: "centered" as const,
   },
 };
 

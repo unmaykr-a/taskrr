@@ -21,7 +21,7 @@ import { CsvMapper } from "@/components/settings/CsvMapper";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { RemindersSection } from "@/components/settings/RemindersSection";
-import { SettingsGroup } from "@/components/settings/SettingsGroup";
+import { SettingsGroup, ToggleRow } from "@/components/settings/SettingsGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/Toast";
@@ -131,7 +131,7 @@ export function AccountSection() {
         id="account.signin"
         title="Sign-in"
         icon={<UserRound />}
-        summary="Username, password, SSO"
+        flat
       >
       <section className="space-y-2">
         <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
@@ -156,26 +156,6 @@ export function AccountSection() {
         {rename.isSuccess && <p className="text-xs text-emerald-500">Username updated.</p>}
       </section>
 
-      {config?.tasksShareable && (
-        <section className="space-y-2">
-          <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
-            <Users className="h-3.5 w-3.5" /> Sharing
-          </h4>
-          <label className="flex items-center justify-between gap-2 text-sm">
-            <span className="text-muted-foreground">
-              Let others share tasks with me
-              <span className="block text-xs">When off, people can't send you tasks.</span>
-            </span>
-            <input
-              type="checkbox"
-              className="h-4 w-4 accent-primary"
-              checked={user?.allowShares ?? true}
-              disabled={allowShares.isPending}
-              onChange={(e) => allowShares.mutate(e.target.checked)}
-            />
-          </label>
-        </section>
-      )}
 
       <section className="space-y-2">
         <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
@@ -274,6 +254,20 @@ export function AccountSection() {
         </section>
       )}
       </SettingsGroup>
+
+      {/* Sharing is a multi-user idea: with lite mode on, or sharing disabled
+          instance-wide, there is nothing here to decide. */}
+      {config?.tasksShareable && !config?.lite && (
+        <SettingsGroup id="account.sharing" title="Sharing" icon={<Users />} summary="Who can send you tasks">
+          <ToggleRow
+            label="Let others share tasks with me"
+            hint="When off, people can't send you tasks."
+            checked={user?.allowShares ?? true}
+            disabled={allowShares.isPending}
+            onChange={(v) => allowShares.mutate(v)}
+          />
+        </SettingsGroup>
+      )}
 
       <RemindersSection />
 

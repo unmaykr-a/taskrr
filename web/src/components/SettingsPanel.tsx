@@ -1,15 +1,17 @@
 import { useRef, useState } from "react";
-import { Palette, Shield, SlidersHorizontal, User } from "lucide-react";
+import { Keyboard, Palette, Shield, SlidersHorizontal, User } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
+import { usePrefs } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { AccountSection } from "@/components/settings/AccountSection";
 import { PreferencesSection } from "@/components/settings/PreferencesSection";
+import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
 import { ThemeCustomizer } from "@/components/settings/ThemeCustomizer";
 import { AdminPanel } from "@/components/AdminPanel";
 
-type Section = "account" | "preferences" | "theme" | "admin";
+type Section = "account" | "preferences" | "shortcuts" | "theme" | "admin";
 
 /**
  * SettingsPanel is the unified settings window body: a left nav with sections
@@ -18,16 +20,26 @@ type Section = "account" | "preferences" | "theme" | "admin";
  */
 export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
   const { user } = useAuth();
+  const { prefs } = usePrefs();
   const [section, setSection] = useState<Section>(initial);
   const navRef = useRef<HTMLElement>(null);
 
-  const items: { id: Section; label: string; icon: typeof User; adminOnly?: boolean }[] = [
+  const items: {
+    id: Section;
+    label: string;
+    icon: typeof User;
+    adminOnly?: boolean;
+    hidden?: boolean;
+  }[] = [
     { id: "account", label: "Account", icon: User },
     { id: "preferences", label: "Preferences", icon: SlidersHorizontal },
+    // Only worth a page of its own when the shortcuts are actually running;
+    // otherwise it would offer to configure something switched off.
+    { id: "shortcuts", label: "Shortcuts", icon: Keyboard, hidden: !prefs.keyboardShortcuts },
     { id: "theme", label: "Theme", icon: Palette },
     { id: "admin", label: "Admin", icon: Shield, adminOnly: true },
   ];
-  const visible = items.filter((i) => !i.adminOnly || user?.role === "admin");
+  const visible = items.filter((i) => !i.hidden && (!i.adminOnly || user?.role === "admin"));
   const active = visible.some((i) => i.id === section) ? section : "account";
 
   return (
@@ -66,6 +78,7 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
       <div className="min-w-0 flex-1 sm:border-l sm:pl-4">
         {active === "account" && <AccountSection />}
         {active === "preferences" && <PreferencesSection />}
+        {active === "shortcuts" && <ShortcutsSection />}
         {active === "theme" && <ThemeCustomizer />}
         {active === "admin" && <AdminPanel />}
       </div>

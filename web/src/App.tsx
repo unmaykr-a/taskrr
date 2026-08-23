@@ -22,6 +22,7 @@ import { useFlip } from "@/lib/useFlip";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { useNow } from "@/lib/useNow";
 import { type Shortcut, useKeyboardShortcuts } from "@/lib/useKeyboardShortcuts";
+import { describeKey, resolveKey } from "@/lib/shortcuts";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
@@ -180,11 +181,14 @@ export default function App() {
     () => (shareEnabled ? [...FILTERS, ...SHARE_FILTERS] : FILTERS),
     [shareEnabled],
   );
+  // Keys come from the user's bindings, falling back to the defaults — see
+  // lib/shortcuts.ts for why only these four are rebindable.
+  const bound = prefs.shortcutKeys;
   const shortcuts = useMemo<Shortcut[]>(() => {
     const list: Shortcut[] = [
-      { key: "n", label: "New task", run: () => setCreateOpen(true) },
+      { key: resolveKey(bound, "new"), label: "New task", run: () => setCreateOpen(true) },
       {
-        key: "/",
+        key: resolveKey(bound, "search"),
         label: "Search tasks",
         run: () => {
           setSidebarOpen(false);
@@ -192,9 +196,9 @@ export default function App() {
           searchRef.current?.select();
         },
       },
-      { key: "?", label: "Show this help", run: () => setShortcutsOpen((v) => !v) },
+      { key: resolveKey(bound, "help"), label: "Show this help", run: () => setShortcutsOpen((v) => !v) },
       {
-        key: "Escape",
+        key: resolveKey(bound, "clear"),
         label: "Clear search and selection",
         run: () => {
           setSearch("");
@@ -217,20 +221,22 @@ export default function App() {
     });
     return list;
     // eslint-disable-next-line react-hooks/exhaustive-deps
-  }, [navFilters]);
+  }, [navFilters, bound]);
   useKeyboardShortcuts(shortcuts, prefs.keyboardShortcuts);
 
   // Grouped for the help overlay: the digits collapse into one row so the list
   // doesn't become seven near-identical lines.
+  // Reads the live bindings rather than the defaults, or the "?" overlay would
+  // keep confidently naming keys the user has since moved.
   const shortcutHelp = useMemo<ShortcutHelp[]>(
     () => [
-      { keys: ["n"], label: "New task" },
-      { keys: ["/"], label: "Search tasks" },
+      { keys: [describeKey(resolveKey(bound, "new"))], label: "New task" },
+      { keys: [describeKey(resolveKey(bound, "search"))], label: "Search tasks" },
       { keys: ["1", "…", String(Math.min(9, navFilters.length))], label: "Switch view" },
-      { keys: ["Esc"], label: "Clear search and selection" },
-      { keys: ["?"], label: "Show this help" },
+      { keys: [describeKey(resolveKey(bound, "clear"))], label: "Clear search and selection" },
+      { keys: [describeKey(resolveKey(bound, "help"))], label: "Show this help" },
     ],
-    [navFilters.length],
+    [navFilters.length, bound],
   );
 
   const filterLabel =

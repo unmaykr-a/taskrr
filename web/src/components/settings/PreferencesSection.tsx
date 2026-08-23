@@ -39,7 +39,7 @@ export function PreferencesSection() {
         id="prefs.time"
         title="Time &amp; date"
         icon={<CalendarClock />}
-        summary="Clock, date format"
+        flat
       >
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Clock</Label>

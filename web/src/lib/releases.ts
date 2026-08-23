@@ -37,6 +37,32 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.18.0",
+    date: "2026-08-23",
+    changes: [
+      feat(
+        "Change the keyboard shortcuts",
+        "A Shortcuts page in Settings, where you press the key you'd rather use. It won't let you take a key something else already has, and the number keys stay with the sidebar views. Only appears when shortcuts are switched on.",
+      ),
+      feat(
+        "Two more login page layouts",
+        "As well as the centred card, the sign-in form can sit in a panel down the left or right, with the background filling the rest. Under Admin \u2192 Branding.",
+      ),
+      feat(
+        "Lite mode hides more",
+        "With lite mode on there is nobody to share with, so task sharing, theme sharing, the site default theme, other accounts and account merging all go rather than sitting there doing nothing.",
+      ),
+      fix(
+        "Settings that were a wall of closed drawers",
+        "Time & date and Sign-in are out in the open again \u2014 they're the ones you'd open every time anyway.",
+      ),
+      fix(
+        "Leftover lines in the admin settings",
+        "Hiding a section left its separator behind, so lite mode and a quiet instance both ended up with stray rules. The admin page now uses the same groups as the rest of Settings and has none.",
+      ),
+    ],
+  },
+  {
     version: "1.17.1",
     date: "2026-08-23",
     changes: [
