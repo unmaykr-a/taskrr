@@ -142,7 +142,23 @@ func (s *Store) UnshareFolder(ctx context.Context, ownerID int64, folder string,
 
 // ListFolderMembers returns everyone on one of an owner's folders, pending and
 // accepted, with their usernames.
+//
+// A folder the caller doesn't have is ErrNotFound rather than an empty list, so
+// asking about someone else's folder answers the same way as asking about a
+// task that isn't yours. A folder that has been emptied but still has members
+// still lists them — that's the state you'd want to see to clean it up.
 func (s *Store) ListFolderMembers(ctx context.Context, ownerID int64, folder string) ([]TaskMember, error) {
+	var n int
+	if err := s.db.QueryRowContext(ctx,
+		`SELECT (SELECT COUNT(*) FROM tasks WHERE owner_id = ? AND folder = ?)
+		      + (SELECT COUNT(*) FROM folder_shares WHERE owner_id = ? AND folder = ?)`,
+		ownerID, folder, ownerID, folder).Scan(&n); err != nil {
+		return nil, err
+	}
+	if n == 0 {
+		return nil, ErrNotFound
+	}
+
 	rows, err := s.db.QueryContext(ctx,
 		`SELECT fs.user_id, u.username, fs.status
 		   FROM folder_shares fs JOIN users u ON u.id = fs.user_id

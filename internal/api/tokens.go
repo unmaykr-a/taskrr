@@ -48,7 +48,17 @@ func tokenAllowedPath(path string) bool {
 		return true
 	}
 	// Tasks and their completions: the whole point of automating this app.
-	return strings.HasPrefix(path, "/api/tasks") || strings.HasPrefix(path, "/api/completions")
+	//
+	// The collection exactly, plus anything *under* it — not a bare prefix. A
+	// prefix would quietly hand tokens any future route that merely starts with
+	// the same letters (/api/tasks-admin, /api/tasksettings), which is the
+	// opt-in-by-default this allowlist exists to prevent.
+	for _, base := range []string{"/api/tasks", "/api/completions"} {
+		if path == base || strings.HasPrefix(path, base+"/") {
+			return true
+		}
+	}
+	return false
 }
 
 // tokenScope rejects token-authenticated requests aimed outside the allowlist.
@@ -148,6 +158,24 @@ func (s *Server) handleDeleteAPIToken(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
+}
+
+// handleDeleteAllAPITokens revokes every token the caller owns at once.
+//
+// The panic button. Revoking one at a time is fine for tidying up, but if you
+// think a token has leaked you want them all gone in one click without having
+// to work out which laptop or script had which.
+func (s *Server) handleDeleteAllAPITokens(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	n, err := s.store.DeleteAllAPITokens(r.Context(), u.ID)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not revoke tokens")
+		return
+	}
+	writeJSON(w, http.StatusOK, map[string]int64{"revoked": n})
 }
 
 // apiTokensEnabled reports the admin's instance-wide switch for the feature.

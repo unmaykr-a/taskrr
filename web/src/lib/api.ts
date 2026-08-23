@@ -397,9 +397,8 @@ const httpApi = {
     }),
 
   unshareFolder: (folder: string, userId: number) =>
-    request<void>(`/api/folders/${encodeURIComponent(folder)}/share`, {
+    request<void>(`/api/folders/${encodeURIComponent(folder)}/members/${userId}`, {
       method: "DELETE",
-      body: JSON.stringify({ userId }),
     }),
 
   listFolderMembers: (folder: string) =>
@@ -481,6 +480,10 @@ const httpApi = {
 
   /** Everyone attached to a task: owner + members. */
   listMembers: (taskId: number) => request<TaskMember[]>(`/api/tasks/${taskId}/members`),
+
+  /** The owner's half of undoing a share, matching unshareFolder. */
+  removeMember: (taskId: number, userId: number) =>
+    request<void>(`/api/tasks/${taskId}/members/${userId}`, { method: "DELETE" }),
 
   /** The current user's pending incoming shares (their Requests view). */
   listIncomingShares: () => request<ShareRequest[]>("/api/me/shares"),
@@ -586,6 +589,8 @@ const httpApi = {
     }),
 
   deleteAPIToken: (id: number) => request<void>(`/api/me/tokens/${id}`, { method: "DELETE" }),
+  /** Revokes every token at once, for when you don't know which one leaked. */
+  deleteAllAPITokens: () => request<{ revoked: number }>("/api/me/tokens", { method: "DELETE" }),
 
   getPreferences: () => request<Record<string, unknown>>("/api/me/preferences"),
 

@@ -121,6 +121,31 @@ func (s *Server) handleListMembers(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, members)
 }
 
+// handleRemoveMember lets a task's owner take an invitation back.
+// DELETE /api/tasks/{id}/members/{userId}.
+//
+// The counterpart to leaving: until now a share could only be undone by the
+// person who received it, so an invitation sent to the wrong username stuck.
+func (s *Server) handleRemoveMember(w http.ResponseWriter, r *http.Request) {
+	u, ok := s.requireUser(w, r)
+	if !ok {
+		return
+	}
+	id, ok := pathID(w, r)
+	if !ok {
+		return
+	}
+	memberID, ok := pathInt64(w, r, "userId")
+	if !ok {
+		return
+	}
+	if err := s.store.RemoveTaskMember(r.Context(), u.ID, id, memberID); err != nil {
+		writeStoreError(w, err, "could not remove that member")
+		return
+	}
+	w.WriteHeader(http.StatusNoContent)
+}
+
 // handleListIncomingShares returns the current user's pending incoming shares
 // (their Requests view). GET /api/me/shares.
 func (s *Server) handleListIncomingShares(w http.ResponseWriter, r *http.Request) {

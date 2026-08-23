@@ -80,6 +80,20 @@ func (s *Store) DeleteAPIToken(ctx context.Context, userID, id int64) error {
 	return nil
 }
 
+// DeleteAllAPITokens revokes every token a user holds, returning how many went.
+//
+// The single-token delete is the tidy-up path; this is the compromise path —
+// "something has my credentials and I don't know which" — so it needs to be one
+// action rather than a list to work through.
+func (s *Store) DeleteAllAPITokens(ctx context.Context, userID int64) (int64, error) {
+	res, err := s.db.ExecContext(ctx, `DELETE FROM api_tokens WHERE user_id = ?`, userID)
+	if err != nil {
+		return 0, err
+	}
+	n, _ := res.RowsAffected()
+	return n, nil
+}
+
 // apiTokenTouchInterval throttles last_used_at writes the same way sessions
 // throttle last_seen: an automation polling every minute shouldn't mean a write
 // on every request.

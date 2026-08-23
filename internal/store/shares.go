@@ -189,6 +189,25 @@ func (s *Store) LeaveTask(ctx context.Context, userID, taskID int64) error {
 	return nil
 }
 
+// RemoveTaskMember drops a member the owner had invited — the other half of
+// sharing a task, matching UnshareFolder. Scoped by owner_id so only the task's
+// owner can do it, and a member can't quietly remove another member.
+// ErrNotFound if the task isn't the caller's or that user isn't on it.
+func (s *Store) RemoveTaskMember(ctx context.Context, ownerID, taskID, memberID int64) error {
+	res, err := s.db.ExecContext(ctx,
+		`DELETE FROM task_shares
+		  WHERE task_id = ? AND user_id = ?
+		    AND task_id IN (SELECT id FROM tasks WHERE owner_id = ?)`,
+		taskID, memberID, ownerID)
+	if err != nil {
+		return err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return ErrNotFound
+	}
+	return nil
+}
+
 // ListIncomingShares returns userID's pending incoming shares (their Requests),
 // newest first, with the task and owner named.
 func (s *Store) ListIncomingShares(ctx context.Context, userID int64) ([]ShareRequest, error) {

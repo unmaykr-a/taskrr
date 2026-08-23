@@ -119,6 +119,8 @@ func (s *Server) handleLeaveFolder(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleUnshareFolder removes a member the owner had invited.
+// DELETE /api/folders/{folder}/members/{userId}, the same shape as the per-task
+// route rather than a DELETE carrying a body.
 func (s *Server) handleUnshareFolder(w http.ResponseWriter, r *http.Request) {
 	u, ok := s.requireUser(w, r)
 	if !ok {
@@ -128,13 +130,11 @@ func (s *Server) handleUnshareFolder(w http.ResponseWriter, r *http.Request) {
 	if !ok {
 		return
 	}
-	var req struct {
-		UserID int64 `json:"userId"`
-	}
-	if !decodeJSON(w, r, &req) {
+	memberID, ok := pathInt64(w, r, "userId")
+	if !ok {
 		return
 	}
-	if err := s.store.UnshareFolder(r.Context(), u.ID, folder, req.UserID); err != nil {
+	if err := s.store.UnshareFolder(r.Context(), u.ID, folder, memberID); err != nil {
 		writeStoreError(w, err, "could not remove that member")
 		return
 	}
@@ -155,7 +155,7 @@ func (s *Server) handleListFolderMembers(w http.ResponseWriter, r *http.Request)
 	}
 	members, err := s.store.ListFolderMembers(r.Context(), u.ID, folder)
 	if err != nil {
-		writeError(w, http.StatusInternalServerError, "could not list members")
+		writeStoreError(w, err, "could not list members")
 		return
 	}
 	writeJSON(w, http.StatusOK, members)

@@ -53,6 +53,7 @@ authenticate either with the web UI's session cookie or with an API token (see
 | GET | `/api/me/tokens` | List your API tokens (metadata only). |
 | POST | `/api/me/tokens` | Mint a token. The response is the only time the value is returned. |
 | DELETE | `/api/me/tokens/{id}` | Revoke a token. |
+| DELETE | `/api/me/tokens` | Revoke every token you hold. Returns `{"revoked": n}`. |
 
 ## API tokens
 
@@ -82,6 +83,21 @@ Administrators can turn the feature off for the whole instance under **Settings
 tokens that already exist keep working until they are revoked, so flipping the
 switch never silently breaks a live automation.
 
+### Revoking
+
+Revoke a single token from its row under **Settings -> Account -> API tokens**,
+or use **Revoke every token** when more than one exists - the option for when
+you think a token has leaked and don't know which of them it is.
+
+Tokens are also revoked automatically:
+
+- when you change your password (which already signs out your other devices), and
+- when an admin terminates an account's sessions under **Settings -> Admin ->
+  Active sessions**, or resets its password.
+
+A bearer credential outlives a cookie, so the two go together: signing a browser
+out while leaving a token working would only be half of shutting an account off.
+
 ## Data export
 
 `GET /api/me/export` returns every task you own or share, each with its full
@@ -92,7 +108,11 @@ history, scoped to the signed-in account:
   account elsewhere.
 - **CSV** (`?format=csv`) - one row per completion, with the task's name,
   description, folder, tags, routine and archived flag repeated on each row. A
-  task with no history still gets a row, so nothing is silently dropped.
+  task with no history still gets a row, so nothing is silently dropped. A cell
+  that begins with `=`, `+`, `-` or `@` is written with a leading apostrophe,
+  which spreadsheets read as literal text rather than a formula to run; the
+  apostrophe isn't displayed. Names on a task shared with you were chosen by
+  someone else, so this isn't only about what you typed yourself.
 
 Both are sent as downloads with a dated filename. Admin backups (whole-database,
 admin-only) remain the right tool for restoring an instance; this is the
@@ -138,6 +158,7 @@ treat a completion as "you actually did this".
 | POST | `/api/tasks/{id}/share/respond` | Accept or decline an invite. |
 | POST | `/api/tasks/{id}/leave` | Leave a shared task. |
 | GET | `/api/tasks/{id}/members` | List a task's members. |
+| DELETE | `/api/tasks/{id}/members/{userId}` | Remove a member (owner). |
 
 ## Folder sharing (authenticated)
 
@@ -154,8 +175,8 @@ The folder name is a path segment, so escape it once (`encodeURIComponent`).
 | POST | `/api/folders/{folder}/share` | Invite a user. Body `{"username": "..."}`. |
 | POST | `/api/folders/{folder}/share/respond` | Accept or decline. Body `{"ownerId": 1, "accept": true}`. |
 | POST | `/api/folders/{folder}/leave` | Leave a folder shared with you. Body `{"ownerId": 1}`. |
-| DELETE | `/api/folders/{folder}/share` | Remove a member. Body `{"userId": 2}`. |
-| GET | `/api/folders/{folder}/members` | Who is on one of your own folders. |
+| DELETE | `/api/folders/{folder}/members/{userId}` | Remove a member (owner). |
+| GET | `/api/folders/{folder}/members` | Who is on one of your own folders. `404` if you have no such folder. |
 
 ## Version
 

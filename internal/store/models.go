@@ -39,9 +39,9 @@ type Task struct {
 	Rotate bool `json:"rotate"`
 	// ReminderLeadSeconds overrides how far ahead of due this task's reminder
 	// fires. nil falls back to the account-wide reminder setting.
-	ReminderLeadSeconds *int64 `json:"reminderLeadSeconds"`
-	CreatedAt  time.Time  `json:"createdAt"`
-	UpdatedAt  time.Time  `json:"updatedAt"`
+	ReminderLeadSeconds *int64    `json:"reminderLeadSeconds"`
+	CreatedAt           time.Time `json:"createdAt"`
+	UpdatedAt           time.Time `json:"updatedAt"`
 	// OwnerID is the account that owns the task. With shared tasks a viewer may
 	// be an accepted member rather than the owner, so the API/UI can compare this
 	// to the current user to decide who may edit/archive the definition.

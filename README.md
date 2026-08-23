@@ -104,7 +104,8 @@ single static `bin/taskrr` with everything inside it.
   with a per-task override.
 - API tokens for the other direction: log a task from a script, an NFC tag, or
   an automation. A token reaches tasks and history and nothing else — not the
-  admin area, not your password.
+  admin area, not your password. Revoke one, or all of them at once; changing
+  your password revokes them too.
 - Export everything as JSON or CSV. Import a JSON export back, or bring a CSV
   from another tracker and match up the columns.
 - Themeable: colour customiser with palette generation, light and dark, animated

@@ -37,6 +37,32 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.21.0",
+    date: "2026-08-23",
+    changes: [
+      feat(
+        "Revoke every API token at once",
+        "If you think a token has leaked and don't know which one it is, there's now one button for all of them under Account \u2192 API tokens.",
+      ),
+      feat(
+        "Take a share back",
+        "The owner of a shared task can remove someone from it, the same way folder sharing already worked. Sending an invite to the wrong username used to be the recipient's to decline.",
+      ),
+      fix(
+        "Changing a password leaving API tokens working",
+        "Changing your password signs out your other devices and now revokes your tokens with them, and an admin terminating an account's sessions does the same.",
+      ),
+      fix(
+        "Exports opening as formulas in a spreadsheet",
+        "A task name starting with =, + or @ was handed to Excel or LibreOffice as something to run. Cells that start that way are quoted in the CSV now, which matters most for a name someone else chose on a task shared with you.",
+      ),
+      fix(
+        "Two API details that didn't match the rest",
+        "Removing someone from a shared folder is DELETE /api/folders/{folder}/members/{userId} rather than a DELETE carrying a body, and asking for the members of a folder you don't have answers 404 instead of an empty list.",
+      ),
+    ],
+  },
+  {
     version: "1.20.1",
     date: "2026-08-23",
     changes: [
