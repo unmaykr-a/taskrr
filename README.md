@@ -85,10 +85,11 @@ single static `bin/taskrr` with everything inside it.
 - Per-task statistics: how often you *actually* do a thing, your longest gap,
   and how that compares to the routine you claimed you'd keep.
 - Filters with live counts — all, due soon, overdue, never done, snoozed,
-  archived — bulk actions over a selection, and pinning for the ones that should
-  stay at the top whatever the sort.
-- Tags with search, filtering and an optional colour each, folders, and sorting
-  by name or last-done.
+  archived — plus folders in the sidebar to narrow any of them. Bulk actions over
+  a selection (log, snooze, skip, routine, tag, folder, archive, delete), and
+  pinning for the ones that should stay at the top whatever the sort.
+- Tags with search, filtering and an optional colour each, folders, sorting by
+  name or last-done, and templates for the setups you reuse.
 - Multiple users with per-user data, local passwords, and optional OIDC SSO
   (tested against Authentik and Pocket ID) including group-to-admin mapping.
   `TASKRR_LITE=true` hides the whole multi-user surface if you're the only one.

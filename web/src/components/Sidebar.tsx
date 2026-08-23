@@ -31,12 +31,19 @@ export function Sidebar({
   filter,
   onFilterChange,
   counts,
+  folders = [],
+  activeFolder = null,
+  onFolderChange,
   shareEnabled = false,
   onClose,
 }: {
   filter: Filter;
   onFilterChange: (f: Filter) => void;
   counts: Record<Filter, number>;
+  /** Folders in use, with how many active tasks each holds. */
+  folders?: { name: string; count: number }[];
+  activeFolder?: string | null;
+  onFolderChange?: (folder: string | null) => void;
   /** Whether task sharing is on (shows the Shared + Requests views). */
   shareEnabled?: boolean;
   onClose?: () => void;
@@ -148,6 +155,35 @@ export function Sidebar({
           );
         })}
       </nav>
+
+      {/* Folders narrow whichever view is open rather than being a view of their
+          own — the same thing clicking a tag on a card does. Only shown when
+          there are folders to pick between. */}
+      {folders.length > 0 && (
+        <div className="mt-4 space-y-1">
+          <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+            Folders
+          </p>
+          {folders.map((f) => {
+            const active = activeFolder?.toLowerCase() === f.name.toLowerCase();
+            return (
+              <button
+                key={f.name}
+                onClick={() => onFolderChange?.(active ? null : f.name)}
+                className={cn(
+                  "flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
+                  active
+                    ? "bg-primary/15 font-medium text-primary"
+                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                )}
+              >
+                <span className="min-w-0 truncate">{f.name}</span>
+                <span className="shrink-0 text-xs tabular-nums">{f.count}</span>
+              </button>
+            );
+          })}
+        </div>
+      )}
 
       <div className="mt-auto space-y-2 pt-4">
         {/* Current account + sign out */}

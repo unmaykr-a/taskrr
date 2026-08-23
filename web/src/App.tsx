@@ -5,6 +5,7 @@ import {
   ChevronDown,
   ChevronRight,
   FolderTree,
+  Folder as FolderIcon,
   ListTodo,
   Menu,
   Plus,
@@ -57,6 +58,7 @@ export default function App() {
   const [filter, setFilter] = useState<Filter>("all");
   const [search, setSearch] = useState("");
   const [activeTag, setActiveTag] = useState<string | null>(null);
+  const [activeFolder, setActiveFolder] = useState<string | null>(null);
 
   // After returning from an OIDC link attempt, surface the outcome and refresh
   // the cached user so the Settings UI reflects the new link state, then strip
@@ -159,6 +161,9 @@ export default function App() {
   const visible = useMemo(() => {
     const q = search.trim().toLowerCase();
     let list = tasks.filter((t) => matchesFilter(t, filter, now));
+    if (activeFolder) {
+      list = list.filter((t) => t.folder.toLowerCase() === activeFolder.toLowerCase());
+    }
     if (activeTag) {
       list = list.filter((t) => t.tags.some((tag) => tag.toLowerCase() === activeTag.toLowerCase()));
     }
@@ -171,7 +176,7 @@ export default function App() {
       );
     }
     return sortTasks(list, prefs.sortBy);
-  }, [tasks, filter, now, search, activeTag, prefs.sortBy]);
+  }, [tasks, filter, now, search, activeTag, activeFolder, prefs.sortBy]);
 
   // --- keyboard shortcuts -----------------------------------------------------
   // Single unmodified keys, matching the sidebar's own order so "3" lands on
@@ -181,6 +186,21 @@ export default function App() {
     () => (shareEnabled ? [...FILTERS, ...SHARE_FILTERS] : FILTERS),
     [shareEnabled],
   );
+  // Folders in use, with how many active tasks are in each. Derived rather than
+  // stored, so a folder appears the moment a task is moved into it and vanishes
+  // when the last one leaves.
+  const folderCounts = useMemo(() => {
+    const byName = new Map<string, { name: string; count: number }>();
+    for (const t of tasks ?? []) {
+      if (t.archivedAt != null || !t.folder) continue;
+      const key = t.folder.toLowerCase();
+      const seen = byName.get(key);
+      if (seen) seen.count += 1;
+      else byName.set(key, { name: t.folder, count: 1 });
+    }
+    return [...byName.values()].sort((a, b) => a.name.localeCompare(b.name));
+  }, [tasks]);
+
   // Keys come from the user's bindings, falling back to the defaults — see
   // lib/shortcuts.ts for why only these four are rebindable.
   const bound = prefs.shortcutKeys;
@@ -203,6 +223,7 @@ export default function App() {
         run: () => {
           setSearch("");
           setActiveTag(null);
+          setActiveFolder(null);
           clearSelection();
         },
       },
@@ -346,6 +367,13 @@ export default function App() {
               setSelected(new Set());
             }}
             counts={counts}
+            folders={folderCounts}
+            activeFolder={activeFolder}
+            onFolderChange={(f) => {
+              setActiveFolder(f);
+              setSidebarOpen(false);
+              setSelected(new Set());
+            }}
             shareEnabled={shareEnabled}
             onClose={() => setSidebarOpen(false)}
           />
@@ -416,6 +444,18 @@ export default function App() {
                       className="h-9 w-full rounded-md border border-input bg-transparent pl-8 pr-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
                     />
                   </div>
+                  {activeFolder && (
+                    <button
+                      type="button"
+                      onClick={() => setActiveFolder(null)}
+                      title="Show every folder again"
+                      className="inline-flex items-center gap-1 rounded-md bg-primary/15 px-2 py-1.5 text-xs font-medium text-primary"
+                    >
+                      <FolderIcon className="h-3 w-3" />
+                      {activeFolder}
+                      <X className="h-3 w-3" />
+                    </button>
+                  )}
                   {activeTag && (
                     <button
                       type="button"
@@ -462,7 +502,7 @@ export default function App() {
               )}
 
               {!requestsView && !isLoading && !isError && visible.length === 0 &&
-                (search.trim() || activeTag ? (
+                (search.trim() || activeTag || activeFolder ? (
                   <p className="rounded-lg border border-dashed py-12 text-center text-sm text-muted-foreground">
                     No tasks match.
                   </p>

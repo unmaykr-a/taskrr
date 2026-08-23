@@ -136,3 +136,70 @@
   transition: none !important;
   will-change: transform;
 }
+
+/* Dragging or resizing a window shouldn't select the page text underneath it,
+   which is what a plain pointer drag does by default. */
+body.win-dragging {
+  user-select: none;
+  -webkit-user-select: none;
+}
+
+/* A floating window is resizable, so panels inside it have to lay themselves
+   out against the *window's* width, not the viewport's: a 320px window on a 4K
+   screen is still 320px, and Tailwind's `sm:` would happily keep a side-by-side
+   layout that has no room to exist. Making the window body a size container
+   lets the rules below ask the right question. */
+.win-body {
+  container-type: inline-size;
+  container-name: panel;
+}
+
+/* Settings: stacked by default, side nav only once the panel is wide enough for
+   one. Below that the nav becomes a scrolling strip across the top, which is
+   the same shape phones already get. */
+.settings-shell {
+  display: flex;
+  flex-direction: column;
+  gap: 0.75rem;
+}
+.settings-nav {
+  position: relative;
+  display: flex;
+  flex-shrink: 0;
+  gap: 0.25rem;
+  overflow-x: auto;
+  border-bottom: 1px solid hsl(var(--border));
+  padding-bottom: 0.5rem;
+}
+.settings-nav > button {
+  flex: 1 1 0%;
+  justify-content: center;
+}
+.settings-body {
+  min-width: 0;
+  flex: 1 1 0%;
+}
+@container panel (min-width: 30rem) {
+  .settings-shell {
+    flex-direction: row;
+    gap: 1rem;
+  }
+  .settings-nav {
+    position: sticky;
+    top: 0;
+    width: 9rem;
+    flex-direction: column;
+    align-self: flex-start;
+    overflow: visible;
+    border-bottom: 0;
+    padding-bottom: 0;
+  }
+  .settings-nav > button {
+    flex: none;
+    justify-content: flex-start;
+  }
+  .settings-body {
+    border-left: 1px solid hsl(var(--border));
+    padding-left: 1rem;
+  }
+}

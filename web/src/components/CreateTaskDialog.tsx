@@ -15,12 +15,14 @@ import {
   DialogTrigger,
 } from "@/components/ui/dialog";
 import { Input } from "@/components/ui/input";
+import { Select } from "@/components/ui/select";
 import { Label } from "@/components/ui/label";
 import { Textarea } from "@/components/ui/textarea";
 import { IntervalField } from "@/components/IntervalField";
 import { TagInput } from "@/components/ui/TagInput";
 import { FolderInput } from "@/components/ui/FolderInput";
 import { folderNames } from "@/lib/folders";
+import { findTemplate, templateToInput } from "@/lib/templates";
 import { describeQuickAdd, parseQuickAdd } from "@/lib/quickAdd";
 import { formatInterval } from "@/lib/time";
 import { usePrefs } from "@/lib/prefs";
@@ -61,6 +63,7 @@ export function CreateTaskDialog({
   const queryClient = useQueryClient();
   const folderSuggestions = folderNames(queryClient.getQueryData<Task[]>(["tasks"]) ?? []);
   const { prefs } = usePrefs();
+  const templates = prefs.taskTemplates ?? [];
 
   // Quick-add: read a cadence, tags and a folder out of the name as it's typed.
   // The parse is only ever *shown* — applying it silently would leave people
@@ -125,6 +128,36 @@ export function CreateTaskDialog({
           }}
           className="space-y-4"
         >
+          {/* Templates fill the form in rather than creating anything, so the
+              usual edits are still available before saving. Only shown when
+              there are templates; nobody needs an empty picker. */}
+          {templates.length > 0 && (
+            <div className="space-y-2">
+              <Label htmlFor="task-template">Start from</Label>
+              <Select
+                id="task-template"
+                value=""
+                onChange={(e) => {
+                  const t = findTemplate(templates, e.target.value);
+                  if (!t) return;
+                  const input = templateToInput(t);
+                  setName(input.name);
+                  setDescription(input.description ?? "");
+                  setIntervalSeconds(input.intervalSeconds ?? null);
+                  setTags(input.tags ?? []);
+                  setFolder(input.folder ?? "");
+                }}
+              >
+                <option value="">Blank task</option>
+                {templates.map((t) => (
+                  <option key={t.name} value={t.name}>
+                    {t.name}
+                  </option>
+                ))}
+              </Select>
+            </div>
+          )}
+
           <div className="space-y-2">
             <Label htmlFor="task-name">Name</Label>
             <Input

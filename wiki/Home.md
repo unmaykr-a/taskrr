@@ -52,8 +52,9 @@ server, so they aren't part of the demo.
 - Filters with live counts - all, due soon, overdue, never done, snoozed,
   archived - bulk actions over a selection, and pinning for the ones that should
   stay at the top.
-- Tags with search and a tag filter, folder grouping, and sorting by name or
-  last-done.
+- Tags with search, a tag filter and an optional colour each; folders listed in
+  the sidebar to narrow any view; sorting by name or last-done; and templates for
+  the setups you reuse.
 - Multiple users with per-user data, local password login, and optional OIDC
   single sign-on with group-to-admin-role mapping. A lite mode turns the
   multi-user surface off for solo use.

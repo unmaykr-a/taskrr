@@ -43,13 +43,12 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
   const active = visible.some((i) => i.id === section) ? section : "account";
 
   return (
-    <div className="flex min-h-full flex-col gap-3 sm:flex-row sm:gap-4">
-      {/* Phone: a horizontal tab strip across the top (the window is full-screen,
-          so this frees the whole width for content). Desktop: a vertical side nav. */}
-      <nav
-        ref={navRef}
-        className="relative flex shrink-0 gap-1 overflow-x-auto border-b pb-2 sm:sticky sm:top-0 sm:w-36 sm:flex-col sm:self-start sm:overflow-visible sm:border-b-0 sm:pb-0"
-      >
+    // The layout responds to the window's width, not the screen's — see
+    // .settings-shell in index.css. A narrow window gets the tab strip a phone
+    // gets, rather than a side nav squeezing the content to a column of
+    // single-word lines.
+    <div className="settings-shell min-h-full">
+      <nav ref={navRef} className="settings-nav">
         {/* The active background is a bubble that slides between nav items
             (works in both the phone row and desktop column orientation). */}
         <SlidingHighlight containerRef={navRef} activeKey={active} className="rounded-md bg-primary/15" />
@@ -62,7 +61,7 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
               type="button"
               onClick={() => setSection(it.id)}
               className={cn(
-                "relative flex flex-1 items-center justify-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors sm:flex-none sm:justify-start",
+                "relative flex items-center gap-2 rounded-md px-2.5 py-2 text-sm transition-colors",
                 active === it.id
                   ? "font-medium text-primary"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -75,7 +74,7 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
         })}
       </nav>
 
-      <div className="min-w-0 flex-1 sm:border-l sm:pl-4">
+      <div className="settings-body">
         {active === "account" && <AccountSection />}
         {active === "preferences" && <PreferencesSection />}
         {active === "shortcuts" && <ShortcutsSection />}

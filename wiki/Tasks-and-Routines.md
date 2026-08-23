@@ -49,6 +49,11 @@ colours over time" preference that applies the same idea to every task at once.
 
 ## Organising larger lists
 
+Folders are listed in the sidebar with a count each. Picking one narrows
+whichever view you are in rather than being a view of its own - the same thing
+clicking a tag on a card does - and both clear from the chips beside the search
+box, or with Escape.
+
 As the list grows, three tools keep it tidy:
 
 - **Tags** - attach labels to tasks, then filter with the search box or by
@@ -57,6 +62,18 @@ As the list grows, three tools keep it tidy:
   mode that collapses the list into a section per folder.
 - **Sorting** - order by name, or by most / least recently done, from the
   toolbar.
+
+### Templates
+
+**Save as template** on a task's right-click menu stores its setup - description,
+routine, tags and folder, but not its history - under a name you choose. The
+new-task form then offers it under **Start from**, which fills the form in so you
+can still change anything before saving.
+
+Duplicate covers "another one like that one". A template covers the case
+duplicate cannot: the shape is in your head rather than in the list, so there is
+nothing to duplicate from yet. Templates are listed under **Settings ->
+Preferences -> Task templates**, where they can be removed.
 
 ### Tag colours
 
