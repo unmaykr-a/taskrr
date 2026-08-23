@@ -32,6 +32,8 @@ export interface Task {
   snoozedUntil: string | null;
   /** Keeps the task at the top of the list whatever the sort. */
   pinned: boolean;
+  /** "Whose turn is it" on a shared task. Whose turn stays derived. */
+  rotate: boolean;
   /** Per-task override for the reminder lead; null uses the account setting. */
   reminderLeadSeconds: number | null;
   createdAt: string;
@@ -314,6 +316,8 @@ export interface TaskInput {
   folder?: string;
   /** Keep the task at the top of the list. */
   pinned?: boolean;
+  /** Turn on the "whose turn is it" hint for a shared task. */
+  rotate?: boolean;
   /** Reminder lead override in seconds, or null to use the account setting. */
   reminderLeadSeconds?: number | null;
 }

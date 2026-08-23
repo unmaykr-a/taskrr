@@ -233,11 +233,24 @@ func (s *Store) ListTaskMembers(ctx context.Context, taskID int64) ([]TaskMember
 		return nil, err
 	}
 
+	// Membership is the union of the two grains: people invited to this task
+	// directly, and people invited to the folder it sits in. Someone reachable
+	// both ways appears once (MIN keeps 'accepted' over 'pending' alphabetically,
+	// which is the answer that matters — they do have access).
 	rows, err := s.db.QueryContext(ctx,
-		`SELECT u.id, u.username, s.status
-		 FROM task_shares s JOIN users u ON u.id = s.user_id
-		 WHERE s.task_id = ?
-		 ORDER BY s.created_at ASC, s.user_id ASC`, taskID)
+		`SELECT user_id, username, MIN(status) AS status, MIN(created_at) AS created_at FROM (
+			SELECT s.user_id AS user_id, u.username AS username, s.status AS status, s.created_at AS created_at
+			  FROM task_shares s JOIN users u ON u.id = s.user_id
+			 WHERE s.task_id = ?
+			UNION ALL
+			SELECT fs.user_id, u.username, fs.status, fs.created_at
+			  FROM folder_shares fs
+			  JOIN users u ON u.id = fs.user_id
+			  JOIN tasks t ON t.owner_id = fs.owner_id AND t.folder = fs.folder
+			 WHERE t.id = ? AND t.folder <> ''
+		 )
+		 GROUP BY user_id, username
+		 ORDER BY created_at ASC, user_id ASC`, taskID, taskID)
 	if err != nil {
 		return nil, err
 	}
@@ -246,7 +259,8 @@ func (s *Store) ListTaskMembers(ctx context.Context, taskID int64) ([]TaskMember
 	members := []TaskMember{owner}
 	for rows.Next() {
 		var m TaskMember
-		if err := rows.Scan(&m.UserID, &m.Username, &m.Status); err != nil {
+		var created string
+		if err := rows.Scan(&m.UserID, &m.Username, &m.Status, &created); err != nil {
 			return nil, err
 		}
 		members = append(members, m)

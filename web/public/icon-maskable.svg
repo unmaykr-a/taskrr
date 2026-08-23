@@ -1,0 +1,17 @@
+<!--
+  The maskable variant: the same mark, but drawn inside the safe zone a
+  platform is allowed to crop to (the middle 80% of the canvas). The plain
+  favicon fills its square edge to edge, which a circular Android icon would
+  clip into.
+-->
+<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 64 64" width="64" height="64">
+  <rect width="64" height="64" fill="#ec8a9a" />
+  <path
+    d="M22 33l7 8 14-16"
+    fill="none"
+    stroke="#3a1620"
+    stroke-width="6"
+    stroke-linecap="round"
+    stroke-linejoin="round"
+  />
+</svg>

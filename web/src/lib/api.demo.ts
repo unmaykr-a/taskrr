@@ -51,6 +51,7 @@ interface StoredTask {
   // projection below fills in the defaults.
   snoozedUntil?: string | null;
   pinned?: boolean;
+  rotate?: boolean;
   reminderLeadSeconds?: number | null;
   createdAt: string;
   updatedAt: string;
@@ -574,6 +575,7 @@ function toTask(db: DB, t: StoredTask): Task {
     archivedAt: t.archivedAt,
     snoozedUntil: t.snoozedUntil ?? null,
     pinned: t.pinned ?? false,
+    rotate: t.rotate ?? false,
     reminderLeadSeconds: t.reminderLeadSeconds ?? null,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
@@ -694,6 +696,7 @@ export const demoApi: Api = {
       archivedAt: null,
       snoozedUntil: null,
       pinned: input.pinned ?? false,
+      rotate: input.rotate ?? false,
       reminderLeadSeconds: input.reminderLeadSeconds ?? null,
       createdAt: now,
       updatedAt: now,
@@ -715,6 +718,7 @@ export const demoApi: Api = {
     if (input.tags !== undefined) t.tags = input.tags;
     if (input.folder !== undefined) t.folder = input.folder;
     if (input.pinned !== undefined) t.pinned = input.pinned;
+    if (input.rotate !== undefined) t.rotate = input.rotate;
     if (input.reminderLeadSeconds !== undefined) t.reminderLeadSeconds = input.reminderLeadSeconds;
     t.updatedAt = new Date().toISOString();
     saveDB(db);
@@ -1027,6 +1031,7 @@ export const demoApi: Api = {
         archivedAt: null,
         snoozedUntil: null,
         pinned: raw.pinned === true,
+        rotate: raw.rotate === true,
         reminderLeadSeconds: null,
         createdAt: now,
         updatedAt: now,

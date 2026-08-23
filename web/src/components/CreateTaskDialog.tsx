@@ -1,6 +1,6 @@
 import { useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Plus } from "lucide-react";
+import { Plus, Wand2 } from "lucide-react";
 
 import { api, type Task } from "@/lib/api";
 import { useToast } from "@/components/ui/Toast";
@@ -21,6 +21,9 @@ import { IntervalField } from "@/components/IntervalField";
 import { TagInput } from "@/components/ui/TagInput";
 import { FolderInput } from "@/components/ui/FolderInput";
 import { folderNames } from "@/lib/folders";
+import { describeQuickAdd, parseQuickAdd } from "@/lib/quickAdd";
+import { formatInterval } from "@/lib/time";
+import { usePrefs } from "@/lib/prefs";
 
 /**
  * CreateTaskDialog owns the "new task" form. `trigger` lets callers supply their
@@ -57,6 +60,23 @@ export function CreateTaskDialog({
   const [folder, setFolder] = useState("");
   const queryClient = useQueryClient();
   const folderSuggestions = folderNames(queryClient.getQueryData<Task[]>(["tasks"]) ?? []);
+  const { prefs } = usePrefs();
+
+  // Quick-add: read a cadence, tags and a folder out of the name as it's typed.
+  // The parse is only ever *shown* — applying it silently would leave people
+  // wondering why their task lost half its title. One click accepts it.
+  const parsed = prefs.quickAdd ? parseQuickAdd(name) : null;
+  const suggestion = parsed?.matched ? parsed : null;
+  const applySuggestion = () => {
+    if (!suggestion) return;
+    setName(suggestion.name);
+    if (suggestion.intervalSeconds != null) setIntervalSeconds(suggestion.intervalSeconds);
+    if (suggestion.tags.length > 0) {
+      const have = new Set(tags.map((t) => t.toLowerCase()));
+      setTags([...tags, ...suggestion.tags.filter((t) => !have.has(t.toLowerCase()))]);
+    }
+    if (suggestion.folder) setFolder(suggestion.folder);
+  };
 
   const toast = useToast();
   const mutation = useMutation({
@@ -111,9 +131,24 @@ export function CreateTaskDialog({
               id="task-name"
               value={name}
               onChange={(e) => setName(e.target.value)}
-              placeholder="e.g. Water the plants"
+              placeholder="e.g. Water the plants every 2 weeks #home"
               autoFocus
             />
+            {suggestion && (
+              <button
+                type="button"
+                onClick={applySuggestion}
+                className="flex w-full items-start gap-1.5 rounded-md border border-primary/40 bg-primary/10 px-2 py-1.5 text-left text-xs transition-colors hover:bg-primary/15"
+              >
+                <Wand2 className="mt-px h-3.5 w-3.5 shrink-0 text-primary" />
+                <span className="min-w-0">
+                  <span className="font-medium text-foreground">{suggestion.name || "(no name yet)"}</span>
+                  <span className="block text-muted-foreground">
+                    {describeQuickAdd(suggestion, formatInterval)} — click to use
+                  </span>
+                </span>
+              </button>
+            )}
           </div>
           <div className="space-y-2">
             <Label htmlFor="task-description">Description (optional)</Label>

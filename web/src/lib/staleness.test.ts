@@ -18,6 +18,7 @@ function task(partial: Partial<Task>): Task {
     archivedAt: null,
     snoozedUntil: null,
     pinned: false,
+    rotate: false,
     reminderLeadSeconds: null,
     createdAt: "",
     updatedAt: "",

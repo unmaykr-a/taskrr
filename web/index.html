@@ -5,6 +5,12 @@
     <link rel="icon" type="image/svg+xml" href="/favicon.svg" />
     <meta name="viewport" content="width=device-width, initial-scale=1.0" />
     <meta name="theme-color" content="#ec8a9a" />
+    <!-- Installable to a phone's home screen. Manifest and icons only: there is
+         no service worker, so this is a launcher rather than offline support. -->
+    <link rel="manifest" href="/manifest.webmanifest" />
+    <meta name="mobile-web-app-capable" content="yes" />
+    <meta name="apple-mobile-web-app-title" content="Taskrr" />
+    <link rel="apple-touch-icon" href="/favicon.svg" />
     <meta
       name="description"
       content="Taskrr — a lightweight, self-hosted tracker for when you last did things."

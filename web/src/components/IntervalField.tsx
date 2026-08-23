@@ -1,4 +1,4 @@
-import { useEffect, useId, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 
 import { cn } from "@/lib/utils";
 import { Input } from "@/components/ui/input";
@@ -42,13 +42,39 @@ export function IntervalField({
   const [amount, setAmount] = useState(initial.amount);
   const [unitSeconds, setUnitSeconds] = useState(initial.unitSeconds);
   const checkboxId = useId();
+  // The last value this component reported upward. It's what tells a genuine
+  // outside change apart from the echo of our own onChange coming back as a
+  // new `value` prop — without it, adopting `value` would fight the push-up
+  // effect below and loop.
+  const reported = useRef<number | null>(value);
+
+  // Adopt a value set from outside.
+  //
+  // The `value` prop used to be read only by the useState initialisers above,
+  // which run once — so the field silently ignored the parent setting a cadence
+  // after mount. That was invisible until quick-add tried to fill this in from
+  // a parsed name, and the routine quietly stayed off.
+  useEffect(() => {
+    if (value === reported.current) return; // our own echo
+    reported.current = value;
+    if (value == null) {
+      setEnabled(false);
+      return;
+    }
+    const next = decompose(value);
+    setEnabled(true);
+    setAmount(next.amount);
+    setUnitSeconds(next.unitSeconds);
+  }, [value]);
 
   // Whenever the inputs change, resolve and report the value upward. A cleared
   // or non-numeric number input reads as NaN, which would otherwise propagate
   // (NaN serialises to null and silently dropped the cadence) — treat it as 1.
   useEffect(() => {
     const n = Number.isFinite(amount) ? Math.max(1, Math.round(amount)) : 1;
-    onChange(enabled ? n * unitSeconds : null);
+    const resolved = enabled ? n * unitSeconds : null;
+    reported.current = resolved;
+    onChange(resolved);
     // We intentionally exclude onChange from deps; it may be a new function each
     // render and we only want to react to the actual input values.
     // eslint-disable-next-line react-hooks/exhaustive-deps

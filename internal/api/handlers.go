@@ -61,6 +61,7 @@ type taskRequest struct {
 	Tags            []string `json:"tags"`
 	Folder          string   `json:"folder"`
 	Pinned          bool     `json:"pinned"`
+	Rotate          bool     `json:"rotate"`
 	// ReminderLeadSeconds overrides the account-wide reminder lead; null uses it.
 	ReminderLeadSeconds *int64 `json:"reminderLeadSeconds"`
 }
@@ -134,6 +135,7 @@ func (req taskRequest) toInput() (store.TaskInput, string) {
 		Tags:                tags,
 		Folder:              folder,
 		Pinned:              req.Pinned,
+		Rotate:              req.Rotate,
 		ReminderLeadSeconds: req.ReminderLeadSeconds,
 	}, ""
 }

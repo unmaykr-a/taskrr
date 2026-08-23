@@ -34,6 +34,9 @@ type Task struct {
 	SnoozedUntil *time.Time `json:"snoozedUntil"`
 	// Pinned keeps the task at the top of the list whatever the chosen sort.
 	Pinned bool `json:"pinned"`
+	// Rotate turns on "whose turn is it" for a shared task. Whose turn it
+	// actually is stays derived from the member order and the last logger.
+	Rotate bool `json:"rotate"`
 	// ReminderLeadSeconds overrides how far ahead of due this task's reminder
 	// fires. nil falls back to the account-wide reminder setting.
 	ReminderLeadSeconds *int64 `json:"reminderLeadSeconds"`
@@ -67,6 +70,7 @@ type TaskInput struct {
 	Tags            []string
 	Folder          string
 	Pinned          bool
+	Rotate          bool
 	// ReminderLeadSeconds overrides the account-wide reminder lead; nil clears
 	// the override.
 	ReminderLeadSeconds *int64

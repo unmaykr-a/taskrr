@@ -259,6 +259,7 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
   const [tags, setTags] = useState<string[]>(task.tags);
   const [folder, setFolder] = useState(task.folder);
   const [pinned, setPinned] = useState(task.pinned);
+  const [rotate, setRotate] = useState(task.rotate);
   const [reminderLead, setReminderLead] = useState<number | null>(task.reminderLeadSeconds);
   const queryClient = useQueryClient();
   const folderSuggestions = folderNames(queryClient.getQueryData<Task[]>(["tasks"]) ?? []);
@@ -276,6 +277,7 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
         tags,
         folder: folder.trim(),
         pinned,
+        rotate,
         reminderLeadSeconds: intervalSeconds == null ? null : reminderLead,
       }),
     onSuccess: () => {
@@ -331,6 +333,25 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
             Only applies when reminders are switched on in your account.
           </p>
         </div>
+      )}
+
+      {/* A rota only means anything once more than one person can log the task,
+          so it appears on shared tasks and nowhere else. */}
+      {task.shared && (
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            Take turns
+            <span className="block text-xs">
+              Shows whose turn it is, moving to the next person each time someone logs it
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={rotate}
+            onChange={(e) => setRotate(e.target.checked)}
+          />
+        </label>
       )}
 
       <label className="flex items-center justify-between gap-2 text-sm">

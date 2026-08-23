@@ -1,5 +1,5 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   Archive,
   ArchiveRestore,
@@ -10,6 +10,7 @@ import {
   Moon,
   Pin,
   PinOff,
+  Repeat,
   Settings2,
   SkipForward,
   Trash2,
@@ -20,6 +21,7 @@ import {
 import { api, type Task } from "@/lib/api";
 import { formatDate, formatDateTime, formatDue, formatInterval, timeSince } from "@/lib/time";
 import { isSnoozed, nextDue, stalenessTint } from "@/lib/staleness";
+import { isMyTurn, nextUp, rotationOrder } from "@/lib/rotation";
 import { ensureContrast } from "@/lib/color";
 import { usePrefs } from "@/lib/prefs";
 import { useNow } from "@/lib/useNow";
@@ -90,6 +92,18 @@ export function TaskCard({
   const isOwner = user ? task.ownerId === user.id : true;
   const snoozed = isSnoozed(task, now);
   const archived = task.archivedAt != null;
+
+  // Rotation: only fetch members for a task that actually uses one. The key is
+  // shared with the Manage window, so opening that costs nothing extra.
+  const rotating = task.rotate && task.shared && !archived;
+  const { data: members } = useQuery({
+    queryKey: ["members", task.id],
+    queryFn: () => api.listMembers(task.id),
+    enabled: rotating,
+  });
+  const order = rotationOrder(members);
+  const turn = rotating ? nextUp(order, task.lastCompletedBy) : null;
+  const myTurn = rotating && isMyTurn(order, task.lastCompletedBy, user?.username);
 
   // Built lazily by the menu on open, so labels track current state.
   const menuEntries = (): ContextMenuEntry[] => {
@@ -237,6 +251,18 @@ export function TaskCard({
             {status.label}
           </span>
         </div>
+
+        {turn && (
+          <p
+            className={cn(
+              "flex items-center gap-1 pl-[18px] text-xs",
+              myTurn ? "font-medium text-primary" : "text-muted-foreground",
+            )}
+          >
+            <Repeat className="h-3 w-3 shrink-0" />
+            {myTurn ? "Your turn" : `${turn}'s turn`}
+          </p>
+        )}
 
         {!compact && task.lastCompletedAt && (
           <p className="pl-[18px] text-xs text-muted-foreground">

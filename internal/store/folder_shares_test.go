@@ -446,3 +446,62 @@ func TestFolderMembersAreReminderRecipients(t *testing.T) {
 		t.Error("someone with no share became a recipient")
 	}
 }
+
+// The member list drives "who's on this" in the UI and the rotation order, so
+// it has to include people who got here through the folder.
+func TestTaskMembersIncludeFolderMembers(t *testing.T) {
+	ctx := context.Background()
+	f := newFolderFixture(t)
+	f.shareHomeWithBob(t, true)
+
+	members, err := f.store.ListTaskMembers(ctx, f.home1.ID)
+	if err != nil {
+		t.Fatalf("ListTaskMembers: %v", err)
+	}
+	byName := map[string]string{}
+	for _, m := range members {
+		byName[m.Username] = m.Status
+	}
+	if byName["alice"] != "owner" {
+		t.Errorf("owner missing or wrong: %v", byName)
+	}
+	if byName["bob"] != "accepted" {
+		t.Errorf("folder member missing from the task's members: %v", byName)
+	}
+
+	// A task outside the folder has only its owner.
+	work, _ := f.store.ListTaskMembers(ctx, f.work.ID)
+	if len(work) != 1 {
+		t.Errorf("a task outside the shared folder has %d members, want 1", len(work))
+	}
+}
+
+// Someone reachable both ways should be listed once, not twice.
+func TestTaskMembersDeduplicateAcrossGrains(t *testing.T) {
+	ctx := context.Background()
+	f := newFolderFixture(t)
+	f.shareHomeWithBob(t, true)
+	if _, err := f.store.ShareTask(ctx, f.alice.ID, f.home1.ID, f.bob.ID); err != nil {
+		t.Fatalf("ShareTask: %v", err)
+	}
+	if err := f.store.RespondToShare(ctx, f.bob.ID, f.home1.ID, true); err != nil {
+		t.Fatalf("RespondToShare: %v", err)
+	}
+
+	members, err := f.store.ListTaskMembers(ctx, f.home1.ID)
+	if err != nil {
+		t.Fatalf("ListTaskMembers: %v", err)
+	}
+	seen := 0
+	for _, m := range members {
+		if m.Username == "bob" {
+			seen++
+			if m.Status != "accepted" {
+				t.Errorf("bob's status = %q, want accepted", m.Status)
+			}
+		}
+	}
+	if seen != 1 {
+		t.Fatalf("bob appears %d times, want 1", seen)
+	}
+}

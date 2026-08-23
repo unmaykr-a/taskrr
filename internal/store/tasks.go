@@ -31,7 +31,7 @@ const taskSelect = `
 	SELECT
 		t.id, t.name, t.description, t.interval_seconds,
 		t.color_fresh, t.color_overdue, t.freeze_color, t.tags, t.folder, t.archived_at,
-		t.snoozed_until, t.pinned, t.reminder_lead_seconds, t.created_at, t.updated_at, t.owner_id,
+		t.snoozed_until, t.pinned, t.rotate, t.reminder_lead_seconds, t.created_at, t.updated_at, t.owner_id,
 		(SELECT MAX(completed_at) FROM completions c WHERE c.task_id = t.id) AS last_completed_at,
 		(SELECT COUNT(*)          FROM completions c WHERE c.task_id = t.id) AS completion_count,
 		` + sharedFlagExpr + ` AS shared,
@@ -117,10 +117,10 @@ func (s *Store) GetTask(ctx context.Context, ownerID, id int64) (Task, error) {
 func (s *Store) CreateTask(ctx context.Context, ownerID int64, in TaskInput) (Task, error) {
 	now := time.Now().UTC().Format(timeLayout)
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO tasks (name, description, interval_seconds, color_fresh, color_overdue, freeze_color, tags, folder, pinned, reminder_lead_seconds, owner_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		`INSERT INTO tasks (name, description, interval_seconds, color_fresh, color_overdue, freeze_color, tags, folder, pinned, rotate, reminder_lead_seconds, owner_id, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
 		in.Name, in.Description, in.IntervalSeconds, in.ColorFresh, in.ColorOverdue, boolToInt(in.FreezeColor), encodeTags(in.Tags), in.Folder,
-		boolToInt(in.Pinned), in.ReminderLeadSeconds, ownerID, now, now,
+		boolToInt(in.Pinned), boolToInt(in.Rotate), in.ReminderLeadSeconds, ownerID, now, now,
 	)
 	if err != nil {
 		return Task{}, err
@@ -141,10 +141,10 @@ func (s *Store) UpdateTask(ctx context.Context, ownerID, id int64, in TaskInput)
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE tasks
 		 SET name = ?, description = ?, interval_seconds = ?, color_fresh = ?, color_overdue = ?, freeze_color = ?, tags = ?, folder = ?,
-		     pinned = ?, reminder_lead_seconds = ?, updated_at = ?
+		     pinned = ?, rotate = ?, reminder_lead_seconds = ?, updated_at = ?
 		 WHERE id = ? AND owner_id = ?`,
 		in.Name, in.Description, in.IntervalSeconds, in.ColorFresh, in.ColorOverdue, boolToInt(in.FreezeColor), encodeTags(in.Tags), in.Folder,
-		boolToInt(in.Pinned), in.ReminderLeadSeconds,
+		boolToInt(in.Pinned), boolToInt(in.Rotate), in.ReminderLeadSeconds,
 		time.Now().UTC().Format(timeLayout), id, ownerID,
 	)
 	if err != nil {
@@ -227,6 +227,7 @@ func (s *Store) DuplicateTask(ctx context.Context, ownerID, id int64, name strin
 		Tags:                src.Tags,
 		Folder:              src.Folder,
 		Pinned:              src.Pinned,
+		Rotate:              src.Rotate,
 		ReminderLeadSeconds: src.ReminderLeadSeconds,
 	})
 }
@@ -339,6 +340,7 @@ func scanTask(sc scanner) (Task, error) {
 		archivedAt   sql.NullString
 		snoozedUntil sql.NullString
 		pinned       int
+		rotate       int
 		reminderLead sql.NullInt64
 		created      string
 		updated      string
@@ -349,7 +351,7 @@ func scanTask(sc scanner) (Task, error) {
 	if err := sc.Scan(
 		&t.ID, &t.Name, &t.Description, &interval,
 		&colorFresh, &colorOverdue, &freezeColor, &tags, &t.Folder, &archivedAt,
-		&snoozedUntil, &pinned, &reminderLead, &created, &updated, &t.OwnerID,
+		&snoozedUntil, &pinned, &rotate, &reminderLead, &created, &updated, &t.OwnerID,
 		&lastDone, &t.CompletionCount, &shared, &lastBy,
 	); err != nil {
 		return Task{}, err
@@ -381,6 +383,7 @@ func scanTask(sc scanner) (Task, error) {
 		t.SnoozedUntil = &when
 	}
 	t.Pinned = pinned != 0
+	t.Rotate = rotate != 0
 	if reminderLead.Valid {
 		t.ReminderLeadSeconds = &reminderLead.Int64
 	}
