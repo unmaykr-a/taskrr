@@ -31,7 +31,8 @@ import {
 } from "@/components/ui/card";
 import { useTaskWindows } from "@/components/useTaskWindows";
 import { ContextMenu } from "@/components/ui/ContextMenu";
-import { useTaskMenu } from "@/components/useTaskActions";
+import { useTaskActions, useTaskMenu } from "@/components/useTaskActions";
+import { useToast } from "@/components/ui/Toast";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -79,6 +80,8 @@ export function TaskCard({
   const queryClient = useQueryClient();
   const { openManage, openComplete } = useTaskWindows();
   const taskMenu = useTaskMenu();
+  const actions = useTaskActions();
+  const toast = useToast();
   const { user } = useAuth();
   const snoozed = isSnoozed(task, now);
   const archived = task.archivedAt != null;
@@ -105,11 +108,14 @@ export function TaskCard({
   }, [justLogged]);
   const quick = useMutation({
     mutationFn: () => api.quickComplete(task.id),
-    onSuccess: () => {
+    onSuccess: (completion) => {
       setJustLogged(true);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["completions", task.id] });
       queryClient.invalidateQueries({ queryKey: ["activity"] });
+      // The card already shows a check and a pulse, so the toast is here purely
+      // to carry Undo — this is the tap that goes wrong most often.
+      toast("Logged", { tone: "success", action: actions.undoCompletion(completion.id, task.id) });
     },
   });
 

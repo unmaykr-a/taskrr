@@ -29,10 +29,13 @@ export interface ToastOptions {
   anchor?: HTMLElement | null;
   /** Fixed screen position when there's no anchor. Default "bottom-right". */
   placement?: ToastPlacement;
-  /** Auto-dismiss after this many ms (default 2000). */
+  /** Auto-dismiss after this many ms (default 2000, or 6000 with an action —
+   *  two seconds is not long enough to read a message and decide to undo it). */
   duration?: number;
   /** Visual tone. */
   tone?: "default" | "success" | "error";
+  /** An optional single action, e.g. "Undo". Dismisses the toast when chosen. */
+  action?: { label: string; onSelect: () => void };
 }
 
 interface ToastItem {
@@ -40,6 +43,7 @@ interface ToastItem {
   message: string;
   style: CSSProperties;
   tone: NonNullable<ToastOptions["tone"]>;
+  action?: ToastOptions["action"];
 }
 
 type ShowToast = (message: string, opts?: ToastOptions) => void;
@@ -92,12 +96,18 @@ export function ToastProvider({ children }: { children: ReactNode }) {
 
   const show = useCallback<ShowToast>(
     (message, opts = {}) => {
-      if (!enabled) return; // the user has turned toast notifications off
+      // Toasts turned off: the message goes, but an action would take a real
+      // affordance with it, so fall back to nothing rather than a silent loss.
+      if (!enabled && !opts.action) return;
       const id = nextId++;
-      setToasts((cur) => [...cur, { id, message, style: positionFor(opts), tone: opts.tone ?? "default" }]);
-      window.setTimeout(() => {
-        setToasts((cur) => cur.filter((t) => t.id !== id));
-      }, opts.duration ?? 2000);
+      setToasts((cur) => [
+        ...cur,
+        { id, message, style: positionFor(opts), tone: opts.tone ?? "default", action: opts.action },
+      ]);
+      window.setTimeout(
+        () => setToasts((cur) => cur.filter((t) => t.id !== id)),
+        opts.duration ?? (opts.action ? 6000 : 2000),
+      );
     },
     [enabled],
   );
@@ -113,12 +123,26 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             <div key={t.id} style={t.style} className="absolute">
               <div
                 className={cn(
-                  "max-w-[80vw] truncate rounded-md border px-3 py-1.5 text-xs font-medium shadow-lg",
+                  "flex max-w-[80vw] items-center gap-3 rounded-md border px-3 py-1.5 text-xs font-medium shadow-lg",
                   "animate-in fade-in-0 slide-in-from-bottom-2 duration-200",
                   TONES[t.tone],
                 )}
               >
-                {t.message}
+                <span className="truncate">{t.message}</span>
+                {t.action && (
+                  // The wrapper is pointer-events-none so toasts never swallow
+                  // a click; the one thing meant to be clicked opts back in.
+                  <button
+                    type="button"
+                    className="pointer-events-auto shrink-0 rounded px-1.5 py-0.5 font-semibold text-primary underline-offset-2 hover:underline focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    onClick={() => {
+                      setToasts((cur) => cur.filter((x) => x.id !== t.id));
+                      t.action!.onSelect();
+                    }}
+                  >
+                    {t.action.label}
+                  </button>
+                )}
               </div>
             </div>
           ))}

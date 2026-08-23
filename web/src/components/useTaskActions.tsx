@@ -54,11 +54,33 @@ export function useTaskActions() {
 
   const fail = (e: unknown) => toast((e as Error).message, { tone: "error" });
 
+  /**
+   * Undo, for a completion that was just created.
+   *
+   * Quick log is one tap on a dense grid and the wrong tap is easy; putting it
+   * right otherwise means Manage → History → delete, which nobody does for a
+   * stray log. Deleting the completion we just made restores exactly the state
+   * before it, which is why this is the whole of "undo" — there is nothing else
+   * a log changes.
+   */
+  const undoCompletion = (completionId: number, taskId: number) => ({
+    label: "Undo",
+    onSelect: () => {
+      api
+        .deleteCompletion(completionId)
+        .then(() => {
+          refresh(taskId);
+          toast("Log undone");
+        })
+        .catch(fail);
+    },
+  });
+
   const quickLog = useMutation({
     mutationFn: (task: Task) => api.quickComplete(task.id),
-    onSuccess: (_d, task) => {
+    onSuccess: (completion, task) => {
       refresh(task.id);
-      toast("Logged", { tone: "success" });
+      toast("Logged", { tone: "success", action: undoCompletion(completion.id, task.id) });
     },
     onError: fail,
   });
@@ -160,7 +182,7 @@ export function useTaskActions() {
     if (ok) remove.mutate(task);
   };
 
-  return { quickLog, snooze, snoozeUntil, wake, skip, pin, duplicate, archive, confirmDelete };
+  return { quickLog, snooze, snoozeUntil, wake, skip, pin, duplicate, archive, confirmDelete, undoCompletion };
 }
 
 /**
