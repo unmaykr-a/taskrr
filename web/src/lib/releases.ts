@@ -41,6 +41,10 @@ export const RELEASES: Release[] = [
     date: "2026-08-23",
     changes: [
       fix(
+        "The sidebar scrolling as one piece",
+        "With a lot of folders the name, the New task button and the account and Settings row all scrolled away with the list. Only the views and folders scroll now; everything above and below stays put.",
+      ),
+      fix(
         "The folder list being easy to miss",
         "Folders sat directly under the views in the sidebar and looked like more of them. They now have a heading and a line above them, and a clear link while one is filtering the list.",
       ),

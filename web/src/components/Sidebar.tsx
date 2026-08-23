@@ -76,8 +76,13 @@ export function Sidebar({
   });
 
   return (
-    <div className="flex h-full w-60 flex-col overflow-y-auto border-r border-border/60 bg-sidebar p-4">
-      <div className="mb-6 flex items-center justify-between">
+    // Only the views and folders scroll. The branding above and the account and
+    // Settings below are how you get out of wherever you are, so they stay put
+    // rather than being scrolled off by a long folder list. Padding moved onto
+    // the three bands so the scrollbar runs inside the list, not down the edge
+    // of the whole sidebar.
+    <div className="flex h-full w-60 flex-col overflow-hidden border-r border-border/60 bg-sidebar">
+      <div className="flex items-center justify-between p-4 pb-0">
         <div className="flex min-w-0 items-center gap-2.5">
           {branding.icon ? (
             <img src={branding.icon} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover shadow" />
@@ -101,8 +106,13 @@ export function Sidebar({
         )}
       </div>
 
-      <CreateTaskDialog />
+      <div className="px-4 pt-6">
+        <CreateTaskDialog />
+      </div>
 
+      {/* The scrolling band. min-h-0 is what lets it actually shrink inside the
+          flex column instead of pushing the footer off the bottom. */}
+      <div className="min-h-0 flex-1 overflow-y-auto px-4">
       {/* flex+gap (not space-y) so the absolutely-positioned highlight doesn't
           pick up a sibling margin; the bubble glides to the selected view. */}
       <nav ref={navRef} className="relative mt-6 flex flex-col gap-1">
@@ -204,8 +214,9 @@ export function Sidebar({
           </div>
         </div>
       )}
+      </div>
 
-      <div className="mt-auto space-y-2 pt-4">
+      <div className="space-y-2 border-t border-border/60 p-4">
         {/* Current account + sign out */}
         <div className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5">
           <div className="min-w-0">
