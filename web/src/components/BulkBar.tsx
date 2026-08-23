@@ -6,6 +6,7 @@ import {
   CheckCheck,
   FolderInput as FolderIcon,
   Moon,
+  Repeat,
   SkipForward,
   Tag,
   Trash2,
@@ -21,12 +22,13 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { FolderInput } from "@/components/ui/FolderInput";
 import { TagInput } from "@/components/ui/TagInput";
+import { IntervalField } from "@/components/IntervalField";
 import { SNOOZE_PRESETS } from "@/components/useTaskActions";
 
-type BulkAction = "done" | "archive" | "unarchive" | "delete" | "tag" | "folder" | "snooze" | "skip";
+type BulkAction = "done" | "archive" | "unarchive" | "delete" | "tag" | "folder" | "snooze" | "skip" | "routine";
 
 /** Which inline editor the bar has swapped its buttons for, if any. */
-type Panel = null | "delete" | "tag" | "folder" | "snooze";
+type Panel = null | "delete" | "tag" | "folder" | "snooze" | "routine";
 
 /**
  * The task-update endpoint is a whole-object PATCH, not a partial one — omitted
@@ -74,6 +76,9 @@ export function BulkBar({
   const toast = useToast();
   const [panel, setPanel] = useState<Panel>(null);
   const [snoozeHours, setSnoozeHours] = useState(SNOOZE_PRESETS[1].hours);
+  // null is a real choice here — it clears the routine, turning a selection back
+  // into plain "how long since" tasks.
+  const [routine, setRoutine] = useState<number | null>(7 * 86_400);
   const [tags, setTags] = useState<string[]>([]);
   const [folder, setFolder] = useState("");
 
@@ -89,6 +94,8 @@ export function BulkBar({
       else if (action === "snooze") {
         const until = new Date(Date.now() + snoozeHours * 3_600_000).toISOString();
         await Promise.all(ids.map((id) => api.snoozeTask(id, until)));
+      } else if (action === "routine") {
+        await Promise.all(selected.map((t) => api.updateTask(t.id, toInput(t, { intervalSeconds: routine }))));
       } else if (action === "skip") {
         // Only routines have a cycle to skip. Filtering here rather than
         // disabling the button means a mixed selection does the sensible thing
@@ -129,6 +136,7 @@ export function BulkBar({
         folder: "Moved",
         snooze: "Snoozed",
         skip: "Skipped",
+        routine: routine == null ? "Cleared the routine on" : "Set a routine on",
       };
       // Skip only touches the routines in the selection, so it has to count
       // what it actually did rather than what was ticked.
@@ -197,6 +205,20 @@ export function BulkBar({
         </>
       )}
 
+      {panel === "routine" && (
+        <>
+          <div className="min-w-[13rem]">
+            <IntervalField value={routine} onChange={setRoutine} />
+          </div>
+          <Button size="sm" disabled={busy} onClick={() => run.mutate("routine")}>
+            Apply
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setPanel(null)}>
+            Cancel
+          </Button>
+        </>
+      )}
+
       {panel === "snooze" && (
         <>
           <span className="px-1 text-xs text-muted-foreground">Snooze until</span>
@@ -238,6 +260,9 @@ export function BulkBar({
                 onClick={() => run.mutate("skip")}
               />
             </>
+          )}
+          {!archivedView && (
+            <BulkButton icon={<Repeat />} label="Routine" disabled={busy} onClick={() => setPanel("routine")} />
           )}
           <BulkButton icon={<Tag />} label="Tag" disabled={busy} onClick={() => setPanel("tag")} />
           <BulkButton icon={<FolderIcon />} label="Folder" disabled={busy} onClick={() => setPanel("folder")} />

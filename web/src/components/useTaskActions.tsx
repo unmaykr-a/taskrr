@@ -4,6 +4,7 @@ import {
   ArchiveRestore,
   BellOff,
   Clock,
+  BookmarkPlus,
   Copy,
   Moon,
   Pin,
@@ -19,6 +20,8 @@ import { isSnoozed, nextDue } from "@/lib/staleness";
 import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { usePrefs } from "@/lib/prefs";
+import { saveTemplate, templateFromTask } from "@/lib/templates";
 import { type ContextMenuEntry } from "@/components/ui/ContextMenu";
 import { useTaskWindows } from "@/components/useTaskWindows";
 
@@ -42,7 +45,8 @@ export const SNOOZE_PRESETS: { label: string; hours: number }[] = [
 export function useTaskActions() {
   const queryClient = useQueryClient();
   const toast = useToast();
-  const { confirm } = useConfirm();
+  const { confirm, prompt } = useConfirm();
+  const { prefs, setPrefs } = usePrefs();
 
   // Every one of these can change what the list shows and what the calendar and
   // activity chart contain, so they all refresh the same set.
@@ -182,7 +186,29 @@ export function useTaskActions() {
     if (ok) remove.mutate(task);
   };
 
-  return { quickLog, snooze, snoozeUntil, wake, skip, pin, duplicate, archive, confirmDelete, undoCompletion };
+  /**
+   * Save this task's setup as a template, under a name the user picks.
+   *
+   * Templates live in preferences rather than the database: they are a personal
+   * starting point, not shared data, and this keeps them out of the schema.
+   */
+  const saveAsTemplate = async (task: Task) => {
+    const name = await prompt({
+      title: "Save as template",
+      description: "New tasks can start from this setup — routine, tags and folder, but not history.",
+      defaultValue: task.name,
+      confirmText: "Save",
+    });
+    const trimmed = (name ?? "").trim();
+    if (!trimmed) return;
+    setPrefs({ taskTemplates: saveTemplate(prefs.taskTemplates, templateFromTask(task, trimmed)) });
+    toast(`Saved "${trimmed}" as a template`, { tone: "success" });
+  };
+
+  return {
+    quickLog, snooze, snoozeUntil, wake, skip, pin, duplicate, archive, confirmDelete,
+    undoCompletion, saveAsTemplate,
+  };
 }
 
 /**
@@ -246,6 +272,11 @@ export function useTaskMenu() {
         onSelect: () => actions.pin.mutate({ task, pinned: !task.pinned }),
       });
       entries.push({ label: "Duplicate", icon: <Copy />, onSelect: () => actions.duplicate.mutate(task) });
+      entries.push({
+        label: "Save as template",
+        icon: <BookmarkPlus />,
+        onSelect: () => void actions.saveAsTemplate(task),
+      });
       entries.push({
         label: archived ? "Restore" : "Archive",
         icon: archived ? <ArchiveRestore /> : <Archive />,

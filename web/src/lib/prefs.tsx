@@ -19,6 +19,7 @@ import {
 import { installSmoothWheel } from "@/lib/smoothScroll";
 import { setTimeFormat } from "@/lib/time";
 import { type Theme } from "@/lib/theme";
+import { type TaskTemplate } from "@/lib/templates";
 import { type SortKey } from "@/lib/sort";
 
 export type ColorPickerStyle = "wheel" | "native";
@@ -95,6 +96,8 @@ export interface Prefs {
   toasts: boolean;
   /** Global single-key shortcuts (new task, search, switch view, help). */
   keyboardShortcuts: boolean;
+  /** Saved task setups, offered as a starting point in the new-task form. */
+  taskTemplates: TaskTemplate[];
   /** An optional colour per tag, keyed by the lowercased tag. Only tags
    *  somebody picked a colour for appear here. */
   tagColors: Record<string, string>;
@@ -184,6 +187,7 @@ function defaults(): Prefs {
     keyboardShortcuts: true,
     shortcutKeys: {},
     tagColors: {},
+    taskTemplates: [],
     contextMenu: true,
     quickAdd: true,
     tabBadge: false,

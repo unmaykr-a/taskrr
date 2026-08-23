@@ -5,7 +5,7 @@ import { cn } from "@/lib/utils";
 import { usePrefs } from "@/lib/prefs";
 
 const WIDTH = 460;
-const MIN_W = 320;
+const MIN_W = 360;
 const MIN_H = 220;
 
 // setDragging flags a drag/resize in progress: it toggles a body class the
@@ -311,7 +311,9 @@ export function FloatingWindow({
         </div>
       </div>
 
-      <div className={cn("min-h-0 flex-1 overflow-y-auto p-4", floating && !size.current.h && "max-h-[75vh]")}>
+      {/* win-body makes this a size container, so panels inside can lay out
+          against the window rather than the screen (see index.css). */}
+      <div className={cn("win-body min-h-0 flex-1 overflow-y-auto p-4", floating && !size.current.h && "max-h-[75vh]")}>
         {children}
       </div>
 

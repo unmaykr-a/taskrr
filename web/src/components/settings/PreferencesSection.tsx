@@ -4,6 +4,7 @@ import {
   Keyboard,
   LayoutGrid,
   Palette,
+  Bookmark as BookmarkIcon,
   Sparkles,
   SlidersHorizontal,
   Tag as TagIcon,
@@ -18,6 +19,8 @@ import {
 } from "@/lib/prefs";
 import { type Task } from "@/lib/api";
 import { setTagColor, tagColor } from "@/lib/tagColors";
+import { deleteTemplate } from "@/lib/templates";
+import { formatInterval } from "@/lib/time";
 import { Button } from "@/components/ui/button";
 import { Segmented } from "@/components/ui/Segmented";
 import { ColorField } from "@/components/ui/ColorPicker";
@@ -128,6 +131,8 @@ export function PreferencesSection() {
       </SettingsGroup>
 
       <TagColoursGroup />
+
+      <TemplatesGroup />
 
       <SettingsGroup
         id="prefs.layout"
@@ -270,6 +275,58 @@ export function PreferencesSection() {
 
       <AnimationsGroup />
     </div>
+  );
+}
+
+/**
+ * The saved task templates, so they can be renamed away or cleared out.
+ *
+ * They are created from a task's right-click menu rather than here — a template
+ * is made *from* something, so a form for typing one from scratch would just be
+ * the new-task form again.
+ */
+function TemplatesGroup() {
+  const { prefs, setPrefs } = usePrefs();
+  const templates = prefs.taskTemplates ?? [];
+
+  return (
+    <SettingsGroup
+      id="prefs.templates"
+      title="Task templates"
+      icon={<BookmarkIcon />}
+      summary={templates.length > 0 ? `${templates.length} saved` : "None yet"}
+    >
+      {templates.length === 0 ? (
+        <p className="text-xs text-muted-foreground">
+          Right-click a task and choose <span className="font-medium">Save as template</span> to reuse its
+          setup on a new one.
+        </p>
+      ) : (
+        templates.map((t) => (
+          <div key={t.name} className="flex items-center justify-between gap-2 text-sm">
+            <div className="min-w-0">
+              <p className="truncate">{t.name}</p>
+              <p className="truncate text-xs text-muted-foreground">
+                {[
+                  t.intervalSeconds != null ? `every ${formatInterval(t.intervalSeconds)}` : "no routine",
+                  t.folder ? `in ${t.folder}` : null,
+                  t.tags.length > 0 ? t.tags.map((x) => `#${x}`).join(" ") : null,
+                ]
+                  .filter(Boolean)
+                  .join(" · ")}
+              </p>
+            </div>
+            <button
+              type="button"
+              onClick={() => setPrefs({ taskTemplates: deleteTemplate(templates, t.name) })}
+              className="shrink-0 text-xs text-muted-foreground hover:text-destructive"
+            >
+              remove
+            </button>
+          </div>
+        ))
+      )}
+    </SettingsGroup>
   );
 }
 

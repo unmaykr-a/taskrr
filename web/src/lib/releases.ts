@@ -37,6 +37,31 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.20.0",
+    date: "2026-08-23",
+    changes: [
+      feat(
+        "Task templates",
+        "Right-click a task and save its setup as a template, then start a new task from it. Handy for the things you add regularly \u2014 a new houseplant, a new bike \u2014 where there's nothing to duplicate from yet.",
+      ),
+      feat(
+        "Filter by folder",
+        "Folders are listed in the sidebar with a count each. Picking one narrows whichever view you're in, the same way clicking a tag does.",
+      ),
+      feat(
+        "Set a routine on several tasks at once",
+        "The bulk bar can now set or clear a routine across a selection, alongside tagging and moving.",
+      ),
+      fix(
+        "Windows that could be squeezed until the contents broke",
+        "Panels inside a window now lay themselves out against the window's width rather than the screen's, so a narrow window gets the stacked layout instead of a side nav crushing the text into single-word lines.",
+      ),
+      fix(
+        "Dragging a window selecting the page text behind it",
+      ),
+    ],
+  },
+  {
     version: "1.19.0",
     date: "2026-08-23",
     changes: [
