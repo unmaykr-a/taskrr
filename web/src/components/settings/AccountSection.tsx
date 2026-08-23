@@ -2,7 +2,6 @@ import { useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   AlertTriangle,
-  ChevronRight,
   Copy,
   Download,
   KeyRound,
@@ -22,6 +21,7 @@ import { CsvMapper } from "@/components/settings/CsvMapper";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { RemindersSection } from "@/components/settings/RemindersSection";
+import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { useToast } from "@/components/ui/Toast";
@@ -127,6 +127,12 @@ export function AccountSection() {
         </p>
       </section>
 
+      <SettingsGroup
+        id="account.signin"
+        title="Sign-in"
+        icon={<UserRound />}
+        summary="Username, password, SSO"
+      >
       <section className="space-y-2">
         <h4 className="flex items-center gap-1.5 text-xs font-semibold text-muted-foreground">
           <UserRound className="h-3.5 w-3.5" /> Username
@@ -267,22 +273,32 @@ export function AccountSection() {
           )}
         </section>
       )}
+      </SettingsGroup>
 
       <RemindersSection />
 
-      <ExportSection />
+      <SettingsGroup
+        id="account.data"
+        title="Your data"
+        icon={<Download />}
+        summary="Export, import"
+      >
+        <ExportSection />
+      </SettingsGroup>
 
-      <APITokensSection />
+      <SettingsGroup
+        id="account.tokens"
+        title="API tokens"
+        icon={<Terminal />}
+        summary="For scripts and automations"
+      >
+        <APITokensSection />
+      </SettingsGroup>
 
       {/* Advanced: the irreversible self-service actions live here (each gated by
           re-typing the account's own username), under a "Danger zone" label.
-          Collapsed by default so it's tucked away. */}
-      <details className="group rounded-md border">
-        <summary className="flex cursor-pointer select-none items-center gap-1.5 px-3 py-2 text-sm font-semibold list-none [&::-webkit-details-marker]:hidden">
-          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
-          Advanced
-        </summary>
-        <div className="space-y-3 border-t p-3">
+          Shut by default so it's tucked away. */}
+      <SettingsGroup id="account.advanced" title="Advanced" icon={<AlertTriangle />}>
         <div className="flex items-center gap-1.5 text-xs font-semibold text-destructive">
           <AlertTriangle className="h-3.5 w-3.5" /> Danger zone
         </div>
@@ -342,8 +358,7 @@ export function AccountSection() {
             {del.isError && <p className="text-xs text-destructive">{(del.error as Error).message}</p>}
           </div>
         )}
-        </div>
-      </details>
+      </SettingsGroup>
     </div>
   );
 }
@@ -380,9 +395,6 @@ function ExportSection() {
 
   return (
     <section className="space-y-2">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-        <Download className="h-4 w-4" /> Export your data
-      </h3>
       <p className="text-xs text-muted-foreground">
         Every task you own or share, with its full history. JSON keeps the structure;
         CSV opens in a spreadsheet.
@@ -588,9 +600,6 @@ function APITokensSection() {
 
   return (
     <section className="space-y-2">
-      <h3 className="flex items-center gap-1.5 text-sm font-semibold">
-        <Terminal className="h-4 w-4" /> API tokens
-      </h3>
       <p className="text-xs text-muted-foreground">
         Log a task from a script, an NFC tag, or your home automation. A token reaches
         your tasks and history only — never the admin area or your password.
