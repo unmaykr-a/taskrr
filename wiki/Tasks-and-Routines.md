@@ -183,7 +183,22 @@ are typing in a field:
 | <kbd>Esc</kbd> | Clear search, tag filter and selection |
 | <kbd>?</kbd> | Show the shortcut list |
 
-Turn them off under **Settings -> Preferences -> Shortcuts & input -> Keyboard shortcuts**.
+Turn them off under **Settings -> Preferences -> Shortcuts & input -> Keyboard
+shortcuts**.
+
+### Changing a key
+
+With shortcuts on, Settings grows a **Shortcuts** page. Click the key next to an
+action and press the one you'd rather use - captured rather than typed, because
+"/" is not the same keystroke on every layout.
+
+It refuses a key another action already holds and says which one, and it refuses
+the number keys: those jump to the views in the sidebar, in the order they
+appear there, and that list changes when sharing is on. A key bound to "the
+fourth one" would quietly start meaning something else.
+
+Only what you actually changed is stored, so an action you never touched keeps
+following its default.
 
 ## See also
 

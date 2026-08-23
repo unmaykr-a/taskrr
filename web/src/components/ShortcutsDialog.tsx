@@ -48,7 +48,8 @@ export function ShortcutsDialog({
           ))}
         </ul>
         <p className="text-xs text-muted-foreground">
-          Turn these off in Settings → Preferences.
+          Change these under Settings → Shortcuts, or turn them off under Preferences →
+          Shortcuts & input.
         </p>
       </DialogContent>
     </Dialog>

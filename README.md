@@ -95,7 +95,8 @@ single static `bin/taskrr` with everything inside it.
   later is included automatically. Optional "whose turn is it" rota, per-user
   opt-out, and an admin switch for the feature as a whole.
 - An admin area in the UI: users, registration with an approval queue, active
-  sessions, live logs, backups with one-click restore, instance settings.
+  sessions, live logs, backups with one-click restore, instance settings, and
+  branding down to which of three layouts the sign-in page uses.
 - Webhook reminders when something's due — ntfy, Gotify, Apprise, Home
   Assistant, a Discord webhook, anything that takes JSON. Lead time is global
   with a per-task override.
@@ -108,7 +109,7 @@ single static `bin/taskrr` with everything inside it.
   backgrounds, frosted glass, floating windows, per-animation toggles. Every
   contrast pair clears WCAG AA in all five presets, including whatever accent
   you pick.
-- Keyboard shortcuts (`?` for the list), quick-add syntax
+- Keyboard shortcuts (`?` for the list) with rebindable keys, quick-add syntax
   (`water plants every 2 weeks #home`), installable to a phone home screen, and
   a preference to switch off anything above that isn't for you.
 

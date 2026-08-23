@@ -1,8 +1,23 @@
 import { useEffect, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { CheckCircle2, ChevronRight, ExternalLink, Trash2, UserPlus, X } from "lucide-react";
+import {
+  CheckCircle2,
+  ExternalLink,
+  Link2,
+  MonitorSmartphone,
+  Palette,
+  ScrollText,
+  Share2,
+  Trash2,
+  UserCheck,
+  UserPlus,
+  UserRoundPlus,
+  UsersRound,
+  Wrench,
+  X,
+} from "lucide-react";
 
-import { api, type SettingsPatch, type User } from "@/lib/api";
+import { api, type LoginLayout, type SettingsPatch, type User } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { timeSince } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -13,6 +28,7 @@ import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/button";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { SettingsGroup } from "@/components/settings/SettingsGroup";
 
 /**
  * AdminPanel is the admin-only window body: registration controls + user
@@ -23,29 +39,24 @@ export function AdminPanel() {
   const { data: config } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
   const lite = config?.lite ?? false;
   return (
-    <div className="space-y-5">
-      {/* Lite mode hides the multi-user surface (registration + adding accounts). */}
-      {!lite && (
-        <>
-          <RegistrationSettings />
-          <hr className="border-border/60" />
-        </>
-      )}
+    // No separators between the groups: each one is a bordered card, and a rule
+    // between them was only ever there to break up the old flat list. It also
+    // meant a hidden section (lite mode) or an empty one (nothing pending, one
+    // user) left its <hr> behind as a stray line.
+    <div className="space-y-2">
+      {/* Lite mode is "I am the only person here", so the whole multi-user
+          surface goes: registration, other accounts, sharing, merging. */}
+      {!lite && <RegistrationSettings />}
       <OIDCSettings />
-      <hr className="border-border/60" />
-      <SharingSettings />
-      <hr className="border-border/60" />
+      {!lite && <SharingSettings />}
       <BrandingSettings />
-      <hr className="border-border/60" />
-      <PendingUsers />
+      {/* Self-hiding: renders nothing when there is nothing waiting. */}
+      {!lite && <PendingUsers />}
       {!lite && <Users />}
-      <hr className="border-border/60" />
       <SessionsSection />
-      <hr className="border-border/60" />
-      <MergeAccounts />
-      <hr className="border-border/60" />
+      {/* Self-hiding: needs at least two accounts to mean anything. */}
+      {!lite && <MergeAccounts />}
       <AdvancedSettings />
-      <hr className="border-border/60" />
       <LogsSection />
     </div>
   );
@@ -106,12 +117,7 @@ function LogsSection() {
     windows.open({ id: "logs", title: "Logs", width: 560, content: <LogsView fill /> });
 
   return (
-    <details
-      className="rounded-lg border"
-      onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}
-    >
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Logs</summary>
-      <div className="space-y-2 border-t p-3">
+    <SettingsGroup id="admin.logs" title="Logs" icon={<ScrollText />} summary="Server and access" onOpenChange={setOpen}>
         <div className="flex justify-end">
           <button
             type="button"
@@ -123,8 +129,7 @@ function LogsSection() {
           </button>
         </div>
         {open && <LogsView />}
-      </div>
-    </details>
+    </SettingsGroup>
   );
 }
 
@@ -143,6 +148,7 @@ function BrandingSettings() {
   const [icon, setIcon] = useState("");
   const [hideIcon, setHideIcon] = useState(false);
   const [hideText, setHideText] = useState(false);
+  const [layout, setLayout] = useState<LoginLayout>("centered");
   const [hydrated, setHydrated] = useState(false);
 
   // Seed the form from the server once.
@@ -154,6 +160,7 @@ function BrandingSettings() {
       setIcon(data.brand_icon ?? "");
       setHideIcon(data.login_hide_icon ?? false);
       setHideText(data.login_hide_text ?? false);
+      setLayout((data.login_layout as LoginLayout) || "centered");
       setHydrated(true);
     }
   }, [data, hydrated]);
@@ -167,6 +174,7 @@ function BrandingSettings() {
         brand_icon: icon,
         login_hide_icon: hideIcon,
         login_hide_text: hideText,
+        login_layout: layout,
       }),
     onSuccess: (next) => {
       queryClient.setQueryData(["settings"], next);
@@ -202,9 +210,7 @@ function BrandingSettings() {
   }
 
   return (
-    <details className="rounded-lg border">
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Branding</summary>
-      <div className="space-y-3 border-t p-3">
+    <SettingsGroup id="admin.branding" title="Branding" icon={<Palette />} summary="Name, icon, login page">
         <div className="space-y-1">
           <Label className="text-xs text-muted-foreground">Name</Label>
           <Input value={name} placeholder="Taskrr" onChange={(e) => setName(e.target.value)} className="h-8" />
@@ -273,13 +279,28 @@ function BrandingSettings() {
             onChange={(e) => setHideText(e.target.checked)}
           />
         </label>
+        <div className="space-y-1">
+          <Label>Login page layout</Label>
+          <select
+            className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={layout}
+            onChange={(e) => setLayout(e.target.value as LoginLayout)}
+          >
+            <option value="centered" className="bg-background">Centred card</option>
+            <option value="left" className="bg-background">Panel on the left</option>
+            <option value="right" className="bg-background">Panel on the right</option>
+          </select>
+          <p className="text-[11px] text-muted-foreground">
+            A side panel gives the background effect the rest of the screen. Phones get the same
+            full-width form whichever you pick.
+          </p>
+        </div>
         <div className="flex justify-end">
           <Button size="sm" disabled={save.isPending} onClick={() => save.mutate()}>
             {save.isPending ? "Saving…" : "Save branding"}
           </Button>
         </div>
-      </div>
-    </details>
+    </SettingsGroup>
   );
 }
 
@@ -307,14 +328,13 @@ function SessionsSection() {
   });
 
   return (
-    <details className="rounded-lg border" onToggle={(e) => setOpen((e.target as HTMLDetailsElement).open)}>
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">
-        Active sessions
-        {sessions && sessions.length > 0 && (
-          <span className="ml-1.5 font-normal text-muted-foreground">{sessions.length}</span>
-        )}
-      </summary>
-      <div className="space-y-2 border-t p-3">
+    <SettingsGroup
+      id="admin.sessions"
+      title="Active sessions"
+      icon={<MonitorSmartphone />}
+      summary={sessions && sessions.length > 0 ? String(sessions.length) : undefined}
+      onOpenChange={setOpen}
+    >
         <p className="text-[11px] text-muted-foreground">
           Who's signed in and when they last opened the site. "Terminate" signs a
           user out on every device.
@@ -367,8 +387,7 @@ function SessionsSection() {
           })}
         </div>
         {terminate.isError && <p className="text-xs text-destructive">{(terminate.error as Error).message}</p>}
-      </div>
-    </details>
+    </SettingsGroup>
   );
 }
 
@@ -432,8 +451,7 @@ function MergeAccounts() {
   };
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold">Merge accounts</h3>
+    <SettingsGroup id="admin.merge" title="Merge accounts" icon={<UserCheck />} summary="Fold one account into another">
       <p className="text-xs text-muted-foreground">
         Fold one account into another — e.g. an OIDC-provisioned account into a local one, so either sign-in
         reaches the same account.
@@ -502,7 +520,7 @@ function MergeAccounts() {
       >
         {merge.isPending ? "Merging…" : "Merge"}
       </Button>
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -695,9 +713,7 @@ function AdvancedSettings() {
   const danger = "border-destructive/50 text-destructive hover:bg-destructive/10";
 
   return (
-    <details className="rounded-lg border">
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">Advanced</summary>
-      <div className="space-y-4 border-t p-3">
+    <SettingsGroup id="admin.advanced" title="Advanced" icon={<Wrench />} summary="Backups, danger zone">
         <BackupsSection />
         <hr className="border-destructive/30" />
         <p className="text-xs font-semibold text-destructive">Danger zone</p>
@@ -739,8 +755,7 @@ function AdvancedSettings() {
           </Button>
         </div>
         {msg && <p className="text-xs text-muted-foreground">{msg}</p>}
-      </div>
-    </details>
+    </SettingsGroup>
   );
 }
 
@@ -753,8 +768,7 @@ function RegistrationSettings() {
   });
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold">Registration</h3>
+    <SettingsGroup id="admin.registration" title="Registration" icon={<UserRoundPlus />} summary="Who may sign up">
       <label className="flex items-center justify-between gap-2 text-sm">
         <span className="text-muted-foreground">Allow local sign-ups (Register tab)</span>
         <input
@@ -785,7 +799,7 @@ function RegistrationSettings() {
           onChange={(e) => save.mutate({ reg_approval: e.target.checked })}
         />
       </label>
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -798,8 +812,7 @@ function SharingSettings() {
     onSuccess: (next) => queryClient.setQueryData(["settings"], next),
   });
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold">Task sharing</h3>
+    <SettingsGroup id="admin.sharing" title="Sharing" icon={<Share2 />} summary="Tasks and themes">
       <label className="flex items-center justify-between gap-2 text-sm">
         <span className="text-muted-foreground">
           Let users share tasks
@@ -830,7 +843,7 @@ function SharingSettings() {
           onChange={(e) => save.mutate({ api_tokens: e.target.checked })}
         />
       </label>
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -865,10 +878,13 @@ function PendingUsers() {
   if (!pending || pending.length === 0) return null;
 
   return (
-    <section className="space-y-2">
-      <h3 className="text-sm font-semibold">
-        Pending approval <span className="text-xs text-amber-500">({pending.length})</span>
-      </h3>
+    <SettingsGroup
+      id="admin.pending"
+      title="Pending approval"
+      icon={<UserCheck />}
+      summary={<span className="text-amber-500">{pending.length} waiting</span>}
+      defaultOpen
+    >
       <div className="space-y-1.5">
         {pending.map((u) => (
           <PendingRow
@@ -880,7 +896,7 @@ function PendingUsers() {
           />
         ))}
       </div>
-    </section>
+    </SettingsGroup>
   );
 }
 
@@ -960,17 +976,16 @@ function OIDCSettings() {
   );
 
   return (
-    <details className="group rounded-lg border">
-      <summary className="flex cursor-pointer select-none items-center justify-between gap-2 px-3 py-2 text-sm font-semibold list-none [&::-webkit-details-marker]:hidden">
-        <span className="flex items-center gap-1.5">
-          <ChevronRight className="h-4 w-4 text-muted-foreground transition-transform group-open:rotate-90" />
-          Single sign-on (OIDC)
-        </span>
-        <span className={data?.oidc_enabled ? "text-xs font-normal text-emerald-400" : "text-xs font-normal text-muted-foreground"}>
+    <SettingsGroup
+      id="admin.oidc"
+      title="Single sign-on (OIDC)"
+      icon={<Link2 />}
+      summary={
+        <span className={data?.oidc_enabled ? "text-emerald-400" : undefined}>
           {data?.oidc_enabled ? "enabled" : "not configured"}
         </span>
-      </summary>
-      <div className="space-y-2 border-t p-3">
+      }
+    >
       {field("oidc_issuer", "Issuer URL", "https://auth.example.com/application/o/taskrr/")}
       <div className="grid grid-cols-2 gap-2">
         {field("oidc_client_id", "Client ID")}
@@ -1029,8 +1044,7 @@ function OIDCSettings() {
         </Button>
       </div>
       {save.isError && <p className="text-xs text-destructive">{(save.error as Error).message}</p>}
-      </div>
-    </details>
+    </SettingsGroup>
   );
 }
 
@@ -1083,14 +1097,12 @@ function Users() {
   };
 
   return (
-    <details className="rounded-lg border">
-      <summary className="cursor-pointer select-none px-3 py-2 text-sm font-semibold">
-        Users
-        {users && users.length > 0 && (
-          <span className="ml-1.5 font-normal text-muted-foreground">{users.length}</span>
-        )}
-      </summary>
-      <div className="space-y-3 border-t p-3">
+    <SettingsGroup
+      id="admin.users"
+      title="Users"
+      icon={<UsersRound />}
+      summary={users && users.length > 0 ? String(users.length) : undefined}
+    >
       <form
         onSubmit={(e) => {
           e.preventDefault();
@@ -1197,7 +1209,6 @@ function Users() {
           {((update.error || remove.error) as Error)?.message}
         </p>
       )}
-      </div>
-    </details>
+    </SettingsGroup>
   );
 }

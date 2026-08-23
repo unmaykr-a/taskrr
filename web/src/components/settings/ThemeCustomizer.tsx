@@ -105,6 +105,9 @@ export function ThemeCustomizer() {
 
   // What the instance allows (sharing) and shared themes everyone can apply.
   const { data: config } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
+  // Lite mode means there is nobody to share a theme with, so the whole
+  // sharing surface goes rather than sitting there doing nothing.
+  const lite = config?.lite ?? false;
   const { data: settings } = useQuery({
     queryKey: ["settings"],
     queryFn: api.getSettings,
@@ -225,7 +228,7 @@ export function ThemeCustomizer() {
       </SettingsGroup>
 
       {/* Shared themes — admin-published, available to everyone. */}
-      {shared && shared.length > 0 && (
+      {!lite && shared && shared.length > 0 && (
         <SettingsGroup id="theme.shared" title="Shared themes" icon={<Users />}>
         <section className="space-y-2">
           <div className="grid grid-cols-3 gap-2">
@@ -482,7 +485,7 @@ export function ThemeCustomizer() {
                 <div className="flex shrink-0 items-center gap-2">
                   {/* Publish a saved theme to all users when sharing is enabled —
                       admins always, regular users when the admin allows it. */}
-                  {config?.themesShareable && (isAdmin || config?.themesShareUsers) && (
+                  {!lite && config?.themesShareable && (isAdmin || config?.themesShareUsers) && (
                     <button
                       type="button"
                       onClick={(e) => {
@@ -525,7 +528,8 @@ export function ThemeCustomizer() {
             onChange={(e) => e.target.files?.[0] && importTheme(e.target.files[0])}
           />
         </div>
-        {isAdmin && (
+        {/* A site default and theme sharing both need more than one account. */}
+        {isAdmin && !lite && (
           <div className="space-y-2 rounded-lg border p-3">
             <h4 className="text-xs font-semibold text-muted-foreground">Site themes (admin)</h4>
             <Button

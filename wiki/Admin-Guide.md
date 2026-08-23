@@ -11,7 +11,10 @@ topics have their own dedicated pages.
   admins.
 - **Merge** two accounts into one (optionally moving data), useful when migrating
   someone onto SSO.
-- In [lite mode](Users-and-Authentication) the Users section is hidden.
+- In [lite mode](Users-and-Authentication) the whole multi-user surface is
+  hidden, not just the user list: registration, other accounts, pending
+  approvals, account merging, task sharing, theme sharing and the site default
+  theme all go. With one account none of them have anything to act on.
 
 ## Registration and approvals
 

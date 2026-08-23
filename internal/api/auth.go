@@ -56,12 +56,16 @@ const (
 	keyBrandIcon     = "brand_icon"      // a data-URL logo; "" = generated mark
 	keyLoginHideIcon = "login_hide_icon" // hide the icon on the login card
 	keyLoginHideText = "login_hide_text" // hide the name/tagline on the login card
+	keyLoginLayout   = "login_layout"    // "centered" (default), "left", "right"
 )
 
 // Branding defaults (used when a setting is unset/empty).
 const (
 	defaultBrandName    = "Taskrr"
 	defaultBrandTagline = "last-done tracker"
+	// defaultLoginLayout is the centred card the app has always had; the split
+	// layouts are opt-in so an upgrade never moves anybody's login page.
+	defaultLoginLayout = "centered"
 	maxBrandIconBytes   = 256 << 10 // 256 KiB data URL cap
 )
 
@@ -189,6 +193,7 @@ func (s *Server) branding(ctx context.Context) map[string]any {
 		"icon":          s.stringSetting(ctx, keyBrandIcon, ""),
 		"loginHideIcon": s.boolSetting(ctx, keyLoginHideIcon, false),
 		"loginHideText": s.boolSetting(ctx, keyLoginHideText, false),
+		"loginLayout":   s.stringSetting(ctx, keyLoginLayout, defaultLoginLayout),
 	}
 }
 
@@ -1438,6 +1443,7 @@ type settingsPatch struct {
 	BrandIcon           *string `json:"brand_icon"`
 	LoginHideIcon       *bool   `json:"login_hide_icon"`
 	LoginHideText       *bool   `json:"login_hide_text"`
+	LoginLayout         *string `json:"login_layout"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -1534,6 +1540,20 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.LoginHideText != nil && !set(keyLoginHideText, boolStr(*req.LoginHideText)) {
 		return
+	}
+	if req.LoginLayout != nil {
+		// Validated rather than trusted: this string is written into a class
+		// decision on a page served to signed-out visitors, so an unknown value
+		// falls back to the default instead of being stored.
+		layout := strings.ToLower(strings.TrimSpace(*req.LoginLayout))
+		switch layout {
+		case "centered", "left", "right":
+		default:
+			layout = defaultLoginLayout
+		}
+		if !set(keyLoginLayout, layout) {
+			return
+		}
 	}
 	// Only overwrite the secret when a new, non-empty one is provided. Encrypt it
 	// at rest when TASKRR_SECRET_KEY is set (a no-op otherwise), so it isn't

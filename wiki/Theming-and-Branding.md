@@ -68,6 +68,19 @@ all users, where it appears in a Shared themes group and can be applied like a
 preset. Admins can unshare. An additional toggle lets non-admin users share
 themes too, not just admins.
 
+## Login page layout (admin)
+
+Under **Admin -> Branding**, the sign-in page has three layouts:
+
+- **Centred card** - the default, and what Taskrr has always looked like.
+- **Panel on the left** / **Panel on the right** - the form sits in a
+  full-height panel down one side and the animated background gets the rest.
+  Worth it if you've picked a background you actually want to see, since a small
+  centred card hides most of it.
+
+Phones get the same full-width form whichever you choose; there is no room for a
+split and nothing to show beside it.
+
 ## Branding (admin)
 
 Customise the instance identity from the admin settings:

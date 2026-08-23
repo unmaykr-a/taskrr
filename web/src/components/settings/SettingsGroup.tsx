@@ -41,15 +41,29 @@ export function SettingsGroup({
   summary,
   icon,
   defaultOpen = false,
+  flat = false,
+  onOpenChange,
   children,
 }: {
   /** Stable key for remembering this group's state. */
   id: string;
   title: string;
-  /** One line naming what's inside, so a shut group is still discoverable. */
-  summary?: string;
+  /** One line naming what's inside, so a shut group is still discoverable.
+   *  A node rather than a string, so a count badge can live here too. */
+  summary?: ReactNode;
   icon?: ReactNode;
   defaultOpen?: boolean;
+  /**
+   * Render as a plain section rather than a drawer.
+   *
+   * A pane where *everything* is shut reads as tidy and behaves as a wall of
+   * closed doors. The one or two groups you'd open on almost every visit — the
+   * clock, who you're signed in as — are better left out in the open, so the
+   * pane still shows something when it opens.
+   */
+  flat?: boolean;
+  /** For a group whose contents are expensive enough to build only when shown. */
+  onOpenChange?: (open: boolean) => void;
   children: ReactNode;
 }) {
   const [open, setOpen] = useState(() => readOpen()[id] ?? defaultOpen);
@@ -59,9 +73,22 @@ export function SettingsGroup({
       const next = e.currentTarget.open;
       setOpen(next);
       writeOpen(id, next);
+      onOpenChange?.(next);
     },
-    [id],
+    [id, onOpenChange],
   );
+
+  if (flat) {
+    return (
+      <section className="space-y-2.5 rounded-lg border p-3">
+        <h3 className="flex items-center gap-1.5 text-sm font-semibold">
+          {icon && <span className="flex h-3.5 w-3.5 shrink-0 items-center justify-center">{icon}</span>}
+          {title}
+        </h3>
+        {children}
+      </section>
+    );
+  }
 
   return (
     <details open={open} onToggle={onToggle} className="group rounded-lg border">
