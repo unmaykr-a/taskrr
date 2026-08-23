@@ -37,6 +37,52 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.16.0",
+    date: "2026-08-23",
+    changes: [
+      feat(
+        "Right-click a task",
+        "Right-click (or long-press on a phone) any task for its actions \u2014 log, snooze, skip, pin, duplicate, archive, delete. Prefer your browser's own menu? Turn it off under Preferences \u2192 Right-click menu.",
+      ),
+      feat(
+        "Snooze and skip",
+        "Put a task off for an hour, a day, or a date you pick, and it stops counting as due (and stops sending reminders) until then. \"Skip this cycle\" moves the next due date on by one routine \u2014 without recording that you did it.",
+      ),
+      feat(
+        "Share a whole folder",
+        "Share a folder once instead of a task at a time. Anything you add to it later is included automatically, and moving a task out takes it back.",
+      ),
+      feat(
+        "Whose turn is it",
+        "Turn on \"Take turns\" for a shared task and each card says who's up next, moving along every time someone logs it.",
+      ),
+      feat(
+        "Restore from a backup file",
+        "Import a JSON export back into your account, either alongside what's there or replacing it. The other half of the export added in 1.15.",
+      ),
+      feat(
+        "Pin and duplicate",
+        "Keep a task at the top of the list whatever the sort, and copy a task's setup \u2014 without copying its history.",
+      ),
+      feat(
+        "Quick add",
+        "Type \"water plants every 2 weeks #home\" and Taskrr offers to fill in the routine, tags and folder. It only ever offers; one click accepts.",
+      ),
+      feat(
+        "Reminders per task",
+        "A task can now have its own lead time \u2014 a day before the NAS backup, an hour before the bins \u2014 instead of one setting for everything.",
+      ),
+      feat(
+        "Add to your home screen",
+        "Taskrr can now be installed to a phone's home screen. There's an optional count of what's due in the browser tab, too.",
+      ),
+      fix(
+        "Setting a routine from outside the form",
+        "The routine field ignored a value set for it by anything other than typing, which is why quick add's suggestion left the routine switched off.",
+      ),
+    ],
+  },
+  {
     version: "1.15.0",
     date: "2026-08-22",
     changes: [

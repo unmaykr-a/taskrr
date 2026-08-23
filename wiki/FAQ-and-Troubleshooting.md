@@ -25,6 +25,14 @@ the instance is copying that folder. See [Backups and Restore](Backups-and-Resto
 history. Admin backups are whole-database and admin-only; this is the per-user
 equivalent. See [API Reference](API-Reference#data-export).
 
+### Can I get my data back in again?
+
+Yes - **Settings -> Account -> Export your data -> Restore from a JSON export**.
+"Add to my tasks" merges the file with what you already have; "Replace
+everything" clears your tasks first and asks you to confirm. The file is read
+and checked before anything is deleted, so a bad file can never cost you what
+you had. CSV is export-only; JSON is the format that round-trips.
+
 ### Can something else log a task for me - a script, or Home Assistant?
 
 Yes. Create an API token under **Settings -> Account -> API tokens** and send it

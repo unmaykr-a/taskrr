@@ -62,3 +62,37 @@ cycle. See [Reminders](Reminders).
 
 Sharing needs a second user and a real server, so it is not available in the
 in-browser [demo](https://unmaykr-a.github.io/taskrr/).
+
+## Sharing a folder
+
+Sharing a folder covers everything the owner keeps in it - and keeps covering
+it. A task created in the folder later, or moved into it, is included with no
+further action; moving a task out takes the access back at the same moment.
+That is the point of the coarser grain: a household with fifteen chores in
+"Home" would otherwise need fifteen invitations, and another every time a chore
+is added.
+
+Share a folder from the folder heading in the task list (the share button, or
+right-click it) when **Group by folder** is on. Invitations arrive in the
+recipient's **Requests** view alongside task shares, marked as a folder and
+saying how many tasks it currently covers - accepting a folder is a bigger
+decision than accepting a task, so it does not look identical to one.
+
+Notes:
+
+- A folder share names *one owner's* folder. Everyone's "Home" is not one
+  shared folder.
+- Ungrouped tasks are never included.
+- Members of a shared folder get reminders for its tasks, exactly as members of
+  a shared task do.
+- A task can be shared both ways at once; it appears once, and removing one
+  route leaves the other working.
+
+## Whose turn is it
+
+A shared task can keep a rota. Turn on **Take turns** in its Manage window and
+each card shows who is up next, moving along every time someone logs it.
+
+Whose turn it is is worked out from the member order and who logged last rather
+than being stored, so it cannot drift out of step when somebody joins, leaves,
+or logs out of turn. A rota needs at least two people to say anything.

@@ -60,6 +60,9 @@ documents every option.
 - One-tap logging, or pick a time and add a note. History is editable — every
   logged completion can be changed or undone later, and you can click a past day
   on the calendar to record something you did then.
+- Right-click any task (long-press on a phone) for everything you can do to it.
+- Snooze a task until later, or skip a cycle — which moves the next due date on
+  without pretending you did it.
 - Routines with due dates: cards shade continuously from fresh to overdue,
   with a progress bar and "due in 3d" on each card. Colours are customisable
   per task and globally.
@@ -67,29 +70,34 @@ documents every option.
   over 7 days, 30 days, 90 days or a year.
 - Per-task statistics: how often you *actually* do a thing, your longest gap,
   and how that compares to the routine you set.
-- Filters with live counts: all, due soon, overdue, never done, archived — and
-  bulk actions (log, tag, move to a folder, archive or delete several at once).
+- Filters with live counts: all, due soon, overdue, never done, snoozed,
+  archived — and bulk actions (log, tag, move to a folder, archive or delete
+  several at once). Pin the ones you want kept at the top.
 - Keep larger lists tidy: tags (with search and a tag filter), folder grouping,
   and sorting by name or last-done.
 - Multiple users with per-user data, local password login, and optional OIDC
   single sign-on (tested with Authentik and Pocket ID), including group-to-admin-role
   mapping. A lite mode turns the multi-user surface off for solo use.
-- Share a task with another user so you both see and log it — admin-enabled,
-  with who-logged-last and a per-user opt-out.
+- Share a task with another user so you both see and log it — or share a whole
+  folder, so anything you add to it later is included. Admin-enabled, with
+  who-logged-last, an optional "whose turn is it" rota, and a per-user opt-out.
 - An admin area in the UI: user management, registration controls with an
   approval queue, active sessions, live server logs, backups with one-click
   restore, and instance settings.
 - Reminders via webhook when a task is due — point it at ntfy, Gotify,
   Apprise, Home Assistant, a Discord webhook, or anything that accepts JSON.
+  Each task can set its own lead time.
 - API tokens for the other direction: log a task from a shell script, an NFC
   tag, or a home automation. A token reaches your tasks and history only — never
   the admin area or your password.
-- Export everything you own as JSON or CSV, whenever you like.
+- Export everything you own as JSON or CSV whenever you like, and import a JSON
+  export back — alongside what's there, or replacing it.
 - A themeable interface: colour customiser with palette generation, light and
   dark modes, animated backgrounds, frosted glass, floating windows, and
   per-animation toggles. Works well on a phone.
 - Keyboard shortcuts for the things you do constantly (press `?` for the list),
-  and a preference to turn off anything above you'd rather not have.
+  quick-add syntax (`water plants every 2 weeks #home`), an installable home
+  screen app, and a preference to turn off anything above you'd rather not have.
 
 ## Configuration
 

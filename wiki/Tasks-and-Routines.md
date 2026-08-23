@@ -53,6 +53,52 @@ As the list grows, three tools keep it tidy:
 - **Sorting** - order by name, or by most / least recently done, from the
   toolbar.
 
+## Snoozing and skipping
+
+Two ways to say "not now", both of which stop a task counting as due and stop
+its reminders until they run out:
+
+- **Snooze** holds a task back for a while - an hour, tomorrow, three days, a
+  week, or a date you pick in its Manage window. It shows as "Snoozed" and
+  appears in its own sidebar view.
+- **Skip this cycle** moves the next due date on by one routine. It is *not* a
+  completion: nothing is added to the history, and the calendar, activity chart
+  and task statistics are all untouched. Skipping something several cycles
+  overdue still lands in the future rather than in the past.
+
+Both are on the right-click menu; the Manage window adds an exact date and a
+"wake up now" for a snoozed task.
+
+## Pinning and duplicating
+
+- **Pin to top** keeps a task first whatever the list is sorted by.
+- **Duplicate** copies a task's setup - description, routine, tags, folder,
+  colours - into a new task. It deliberately does not copy the history, since
+  the copy has not been done yet.
+
+## The right-click menu
+
+Right-click any task card (or long-press on a touchscreen) for everything you
+can do to it: log it, snooze or skip, pin, duplicate, archive, delete. It is
+keyboard-navigable, and turning it off under **Settings -> Preferences ->
+Right-click menu** gives you your browser's own menu back - which is what you
+want for copying a task name.
+
+## Quick add
+
+Typing a new task's name, you can describe it in the same breath:
+
+```
+water plants every 2 weeks #home /Kitchen
+```
+
+Taskrr reads the routine, the tags and the folder out of it and *offers* the
+interpretation under the box; one click fills the fields in. It never applies
+silently, and a plain name is left completely alone. Folders with spaces need
+quoting: `/"Front Garden"`.
+
+Turn it off under **Settings -> Preferences -> Quick add**.
+
 ## Filters and bulk actions
 
 The sidebar offers filter views with live counts:
@@ -61,6 +107,7 @@ The sidebar offers filter views with live counts:
 - **Due soon** - has a routine and is approaching its due time.
 - **Overdue** - past its due time.
 - **Never done** - no completions yet.
+- **Snoozed** - deliberately put off until later (see above).
 - **Archived** - soft-archived tasks (see below).
 
 Select several tasks to run a **bulk action**: log, add a tag, move them to a
