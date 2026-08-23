@@ -231,6 +231,38 @@ func TestLeaveHTTP(t *testing.T) {
 	}
 }
 
+// TestRemoveMemberHTTP: the owner's half of undoing a share. Until this route
+// existed an invitation could only be taken back by the person who got it.
+func TestRemoveMemberHTTP(t *testing.T) {
+	e := newShareEnv(t, true)
+	base := "/api/tasks/" + itoa(e.taskID)
+	if w := e.do(t, e.alice, http.MethodPost, base+"/share", `{"username":"bob"}`); w.Code != http.StatusCreated {
+		t.Fatalf("share = %d", w.Code)
+	}
+	if w := e.do(t, e.bob, http.MethodPost, base+"/share/respond", `{"accept":true}`); w.Code != http.StatusNoContent {
+		t.Fatalf("accept = %d", w.Code)
+	}
+
+	// A member can't remove another member — only the owner can.
+	if w := e.do(t, e.bob, http.MethodDelete, base+"/members/"+itoa(e.bob.ID), ""); w.Code != http.StatusNotFound {
+		t.Fatalf("member removing themselves via the owner route = %d, want 404", w.Code)
+	}
+
+	if w := e.do(t, e.alice, http.MethodDelete, base+"/members/"+itoa(e.bob.ID), ""); w.Code != http.StatusNoContent {
+		t.Fatalf("remove = %d, want 204 (body: %s)", w.Code, w.Body.String())
+	}
+	if containsID(e.taskIDs(t, e.bob), e.taskID) {
+		t.Fatal("task should be gone from bob after the owner removed him")
+	}
+	if !containsID(e.taskIDs(t, e.alice), e.taskID) {
+		t.Fatal("task should remain with alice")
+	}
+	// Removing again is a 404.
+	if w := e.do(t, e.alice, http.MethodDelete, base+"/members/"+itoa(e.bob.ID), ""); w.Code != http.StatusNotFound {
+		t.Fatalf("remove twice = %d, want 404", w.Code)
+	}
+}
+
 // itoa is a tiny local int64->string to keep paths readable.
 func itoa(n int64) string {
 	return strconv.FormatInt(n, 10)

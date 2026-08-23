@@ -66,7 +66,7 @@ const (
 	// defaultLoginLayout is the centred card the app has always had; the split
 	// layouts are opt-in so an upgrade never moves anybody's login page.
 	defaultLoginLayout = "centered"
-	maxBrandIconBytes   = 256 << 10 // 256 KiB data URL cap
+	maxBrandIconBytes  = 256 << 10 // 256 KiB data URL cap
 )
 
 type userCtxKey struct{}
@@ -480,7 +480,8 @@ type changePasswordRequest struct {
 
 // handleChangePassword lets a signed-in user set a new password. If they already
 // have one, the current password must check out. Changing it revokes every other
-// session and re-issues this one, so other devices are logged out.
+// session and every API token, then re-issues this session, so the device you're
+// on stays signed in and nothing else keeps access.
 type usernameRequest struct {
 	Username string `json:"username"`
 }
@@ -641,8 +642,12 @@ func (s *Server) handleChangePassword(w http.ResponseWriter, r *http.Request) {
 		return
 	}
 	// Revoke all sessions (including this one), then start a fresh session so the
-	// current device stays signed in but every other one is logged out.
+	// current device stays signed in but every other one is logged out. API
+	// tokens go with them: changing a password is what you do when you think a
+	// credential has leaked, and leaving bearer tokens alive would make that
+	// half a fix. The form says so, so it isn't a surprise on a routine change.
 	_ = s.store.DeleteUserSessions(r.Context(), u.ID)
+	_, _ = s.store.DeleteAllAPITokens(r.Context(), u.ID)
 	if err := s.startSession(w, r, u); err != nil {
 		writeError(w, http.StatusInternalServerError, "could not refresh session")
 		return
@@ -980,7 +985,12 @@ func (s *Server) handleListSessions(w http.ResponseWriter, r *http.Request) {
 }
 
 // handleTerminateSessions signs a user out everywhere by deleting all their
-// sessions. A different admin can't terminate the protected bootstrap admin.
+// sessions and API tokens. A different admin can't terminate the protected
+// bootstrap admin.
+//
+// Tokens are included because this is the button an admin reaches for when an
+// account looks compromised, and a bearer token outlives a cookie — signing the
+// browser out while leaving the token working would be the wrong half.
 func (s *Server) handleTerminateSessions(w http.ResponseWriter, r *http.Request) {
 	admin, ok := s.requireAdmin(w, r)
 	if !ok {
@@ -996,6 +1006,10 @@ func (s *Server) handleTerminateSessions(w http.ResponseWriter, r *http.Request)
 	}
 	if err := s.store.DeleteUserSessions(r.Context(), id); err != nil {
 		writeStoreError(w, err, "could not terminate sessions")
+		return
+	}
+	if _, err := s.store.DeleteAllAPITokens(r.Context(), id); err != nil {
+		writeStoreError(w, err, "could not revoke tokens")
 		return
 	}
 	w.WriteHeader(http.StatusNoContent)
@@ -1129,9 +1143,11 @@ func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {
 			writeStoreError(w, err, "could not update password")
 			return
 		}
-		// Changing a password logs that user's other sessions out.
+		// Changing a password logs that user's other sessions out and revokes
+		// their tokens, same as changing your own does.
 		if id != admin.ID {
 			_ = s.store.DeleteUserSessions(r.Context(), id)
+			_, _ = s.store.DeleteAllAPITokens(r.Context(), id)
 		}
 	}
 

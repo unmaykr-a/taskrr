@@ -163,6 +163,9 @@ export function AccountSection() {
           <KeyRound className="h-3.5 w-3.5" /> Change password
           {!needsCurrent && " (set one to enable username sign-in)"}
         </h4>
+        <p className="text-[11px] text-muted-foreground">
+          Signs out your other devices and revokes any API tokens you've made.
+        </p>
         {needsCurrent && (
           <Input
             type="password"
@@ -580,6 +583,17 @@ function APITokensSection() {
     onError: (e) => toast((e as Error).message, { tone: "error" }),
   });
 
+  // The one-by-one revoke above is for tidying up. This is for the other case:
+  // you think a token has leaked and don't know which of them it is.
+  const revokeAll = useMutation({
+    mutationFn: api.deleteAllAPITokens,
+    onSuccess: (r) => {
+      queryClient.invalidateQueries({ queryKey: ["api-tokens"] });
+      toast(r.revoked === 1 ? "1 token revoked" : `${r.revoked} tokens revoked`, { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
   const copy = async (text: string) => {
     try {
       await navigator.clipboard.writeText(text);
@@ -664,6 +678,25 @@ function APITokensSection() {
             </li>
           ))}
         </ul>
+      )}
+
+      {tokens && tokens.length > 1 && (
+        <button
+          type="button"
+          disabled={revokeAll.isPending}
+          onClick={async () => {
+            const ok = await confirm({
+              title: "Revoke every token",
+              description: `All ${tokens.length} tokens stop working immediately, and anything using them stops with them. This can't be undone.`,
+              confirmText: "Revoke all",
+              destructive: true,
+            });
+            if (ok) revokeAll.mutate();
+          }}
+          className="text-[11px] font-medium text-muted-foreground transition-colors hover:text-destructive"
+        >
+          Revoke every token
+        </button>
       )}
     </section>
   );

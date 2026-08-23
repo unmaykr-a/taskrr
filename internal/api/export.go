@@ -100,6 +100,38 @@ func (s *Server) handleExport(w http.ResponseWriter, r *http.Request) {
 	_ = enc.Encode(doc)
 }
 
+// csvCell defuses a cell a spreadsheet would treat as a formula.
+//
+// Excel, LibreOffice and Sheets all execute a cell starting with =, +, - or @,
+// so a task named `=HYPERLINK("http://evil","invoice")` runs on open. The names
+// in an export are not all your own: a task shared with you carries the name its
+// owner chose, so this is reachable by someone else, not just by typing a
+// payload into your own list.
+//
+// A leading apostrophe is the standard defusal — spreadsheets read the rest as
+// literal text and don't show the quote. Leading tab, CR and LF go the same way
+// because they can shift the parse onto the next character.
+func csvCell(v string) string {
+	if v == "" {
+		return v
+	}
+	switch v[0] {
+	case '=', '+', '-', '@', '\t', '\r', '\n':
+		return "'" + v
+	}
+	return v
+}
+
+// csvRow defuses every cell in a row. Applied to whole rows rather than to the
+// fields that look risky, so a column added later is covered by default.
+func csvRow(cells ...string) []string {
+	out := make([]string, len(cells))
+	for i, c := range cells {
+		out[i] = csvCell(c)
+	}
+	return out
+}
+
 // writeExportCSV emits one row per completion — the shape a spreadsheet wants.
 // A task that has never been logged still gets a row (with empty completion
 // columns) so nothing silently vanishes from the export.
@@ -120,14 +152,14 @@ func writeExportCSV(w http.ResponseWriter, doc exportDocument) {
 		if t.ArchivedAt != nil {
 			archived = "true"
 		}
-		base := []string{t.Name, t.Description, t.Folder, strings.Join(t.Tags, " "), routine, archived}
+		base := csvRow(t.Name, t.Description, t.Folder, strings.Join(t.Tags, " "), routine, archived)
 		if len(t.Completions) == 0 {
 			_ = cw.Write(append(base, "", ""))
 			continue
 		}
 		for _, c := range t.Completions {
 			_ = cw.Write(append(append([]string{}, base...),
-				c.CompletedAt.UTC().Format(time.RFC3339), c.Note))
+				c.CompletedAt.UTC().Format(time.RFC3339), csvCell(c.Note)))
 		}
 	}
 }

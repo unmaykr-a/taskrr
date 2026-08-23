@@ -317,7 +317,7 @@ function SessionsSection() {
     mutationFn: (userId: number) => api.terminateSessions(userId),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["sessions"] });
-      toast("Signed out everywhere", { tone: "success" });
+      toast("Signed out everywhere, tokens revoked", { tone: "success" });
     },
   });
 
@@ -331,7 +331,8 @@ function SessionsSection() {
     >
         <p className="text-[11px] text-muted-foreground">
           Who's signed in and when they last opened the site. "Terminate" signs a
-          user out on every device.
+          user out on every device and revokes their API tokens, so a leaked
+          account is closed off in one go.
         </p>
         {sessions?.length === 0 && <p className="text-xs text-muted-foreground">No active sessions.</p>}
         <div className="space-y-1.5">
@@ -368,8 +369,8 @@ function SessionsSection() {
                       locked
                         ? "Primary admin — protected from other admins"
                         : isSelf
-                          ? "This signs you out too"
-                          : "Sign out on all devices"
+                          ? "This signs you out too, and revokes your tokens"
+                          : "Sign out on all devices and revoke API tokens"
                     }
                     className="whitespace-nowrap text-xs text-destructive hover:underline disabled:opacity-40 disabled:no-underline"
                   >
@@ -1030,7 +1031,7 @@ function Users() {
   const resetPassword = async (u: User) => {
     const next = await prompt({
       title: "Reset password",
-      description: `New password for ${u.username} (min 8 chars):`,
+      description: `New password for ${u.username} (min 8 chars). Signs them out everywhere and revokes their API tokens:`,
       inputType: "password",
       placeholder: "New password",
       confirmText: "Set password",

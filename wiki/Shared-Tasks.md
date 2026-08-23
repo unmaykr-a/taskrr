@@ -21,14 +21,19 @@ share. See the [Admin Guide](Admin-Guide).
    and see the full history. Each completion records who logged it, and the card
    shows who logged last.
 
+Removing someone is the owner's to do, from the member list in the task's Manage
+window (folder shares have the same control in the folder's share dialog). It
+takes back a pending invite and an accepted membership alike; the task, its
+history and everyone else on it are untouched.
+
 Only **accepted** membership counts: a task is badged as shared, appears for the
 member, and generates reminders for the member only after the invite is accepted -
 a pending invite alone does none of these.
 
 ## Who can do what
 
-- **Owner** - edits and archives the task definition, invites members, and has
-  full control.
+- **Owner** - edits and archives the task definition, invites members, removes
+  them again, and has full control.
 - **Member** (accepted) - views the task, logs completions, edits their own
   completions, and can leave at any time.
 - A completion can be edited or deleted by the **task owner** or by **whoever

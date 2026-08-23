@@ -405,7 +405,13 @@ func (s *Server) handleListActivity(w http.ResponseWriter, r *http.Request) {
 // --- helpers ---
 
 func pathID(w http.ResponseWriter, r *http.Request) (int64, bool) {
-	id, err := strconv.ParseInt(r.PathValue("id"), 10, 64)
+	return pathInt64(w, r, "id")
+}
+
+// pathInt64 reads any positive integer wildcard, for routes that carry a second
+// one (a member's user id after the task's).
+func pathInt64(w http.ResponseWriter, r *http.Request, name string) (int64, bool) {
+	id, err := strconv.ParseInt(r.PathValue(name), 10, 64)
 	if err != nil || id <= 0 {
 		writeError(w, http.StatusBadRequest, "invalid id")
 		return 0, false

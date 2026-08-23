@@ -50,10 +50,13 @@ These live in the [Admin Guide](Admin-Guide).
 Every signed-in user can, from their account settings:
 
 - Change their **username**.
-- Change their **password**.
+- Change their **password** - which signs their other devices out and revokes
+  their API tokens.
 - Connect or disconnect **OIDC** (link/unlink the SSO identity).
 - Manage **reminders** (see [Reminders](Reminders)).
 - Opt in or out of receiving **task shares** (see [Shared Tasks](Shared-Tasks)).
+- Mint and revoke **API tokens**, one at a time or all at once
+  (see [API Reference](API-Reference#api-tokens)).
 - **Wipe my data** - delete their own tasks and history while keeping the account.
 - **Delete account** - remove the account entirely.
 

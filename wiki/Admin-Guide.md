@@ -47,9 +47,13 @@ completions, activity and that user's own export - never the admin area,
 password changes or account deletion, which all require a real sign-in.
 
 Turning the gate off stops *new* tokens being created. Tokens that already exist
-keep working until their owner revokes them, so flipping the switch never
-silently breaks an automation someone has already set up. See
-[API Reference](API-Reference#api-tokens).
+keep working until they are revoked, so flipping the switch never silently
+breaks an automation someone has already set up.
+
+When an account needs shutting off rather than the feature, **terminate its
+sessions** (below) or reset its password: either revokes that account's tokens
+along with its sign-ins. Users can also revoke their own, one at a time or all
+at once. See [API Reference](API-Reference#api-tokens).
 
 ## Themes (instance-wide)
 
@@ -74,7 +78,8 @@ login card. Branding is applied even when signed out. Details in
 ## Sessions
 
 View all active sessions and **terminate** them - for a single user or in bulk.
-Useful after a password change or to revoke a lost device.
+Terminating signs the account out on every device and revokes its API tokens, so
+one action closes off a lost device or an account that looks compromised.
 
 ## Live logs
 

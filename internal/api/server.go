@@ -45,6 +45,7 @@ type ShareStore interface {
 	ShareTask(ctx context.Context, ownerID, taskID, recipientID int64) (store.TaskShare, error)
 	RespondToShare(ctx context.Context, userID, taskID int64, accept bool) error
 	LeaveTask(ctx context.Context, userID, taskID int64) error
+	RemoveTaskMember(ctx context.Context, ownerID, taskID, memberID int64) error
 	ListIncomingShares(ctx context.Context, userID int64) ([]store.ShareRequest, error)
 
 	// Folder-level sharing.
@@ -110,6 +111,7 @@ type AuthStore interface {
 	CreateAPIToken(ctx context.Context, userID int64, name, tokenHash string) (store.APIToken, error)
 	ListAPITokens(ctx context.Context, userID int64) ([]store.APIToken, error)
 	DeleteAPIToken(ctx context.Context, userID, id int64) error
+	DeleteAllAPITokens(ctx context.Context, userID int64) (int64, error)
 	APITokenUser(ctx context.Context, tokenHash string) (store.User, error)
 	TouchAPIToken(ctx context.Context, tokenHash string) error
 
@@ -225,6 +227,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/me/import", s.handleImport)
 	mux.HandleFunc("GET /api/me/tokens", s.handleListAPITokens)
 	mux.HandleFunc("POST /api/me/tokens", s.handleCreateAPIToken)
+	mux.HandleFunc("DELETE /api/me/tokens", s.handleDeleteAllAPITokens)
 	mux.HandleFunc("DELETE /api/me/tokens/{id}", s.handleDeleteAPIToken)
 	mux.HandleFunc("POST /api/me/wipe", s.handleWipeMyData)
 	mux.HandleFunc("DELETE /api/me", s.handleDeleteAccount)
@@ -249,13 +252,14 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/tasks/{id}/share/respond", s.handleRespondShare)
 	mux.HandleFunc("POST /api/tasks/{id}/leave", s.handleLeaveTask)
 	mux.HandleFunc("GET /api/tasks/{id}/members", s.handleListMembers)
+	mux.HandleFunc("DELETE /api/tasks/{id}/members/{userId}", s.handleRemoveMember)
 	mux.HandleFunc("GET /api/me/shares", s.handleListIncomingShares)
 
 	// Folder sharing: the same lifecycle at a coarser grain.
 	mux.HandleFunc("POST /api/folders/{folder}/share", s.handleShareFolder)
 	mux.HandleFunc("POST /api/folders/{folder}/share/respond", s.handleRespondFolderShare)
 	mux.HandleFunc("POST /api/folders/{folder}/leave", s.handleLeaveFolder)
-	mux.HandleFunc("DELETE /api/folders/{folder}/share", s.handleUnshareFolder)
+	mux.HandleFunc("DELETE /api/folders/{folder}/members/{userId}", s.handleUnshareFolder)
 	mux.HandleFunc("GET /api/folders/{folder}/members", s.handleListFolderMembers)
 	mux.HandleFunc("GET /api/me/folder-shares", s.handleListMyFolderShares)
 	mux.HandleFunc("GET /api/me/folder-invites", s.handleListIncomingFolderShares)

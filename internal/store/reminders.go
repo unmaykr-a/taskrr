@@ -10,8 +10,8 @@ import (
 // ReminderSettings is a user's webhook reminder configuration. The secret-ish
 // webhook URL is only ever returned to its owner.
 type ReminderSettings struct {
-	Enabled     bool   `json:"enabled"`
-	WebhookURL  string `json:"webhookUrl"`
+	Enabled    bool   `json:"enabled"`
+	WebhookURL string `json:"webhookUrl"`
 	// LeadSeconds fires the reminder this long before the due time (0 = at the
 	// due time / once overdue).
 	LeadSeconds int64 `json:"leadSeconds"`

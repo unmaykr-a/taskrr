@@ -7,7 +7,6 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"net/url"
-	"strings"
 	"testing"
 
 	"github.com/unmaykr-a/taskrr/internal/store"
@@ -87,9 +86,8 @@ func TestShareFolderLifecycleOverHTTP(t *testing.T) {
 	}
 
 	// And remove him again.
-	req := httptest.NewRequest(http.MethodDelete, folderPath("Home", "/share"),
-		strings.NewReader(fmt.Sprintf(`{"userId":%d}`, bob.ID)))
-	req.Header.Set("Content-Type", "application/json")
+	req := httptest.NewRequest(http.MethodDelete,
+		folderPath("Home", fmt.Sprintf("/members/%d", bob.ID)), nil)
 	req.AddCookie(aliceCookie)
 	rec = httptest.NewRecorder()
 	h.ServeHTTP(rec, req)
@@ -152,14 +150,12 @@ func TestShareFolderIsOwnerScoped(t *testing.T) {
 	if rec.Code != http.StatusNotFound {
 		t.Fatalf("expected 404, got %d (%s)", rec.Code, rec.Body.String())
 	}
-	// And listing members of "Home" shows bob's own (empty) folder, never alice's.
+	// And listing members of "Home" answers about bob's account, where there is
+	// no such folder — a 404, the same as asking about a task that isn't yours,
+	// never a window into alice's.
 	rec = getWithCookie(t, h, folderPath("Home", "/members"), bobCookie)
-	var members []store.TaskMember
-	if err := json.Unmarshal(rec.Body.Bytes(), &members); err != nil {
-		t.Fatalf("decode: %v", err)
-	}
-	if len(members) != 0 {
-		t.Fatalf("bob saw %d member(s) of alice's folder", len(members))
+	if rec.Code != http.StatusNotFound {
+		t.Fatalf("expected 404 listing another account's folder, got %d (%s)", rec.Code, rec.Body.String())
 	}
 	_ = alice
 }

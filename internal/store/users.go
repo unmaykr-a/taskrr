@@ -13,14 +13,14 @@ import (
 // the derived booleans (PasswordSet / OIDCLinked) are, so the UI can tell a
 // claimed account from one waiting for its owner to set a password.
 type User struct {
-	ID           int64     `json:"id"`
-	Username     string    `json:"username"`
-	Role         string    `json:"role"` // "admin" | "user"
-	PasswordHash *string   `json:"-"`
-	OIDCSubject  *string   `json:"-"`
-	PasswordSet  bool      `json:"passwordSet"`
-	OIDCLinked   bool      `json:"oidcLinked"`
-	Approved     bool      `json:"approved"`
+	ID           int64   `json:"id"`
+	Username     string  `json:"username"`
+	Role         string  `json:"role"` // "admin" | "user"
+	PasswordHash *string `json:"-"`
+	OIDCSubject  *string `json:"-"`
+	PasswordSet  bool    `json:"passwordSet"`
+	OIDCLinked   bool    `json:"oidcLinked"`
+	Approved     bool    `json:"approved"`
 	// AllowShares is the per-user opt-in (default true) to receiving shared
 	// tasks. When false, the share API refuses to target this user.
 	AllowShares bool `json:"allowShares"`

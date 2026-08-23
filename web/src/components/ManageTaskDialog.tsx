@@ -11,6 +11,7 @@ import {
   Trash2,
   UserPlus,
   Users,
+  X,
 } from "lucide-react";
 
 import { api, type Completion, type Task } from "@/lib/api";
@@ -174,6 +175,17 @@ function ShareSection({ task, isOwner, onLeft }: { task: Task; isOwner: boolean;
     onError: (e) => toast((e as Error).message, { tone: "error" }),
   });
 
+  // The owner's side of undoing a share, the same control the folder dialog has:
+  // an invite sent to the wrong username used to be the recipient's to decline.
+  const remove = useMutation({
+    mutationFn: (userId: number) => api.removeMember(task.id, userId),
+    onSuccess: () => {
+      invalidate();
+      toast("Removed", { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
   const leave = useMutation({
     mutationFn: () => api.leaveTask(task.id),
     onSuccess: () => {
@@ -199,8 +211,22 @@ function ShareSection({ task, isOwner, onLeft }: { task: Task; isOwner: boolean;
           {members.map((m) => (
             <li key={m.userId} className="flex items-center justify-between gap-2 text-sm">
               <span className="truncate">{m.username}</span>
-              <span className="shrink-0 text-xs capitalize text-muted-foreground">
-                {m.status === "pending" ? "invited" : m.status}
+              <span className="flex shrink-0 items-center gap-2">
+                <span className="text-xs capitalize text-muted-foreground">
+                  {m.status === "pending" ? "invited" : m.status}
+                </span>
+                {isOwner && m.status !== "owner" && (
+                  <Button
+                    size="icon"
+                    variant="ghost"
+                    className="h-6 w-6 hover:text-destructive"
+                    aria-label={`Remove ${m.username}`}
+                    disabled={remove.isPending}
+                    onClick={() => remove.mutate(m.userId)}
+                  >
+                    <X className="h-3.5 w-3.5" />
+                  </Button>
+                )}
               </span>
             </li>
           ))}

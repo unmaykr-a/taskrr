@@ -202,3 +202,67 @@ func TestSanitizeFilename(t *testing.T) {
 		}
 	}
 }
+
+// TestExportCSVDefusesFormulas: a task name is not always your own — a task
+// shared with you carries the name its owner chose — so a cell that a
+// spreadsheet would execute has to be neutralised on the way out.
+func TestExportCSVDefusesFormulas(t *testing.T) {
+	for _, tc := range []struct {
+		name string
+		in   string
+		want string
+	}{
+		{"equals", `=HYPERLINK("http://evil","invoice")`, `'=HYPERLINK("http://evil","invoice")`},
+		{"plus", "+1+1", "'+1+1"},
+		{"minus", "-2+3", "'-2+3"},
+		{"at", "@SUM(A1:A9)", "'@SUM(A1:A9)"},
+		{"tab", "\tcmd", "'\tcmd"},
+		{"carriage return", "\r=1", "'\r=1"},
+		{"ordinary name", "Water the plants", "Water the plants"},
+		{"empty", "", ""},
+		{"equals not at the start", "2 = 2", "2 = 2"},
+	} {
+		if got := csvCell(tc.in); got != tc.want {
+			t.Errorf("%s: csvCell(%q) = %q, want %q", tc.name, tc.in, got, tc.want)
+		}
+	}
+}
+
+// TestExportCSVFormulaEndToEnd: the defusal is actually wired into the export,
+// not just available as a helper.
+func TestExportCSVFormulaEndToEnd(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	u, _ := st.CreateUser(ctx, store.UserInput{Username: "csvuser", PasswordHash: ptr("h")})
+	s := NewServer(st, Options{ProtectedUserID: u.ID})
+
+	payload := `=HYPERLINK("http://evil","x")`
+	task, err := st.CreateTask(ctx, u.ID, store.TaskInput{Name: payload, Description: "@danger", Folder: "-Home"})
+	if err != nil {
+		t.Fatalf("create: %v", err)
+	}
+	if _, err := st.AddCompletion(ctx, task.ID, u.ID, time.Now(), "+note"); err != nil {
+		t.Fatalf("complete: %v", err)
+	}
+
+	w := httptest.NewRecorder()
+	req := authed("GET", "", u)
+	q := req.URL.Query()
+	q.Set("format", "csv")
+	req.URL.RawQuery = q.Encode()
+	s.handleExport(w, req)
+	if w.Code != 200 {
+		t.Fatalf("csv export = %d, want 200", w.Code)
+	}
+	csvBody := w.Body.String()
+	for _, live := range []string{"\"" + payload, ",@danger", ",-Home", ",+note"} {
+		if strings.Contains(csvBody, live) {
+			t.Errorf("csv still contains an executable cell %q:\n%s", live, csvBody)
+		}
+	}
+	for _, defused := range []string{"'=HYPERLINK", "'@danger", "'-Home", "'+note"} {
+		if !strings.Contains(csvBody, defused) {
+			t.Errorf("csv missing the defused form %q:\n%s", defused, csvBody)
+		}
+	}
+}

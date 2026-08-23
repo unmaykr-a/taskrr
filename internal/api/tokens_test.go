@@ -257,3 +257,132 @@ func TestBearerTokenParsing(t *testing.T) {
 		}
 	}
 }
+
+// TestTokenAllowlistIsNotAPrefixMatch: the allowlist is meant to refuse a route
+// added later unless it is opted in. A bare prefix match would break that for
+// any path that merely starts with the same letters.
+func TestTokenAllowlistIsNotAPrefixMatch(t *testing.T) {
+	allowed := []string{
+		"/api/tasks", "/api/tasks/1", "/api/tasks/1/complete", "/api/tasks/1/members",
+		"/api/completions", "/api/completions/7",
+		"/api/health", "/api/auth/me", "/api/activity", "/api/me/export", "/api/me/shares",
+	}
+	for _, p := range allowed {
+		if !tokenAllowedPath(p) {
+			t.Errorf("tokenAllowedPath(%q) = false, want true", p)
+		}
+	}
+
+	refused := []string{
+		// The ones a prefix match would have let through.
+		"/api/tasks-admin", "/api/tasksettings", "/api/tasks_export",
+		"/api/completionsomething", "/api/completions-admin",
+		// And the rest of the API, which was never in scope.
+		"/api/me/import", "/api/me/password", "/api/admin/users", "/api/admin/settings",
+		"/api/folders/Home/share", "/api/me/tokens",
+	}
+	for _, p := range refused {
+		if tokenAllowedPath(p) {
+			t.Errorf("tokenAllowedPath(%q) = true, want false", p)
+		}
+	}
+}
+
+// TestRevokeAllTokens covers the panic button: one call kills every token the
+// caller owns, and nobody else's.
+func TestRevokeAllTokens(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	alice, _ := st.CreateUser(ctx, store.UserInput{Username: "alice", Role: "user", PasswordHash: ptr("h")})
+	bob, _ := st.CreateUser(ctx, store.UserInput{Username: "bob", Role: "user", PasswordHash: ptr("h")})
+	s := NewServer(st, Options{})
+	h := s.Handler()
+	aliceCookie := signIn(t, st, s.opts.SessionTTL, alice)
+	bobCookie := signIn(t, st, s.opts.SessionTTL, bob)
+
+	first, _ := mintToken(t, h, aliceCookie, "kitchen tablet")
+	second, _ := mintToken(t, h, aliceCookie, "shell script")
+	bobToken, _ := mintToken(t, h, bobCookie, "bob's")
+
+	req := httptest.NewRequest(http.MethodDelete, "/api/me/tokens", nil)
+	req.AddCookie(aliceCookie)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("revoke all: got %d, body %s", rec.Code, rec.Body.String())
+	}
+	var out struct {
+		Revoked int64 `json:"revoked"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+		t.Fatalf("decode: %v", err)
+	}
+	if out.Revoked != 2 {
+		t.Fatalf("revoked count: got %d, want 2", out.Revoked)
+	}
+
+	for _, tok := range []string{first, second} {
+		if rec := bearer(t, h, http.MethodGet, "/api/tasks", tok, ""); rec.Code != http.StatusUnauthorized {
+			t.Fatalf("revoked token still works: got %d", rec.Code)
+		}
+	}
+	if rec := bearer(t, h, http.MethodGet, "/api/tasks", bobToken, ""); rec.Code != http.StatusOK {
+		t.Fatalf("another account's token should be untouched, got %d", rec.Code)
+	}
+}
+
+// TestChangingPasswordRevokesTokens: a password change is what you do when you
+// think a credential has leaked, so bearer tokens have to go with the cookies.
+func TestChangingPasswordRevokesTokens(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	u, _ := st.CreateUser(ctx, store.UserInput{Username: "u", Role: "user"})
+	s := NewServer(st, Options{})
+	h := s.Handler()
+	cookie := signIn(t, st, s.opts.SessionTTL, u)
+	token, _ := mintToken(t, h, cookie, "old laptop")
+
+	if rec := bearer(t, h, http.MethodGet, "/api/tasks", token, ""); rec.Code != http.StatusOK {
+		t.Fatalf("token should work before the password change, got %d", rec.Code)
+	}
+
+	req := httptest.NewRequest(http.MethodPost, "/api/me/password",
+		strings.NewReader(`{"newPassword":"hunter2hunter2"}`))
+	req.Header.Set("Content-Type", "application/json")
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("change password: got %d, body %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := bearer(t, h, http.MethodGet, "/api/tasks", token, ""); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("token should be dead after the password change, got %d", rec.Code)
+	}
+}
+
+// TestTerminateSessionsRevokesTokens: the admin's "this account looks
+// compromised" button has to close the token door too, not just the browser one.
+func TestTerminateSessionsRevokesTokens(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	admin, _ := st.CreateUser(ctx, store.UserInput{Username: "admin", Role: "admin", PasswordHash: ptr("h")})
+	u, _ := st.CreateUser(ctx, store.UserInput{Username: "u", Role: "user", PasswordHash: ptr("h")})
+	s := NewServer(st, Options{})
+	h := s.Handler()
+	adminCookie := signIn(t, st, s.opts.SessionTTL, admin)
+	userCookie := signIn(t, st, s.opts.SessionTTL, u)
+	token, _ := mintToken(t, h, userCookie, "kitchen tablet")
+
+	req := httptest.NewRequest(http.MethodDelete, fmt.Sprintf("/api/admin/sessions/%d", u.ID), nil)
+	req.AddCookie(adminCookie)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNoContent {
+		t.Fatalf("terminate: got %d, body %s", rec.Code, rec.Body.String())
+	}
+
+	if rec := bearer(t, h, http.MethodGet, "/api/tasks", token, ""); rec.Code != http.StatusUnauthorized {
+		t.Fatalf("terminated account's token should be dead, got %d", rec.Code)
+	}
+}

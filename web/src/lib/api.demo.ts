@@ -1269,6 +1269,7 @@ export const demoApi: Api = {
   respondShare: notAvailable,
   leaveTask: notAvailable,
   listMembers: () => tick([]),
+  removeMember: notAvailable,
   listIncomingShares: () => tick([]),
   setAllowShares: () => tick(demoUser()),
 
@@ -1449,6 +1450,7 @@ export const demoApi: Api = {
   listAPITokens: () => tick([]),
   createAPIToken: notAvailable,
   deleteAPIToken: notAvailable,
+  deleteAllAPITokens: notAvailable,
 
   getPreferences: () => {
     try {
