@@ -47,7 +47,7 @@ authenticate either with the web UI's session cookie or with an API token (see
 | POST | `/api/me/wipe` | Delete the user's own tasks and history. |
 | DELETE | `/api/me` | Delete the account. |
 | GET | `/api/me/export` | Download your own data. `?format=csv` for CSV, JSON by default. |
-| POST | `/api/me/import` | Restore a JSON export. `?mode=merge` (default) or `?mode=replace`. |
+| POST | `/api/me/import` | Restore a `taskrr-export-v1` document. `?mode=merge` (default) or `?mode=replace`. CSV import is a conversion in the browser, not a separate endpoint - it posts the same document. |
 | GET | `/api/me/folder-shares` | Folders you have shared out. |
 | GET | `/api/me/folder-invites` | Folder invitations waiting for you. |
 | GET | `/api/me/tokens` | List your API tokens (metadata only). |

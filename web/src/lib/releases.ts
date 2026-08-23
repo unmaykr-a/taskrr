@@ -37,6 +37,48 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.17.0",
+    date: "2026-08-23",
+    changes: [
+      feat(
+        "Undo a log you didn't mean",
+        "Quick log is one tap, and the wrong tap is easy. The confirmation now has an Undo on it, which puts the task back exactly as it was \u2014 no trip through Manage \u2192 History.",
+      ),
+      feat(
+        "Right-click in the calendar too",
+        "Click a day and the tasks listed under it get the same menu the cards have.",
+      ),
+      feat(
+        "A Today button on the calendar",
+        "Getting back from a wander through last spring used to mean pressing the arrow as many times as it took.",
+      ),
+      feat(
+        "Snooze and skip a whole selection",
+        "Both are in the bulk bar now. Skip only touches the tasks that actually have a routine, so a mixed selection does the sensible thing.",
+      ),
+      feat(
+        "Bring your tasks from another tracker",
+        "Import a CSV and say which column is the name, which is the cadence, and so on. Taskrr guesses from the headers first, and shows you what each row will become before anything is imported.",
+      ),
+      feat(
+        "The demo has seasons",
+        "The sample list now matches the time of year, and you can switch between spring, summer, autumn and winter from the banner.",
+      ),
+      fix(
+        "The right-click menu flying in from off-screen",
+        "It was being drawn off-screen first and then animated into place. It now opens where you clicked.",
+      ),
+      fix(
+        "The right-click menu hanging off the bottom",
+        "Near the bottom of the screen it worked out where to go while it was still mid-animation, and got the size wrong by 5%.",
+      ),
+      fix(
+        "Accent colours that were hard to read",
+        "Where your accent colour is used as *text* \u2014 the selected sidebar item, mostly \u2014 it now gets nudged until it's properly readable. Blocks of the colour are untouched, so what you picked is still what you see.",
+      ),
+    ],
+  },
+  {
     version: "1.16.0",
     date: "2026-08-23",
     changes: [

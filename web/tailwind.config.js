@@ -6,6 +6,22 @@ export default {
   content: ["./index.html", "./src/**/*.{ts,tsx}"],
   theme: {
     extend: {
+      // `text-primary` resolves to a readable version of the accent rather than
+      // the accent itself. Painting the accent as a block (`bg-primary`) is
+      // checked against `--primary-foreground` already; drawing it as text on a
+      // plain surface is the other half, and it was the last place the app fell
+      // short of AA — the `paper` preset's active sidebar item, at 4.26:1.
+      //
+      // Done here rather than by renaming 40 call sites, so the two can't drift:
+      // every `text-primary` in the app is readable by construction, and
+      // `--primary-readable` is a no-op wherever the accent already passes.
+      // bg-/border-/ring-primary still paint exactly the colour the user chose.
+      textColor: {
+        primary: {
+          DEFAULT: "hsl(var(--primary-readable))",
+          foreground: "hsl(var(--primary-foreground))",
+        },
+      },
       colors: {
         border: "hsl(var(--border))",
         input: "hsl(var(--input))",

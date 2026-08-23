@@ -5,6 +5,8 @@ import {
   ArchiveRestore,
   CheckCheck,
   FolderInput as FolderIcon,
+  Moon,
+  SkipForward,
   Tag,
   Trash2,
   X,
@@ -18,11 +20,12 @@ import { useToast } from "@/components/ui/Toast";
 import { Button } from "@/components/ui/button";
 import { FolderInput } from "@/components/ui/FolderInput";
 import { TagInput } from "@/components/ui/TagInput";
+import { SNOOZE_PRESETS } from "@/components/useTaskActions";
 
-type BulkAction = "done" | "archive" | "unarchive" | "delete" | "tag" | "folder";
+type BulkAction = "done" | "archive" | "unarchive" | "delete" | "tag" | "folder" | "snooze" | "skip";
 
 /** Which inline editor the bar has swapped its buttons for, if any. */
-type Panel = null | "delete" | "tag" | "folder";
+type Panel = null | "delete" | "tag" | "folder" | "snooze";
 
 /**
  * The task-update endpoint is a whole-object PATCH, not a partial one — omitted
@@ -69,6 +72,7 @@ export function BulkBar({
   const { prefs } = usePrefs();
   const toast = useToast();
   const [panel, setPanel] = useState<Panel>(null);
+  const [snoozeHours, setSnoozeHours] = useState(SNOOZE_PRESETS[1].hours);
   const [tags, setTags] = useState<string[]>([]);
   const [folder, setFolder] = useState("");
 
@@ -81,6 +85,17 @@ export function BulkBar({
       else if (action === "archive") await Promise.all(ids.map((id) => api.archiveTask(id)));
       else if (action === "unarchive") await Promise.all(ids.map((id) => api.unarchiveTask(id)));
       else if (action === "delete") await Promise.all(ids.map((id) => api.deleteTask(id)));
+      else if (action === "snooze") {
+        const until = new Date(Date.now() + snoozeHours * 3_600_000).toISOString();
+        await Promise.all(ids.map((id) => api.snoozeTask(id, until)));
+      } else if (action === "skip") {
+        // Only routines have a cycle to skip. Filtering here rather than
+        // disabling the button means a mixed selection does the sensible thing
+        // instead of failing whole.
+        await Promise.all(
+          selected.filter((t) => t.intervalSeconds != null).map((t) => api.skipTask(t.id)),
+        );
+      }
       else if (action === "tag") {
         // Add, don't replace: bulk-tagging a mixed selection should never be a
         // silent way to wipe tags the other tasks already had. Matching is
@@ -111,8 +126,13 @@ export function BulkBar({
         delete: "Deleted",
         tag: "Tagged",
         folder: "Moved",
+        snooze: "Snoozed",
+        skip: "Skipped",
       };
-      const n = `${ids.length} ${ids.length === 1 ? "task" : "tasks"}`;
+      // Skip only touches the routines in the selection, so it has to count
+      // what it actually did rather than what was ticked.
+      const count = action === "skip" ? selected.filter((t) => t.intervalSeconds != null).length : ids.length;
+      const n = `${count} ${count === 1 ? "task" : "tasks"}`;
       toast(`${labels[action]} ${n}`, { tone: "success" });
       // Tagging and moving keep the selection, so several edits can be made in
       // a row; the destructive and state-changing ones dismiss the bar.
@@ -176,10 +196,47 @@ export function BulkBar({
         </>
       )}
 
+      {panel === "snooze" && (
+        <>
+          <span className="px-1 text-xs text-muted-foreground">Snooze until</span>
+          <select
+            value={snoozeHours}
+            autoFocus
+            onChange={(e) => setSnoozeHours(Number(e.target.value))}
+            aria-label="Snooze for"
+            className="h-8 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          >
+            {SNOOZE_PRESETS.map((p) => (
+              <option key={p.hours} value={p.hours} className="bg-background">
+                {p.label}
+              </option>
+            ))}
+          </select>
+          <Button size="sm" disabled={busy} onClick={() => run.mutate("snooze")}>
+            Snooze
+          </Button>
+          <Button size="sm" variant="ghost" onClick={() => setPanel(null)}>
+            Cancel
+          </Button>
+        </>
+      )}
+
       {panel === null && (
         <>
           {!archivedView && (
             <BulkButton icon={<CheckCheck />} label="Done" disabled={busy} onClick={() => run.mutate("done")} />
+          )}
+          {!archivedView && (
+            <>
+              <BulkButton icon={<Moon />} label="Snooze" disabled={busy} onClick={() => setPanel("snooze")} />
+              <BulkButton
+                icon={<SkipForward />}
+                label="Skip"
+                // Nothing to skip when the selection is all one-offs.
+                disabled={busy || !selected.some((t) => t.intervalSeconds != null)}
+                onClick={() => run.mutate("skip")}
+              />
+            </>
           )}
           <BulkButton icon={<Tag />} label="Tag" disabled={busy} onClick={() => setPanel("tag")} />
           <BulkButton icon={<FolderIcon />} label="Folder" disabled={busy} onClick={() => setPanel("folder")} />

@@ -17,6 +17,8 @@ import {
 } from "lucide-react";
 
 import { api, type APIToken, type ImportResult } from "@/lib/api";
+import { parseCsv, type CsvTable } from "@/lib/csv";
+import { CsvMapper } from "@/components/settings/CsvMapper";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { RemindersSection } from "@/components/settings/RemindersSection";
@@ -412,11 +414,14 @@ function ImportControls() {
   const fileRef = useRef<HTMLInputElement>(null);
   const [mode, setMode] = useState<"merge" | "replace">("merge");
   const [result, setResult] = useState<ImportResult | null>(null);
+  // Set while a CSV is waiting for its columns to be matched up.
+  const [csv, setCsv] = useState<{ table: CsvTable; fileName: string } | null>(null);
 
   const run = useMutation({
     mutationFn: ({ json, mode: m }: { json: string; mode: "merge" | "replace" }) => api.importData(json, m),
     onSuccess: (res) => {
       setResult(res);
+      setCsv(null);
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
       queryClient.invalidateQueries({ queryKey: ["activity"] });
       toast(
@@ -427,8 +432,25 @@ function ImportControls() {
     onError: (e) => toast((e as Error).message, { tone: "error" }),
   });
 
+  // A CSV can't go straight to the server: it needs a mapping step first, so
+  // it detours through CsvMapper and comes back as the same JSON document.
   const pick = async (file: File) => {
-    const json = await file.text();
+    const text = await file.text();
+    const isCsv = /\.(csv|tsv|txt)$/i.test(file.name) || !text.trimStart().startsWith("{");
+    if (isCsv) {
+      const table = parseCsv(text);
+      if (table.headers.length === 0) {
+        toast("That file looks empty", { tone: "error" });
+        return;
+      }
+      setCsv({ table, fileName: file.name });
+      setResult(null);
+      return;
+    }
+    await send(text);
+  };
+
+  const send = async (json: string) => {
     if (mode === "replace") {
       const ok = await confirm({
         title: "Replace everything?",
@@ -445,7 +467,7 @@ function ImportControls() {
   return (
     <div className="space-y-2 pt-1">
       <h4 className="flex items-center gap-1.5 text-sm font-medium">
-        <Upload className="h-3.5 w-3.5" /> Restore from a JSON export
+        <Upload className="h-3.5 w-3.5" /> Restore from a file
       </h4>
       <div className="flex flex-wrap items-center gap-2">
         <select
@@ -460,7 +482,7 @@ function ImportControls() {
         <input
           ref={fileRef}
           type="file"
-          accept="application/json,.json"
+          accept="application/json,.json,text/csv,.csv,.tsv"
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -473,6 +495,20 @@ function ImportControls() {
           {run.isPending ? "Importing…" : "Choose a file…"}
         </Button>
       </div>
+      <p className="text-xs text-muted-foreground">
+        A Taskrr JSON export restores as-is. A CSV from another tracker asks which column is which
+        first.
+      </p>
+
+      {csv && (
+        <CsvMapper
+          table={csv.table}
+          fileName={csv.fileName}
+          busy={run.isPending}
+          onCancel={() => setCsv(null)}
+          onImport={(json) => void send(json)}
+        />
+      )}
 
       {result && (
         <div className="space-y-1 rounded-md border p-2 text-xs">

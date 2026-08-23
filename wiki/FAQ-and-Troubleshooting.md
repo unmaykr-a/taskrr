@@ -27,11 +27,31 @@ equivalent. See [API Reference](API-Reference#data-export).
 
 ### Can I get my data back in again?
 
-Yes - **Settings -> Account -> Export your data -> Restore from a JSON export**.
-"Add to my tasks" merges the file with what you already have; "Replace
-everything" clears your tasks first and asks you to confirm. The file is read
-and checked before anything is deleted, so a bad file can never cost you what
-you had. CSV is export-only; JSON is the format that round-trips.
+Yes - **Settings -> Account -> Restore from a file**. "Add to my tasks" merges
+the file with what you already have; "Replace everything" clears your tasks
+first and asks you to confirm. The file is read and checked before anything is
+deleted, so a bad file can never cost you what you had.
+
+A Taskrr JSON export restores as-is. That is the format that round-trips - it
+carries history, tags, folders, colours and snoozes.
+
+### Can I bring my tasks over from another app?
+
+Export a CSV from wherever they are now and pick it in the same place. Taskrr
+reads the header row, guesses which column is the name, the folder, the tags,
+the cadence and the last-done date, and shows you the guesses so you can fix
+them. Under the mapping it shows what the first few rows will actually become,
+so you can check before committing.
+
+Two things a CSV cannot tell us, so you get asked only when they come up:
+
+- **What a column of bare numbers means.** "14" could be days or weeks.
+- **Which way round your dates are.** 03/04/2026 is March in one country and
+  April in another. ISO dates (`2026-04-03`) are never ambiguous and never ask.
+
+Anything unreadable is listed rather than guessed at - a cadence it cannot parse
+leaves the task without a routine instead of inventing one, and only a missing
+name loses the row.
 
 ### Can something else log a task for me - a script, or Home Assistant?
 

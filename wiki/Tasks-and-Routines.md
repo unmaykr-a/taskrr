@@ -14,6 +14,11 @@ Each time you do the thing, log a completion:
 Completions are an append-only history. The card counts up from the most recent
 one ("3 days ago"), and the most recent completion drives the staleness colour.
 
+Logged the wrong thing? The confirmation that appears has an **Undo** on it,
+which removes the completion you just made and puts the task back exactly as it
+was. It is there for a few seconds; after that, the history in the Manage window
+is where a stray log gets fixed.
+
 ### Editing history
 
 History is editable. Any logged completion can be changed (its time or note) or
@@ -67,7 +72,9 @@ its reminders until they run out:
   overdue still lands in the future rather than in the past.
 
 Both are on the right-click menu; the Manage window adds an exact date and a
-"wake up now" for a snoozed task.
+"wake up now" for a snoozed task. Both are also in the bulk bar, so a selection
+can be put off in one go - skipping only touches the tasks in the selection that
+actually have a routine, and tells you how many that was.
 
 ## Pinning and duplicating
 
@@ -79,7 +86,8 @@ Both are on the right-click menu; the Manage window adds an exact date and a
 ## The right-click menu
 
 Right-click any task card (or long-press on a touchscreen) for everything you
-can do to it: log it, snooze or skip, pin, duplicate, archive, delete. It is
+can do to it: log it, snooze or skip, pin, duplicate, archive, delete. The same
+menu is on the tasks listed under an open day in the calendar. It is
 keyboard-navigable, and turning it off under **Settings -> Preferences ->
 Right-click menu** gives you your browser's own menu back - which is what you
 want for copying a task name.
@@ -135,6 +143,10 @@ selection out of any folder.
 - Clicking any **past day** opens it, and you can log a task straight onto that
   day without opening the task first - the quickest way to record something you
   did yesterday. Future days only open when something is scheduled for them.
+- The tasks listed under an open day carry the same right-click menu the cards
+  do, so you can act on something the moment you spot it there.
+- **Today** takes you back to the current month with today open, however far you
+  have wandered.
 - An **activity chart** summarises your completions over 7 days, 30 days, 90
   days or a year. The range follows your account. A year groups into weeks so
   the shape stays readable in a narrow panel.

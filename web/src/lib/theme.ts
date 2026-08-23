@@ -142,7 +142,7 @@ export function hslToHex(h: number, s: number, l: number): string {
  * a hair while the painted surface sits just under it. Round-trip through the
  * same rounding the token write does, and the check matches what is rendered.
  */
-function asPainted(hex: string): string {
+export function asPainted(hex: string): string {
   const [h, s, l] = hexToHslTriplet(hex).split(" ");
   return hslToHex(parseFloat(h), parseFloat(s), parseFloat(l));
 }
@@ -224,7 +224,7 @@ const FONT_STACKS: Record<FontChoice, string> = {
  * on every surface muted text actually sits on (page, panel, sidebar). Dark
  * themes already pass and come through untouched.
  */
-function mutedForeground(c: ThemeColors): string {
+export function mutedForeground(c: ThemeColors): string {
   const surfaces = [c.background, c.card, c.sidebar].map(asPainted);
   let muted = mix(c.foreground, c.background, 0.45);
 
@@ -241,6 +241,32 @@ function mutedForeground(c: ThemeColors): string {
   return muted;
 }
 
+/**
+ * The accent, made safe to use as text.
+ *
+ * `bg-primary` paints the accent as a block with `--primary-foreground` on top,
+ * and that pair is checked already. Drawing the same accent as *text* on a
+ * plain surface is the other problem, and it was the last place the app fell
+ * short: the `paper` preset's active sidebar item rendered a user-chosen accent
+ * at 4.26:1 against the sidebar.
+ *
+ * Same approach as mutedForeground: aim at AA on every surface the accent gets
+ * drawn on, then check what actually gets painted and aim higher if rounding
+ * cost us the last tenth. A dark accent on a dark theme usually passes already
+ * and comes back untouched.
+ */
+export function primaryReadable(c: ThemeColors): string {
+  const surfaces = [c.background, c.card, c.sidebar].map(asPainted);
+  let readable = c.accent;
+  for (let attempt = 0; attempt < 6; attempt++) {
+    const target = AA_CONTRAST + attempt * 0.1;
+    for (const surface of surfaces) readable = ensureContrast(readable, surface, target);
+    const painted = asPainted(readable);
+    if (surfaces.every((s) => contrastRatio(painted, s) >= AA_CONTRAST)) break;
+  }
+  return readable;
+}
+
 /** Write a theme to the document as CSS custom properties. */
 export function applyTheme(theme: Theme) {
   const root = document.documentElement;
@@ -255,6 +281,7 @@ export function applyTheme(theme: Theme) {
   set("--popover-foreground", c.foreground);
   set("--primary", c.accent);
   set("--primary-foreground", readableOn(c.accent));
+  set("--primary-readable", primaryReadable(c));
   set("--secondary", mix(c.card, c.foreground, 0.08));
   set("--secondary-foreground", c.foreground);
   set("--muted", mix(c.card, c.foreground, 0.08));

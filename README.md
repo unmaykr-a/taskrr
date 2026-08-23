@@ -9,10 +9,9 @@ that: create a task once, tap **Quick log** each time you do it, and the card
 counts up from there. Give a task a routine ("every 2 weeks") and it shades
 from green to red as the next one comes due.
 
-The whole app is one ~12 MB binary with the web UI and SQLite database baked
-in. It idles at ~12 MB of memory and under half a percent of one CPU core, so
-it runs happily in the corner of a Raspberry Pi or any small box you already
-have.
+One ~12 MB binary, web UI and SQLite baked in. It idles at ~12 MB of memory and
+under half a percent of a core, so it's happy on a Pi or whatever small box is
+already running in the cupboard.
 
 ![Tasks with staleness colours, the month calendar, and the activity chart](docs/screenshots/overview.png)
 
@@ -25,119 +24,130 @@ backgrounds, frosted glass — from a floating settings window:
 
 **[Try Taskrr in your browser →](https://unmaykr-a.github.io/taskrr/)**
 
-The demo is the real UI with no backend: it runs against an in-browser mock of
-the API, seeded with sample tasks and history, and saves everything to your
-browser's local storage. There's no account and no server — every visitor gets
-their own private sandbox, and the in-app "Reset demo" button clears it. (The
-admin area, single sign-on, backups and reminder delivery need a real server, so
-they're not part of the demo.)
+The real UI with no backend behind it: an in-browser mock of the API, seeded
+with sample tasks and history, saved to local storage. Every visitor gets their
+own sandbox, and there's a "Reset demo" button when you've made a mess of it.
+The sample list changes with the season, and you can switch seasons from the
+banner. The admin area, SSO, backups and reminder delivery need a real server,
+so they aren't in it.
 
-## Quick start
+## Running it
 
-All you need is Docker and the compose file — no cloning, no building:
-
-```bash
-mkdir taskrr && cd taskrr
-curl -LO https://raw.githubusercontent.com/unmaykr-a/taskrr/main/docker-compose.yml
-mkdir data
-docker compose up -d
+```yaml
+services:
+  taskrr:
+    image: ghcr.io/unmaykr-a/taskrr:latest
+    restart: unless-stopped
+    user: "1000:1000"
+    ports: ["8787:8787"]
+    environment:
+      TASKRR_DB_PATH: /data/taskrr.db
+    volumes:
+      - ./data:/data
 ```
 
-Open <http://localhost:8787> and sign in as `admin` — you'll be asked to set a
-password on the first sign-in. Your data lives in the plain `./data` folder
-next to the compose file; backing up or moving the instance is copying that
-folder.
+That's the whole thing. There's a fuller
+[`docker-compose.yml`](./docker-compose.yml) in the repo with a healthcheck and
+an optional `.env`, if you'd rather start from that.
 
-> The container writes as uid/gid 1000 by default (a typical single-user Linux
-> box). If `id -u` says otherwise, set `TASKRR_UID` / `TASKRR_GID`.
+Sign in as `admin`; you'll set the password on first run, or preset it with
+`TASKRR_ADMIN_PASSWORD` (or `_HASH` — `.env.example` has a one-liner to
+generate one). Everything lives in the mounted directory as a single SQLite
+file, so backing it up or moving it somewhere else is `cp -r`.
 
-To preset the admin password or configure anything else up front, drop a
-`.env` file next to the compose file — [`.env.example`](./.env.example)
-documents every option.
+Two things worth knowing before you file a bug:
 
-## Features
+- **It writes as uid 1000.** The image drops privileges, so the mounted
+  directory has to be writable by whoever you run it as, and `user:` has to
+  match. This is the one that bites people.
+- **Set `TASKRR_COOKIE_SECURE=true` behind TLS.** Session cookies aren't marked
+  Secure by default, because the default assumption is `http://` on a LAN. If
+  you're proxying it with a certificate, flip this.
 
-- One-tap logging, or pick a time and add a note. History is editable — every
-  logged completion can be changed or undone later, and you can click a past day
-  on the calendar to record something you did then.
-- Right-click any task (long-press on a phone) for everything you can do to it.
-- Snooze a task until later, or skip a cycle — which moves the next due date on
-  without pretending you did it.
-- Routines with due dates: cards shade continuously from fresh to overdue,
-  with a progress bar and "due in 3d" on each card. Colours are customisable
-  per task and globally.
-- A month calendar of what you did and what's coming up, plus an activity chart
+Images are `linux/amd64` and `linux/arm64`, and every released version stays
+pullable, so you can pin a tag instead of riding `:latest`. There are no
+prebuilt binaries — if you want one without Docker, `make build` produces a
+single static `bin/taskrr` with everything inside it.
+
+## What it does
+
+- One-tap logging, or pick a time and add a note. History is editable, and a
+  stray log has an **Undo** on the toast rather than a trip through the history
+  window. Backdate straight from the calendar by clicking the day.
+- Right-click anything (long-press on a phone) for the whole menu — log, snooze,
+  skip, pin, duplicate, archive, delete. Works on the calendar's day list too.
+- Snooze until later, or skip a cycle — which moves the next due date on without
+  pretending you did it. Both work on a whole selection at once.
+- Routines with due dates: cards shade continuously from fresh to overdue, with
+  a progress bar and "due in 3d". Colours are yours, per task and globally.
+- A month calendar of what you did and what's coming, plus an activity chart
   over 7 days, 30 days, 90 days or a year.
 - Per-task statistics: how often you *actually* do a thing, your longest gap,
-  and how that compares to the routine you set.
-- Filters with live counts: all, due soon, overdue, never done, snoozed,
-  archived — and bulk actions (log, tag, move to a folder, archive or delete
-  several at once). Pin the ones you want kept at the top.
-- Keep larger lists tidy: tags (with search and a tag filter), folder grouping,
-  and sorting by name or last-done.
-- Multiple users with per-user data, local password login, and optional OIDC
-  single sign-on (tested with Authentik and Pocket ID), including group-to-admin-role
-  mapping. A lite mode turns the multi-user surface off for solo use.
-- Share a task with another user so you both see and log it — or share a whole
-  folder, so anything you add to it later is included. Admin-enabled, with
-  who-logged-last, an optional "whose turn is it" rota, and a per-user opt-out.
-- An admin area in the UI: user management, registration controls with an
-  approval queue, active sessions, live server logs, backups with one-click
-  restore, and instance settings.
-- Reminders via webhook when a task is due — point it at ntfy, Gotify,
-  Apprise, Home Assistant, a Discord webhook, or anything that accepts JSON.
-  Each task can set its own lead time.
-- API tokens for the other direction: log a task from a shell script, an NFC
-  tag, or a home automation. A token reaches your tasks and history only — never
-  the admin area or your password.
-- Export everything you own as JSON or CSV whenever you like, and import a JSON
-  export back — alongside what's there, or replacing it.
-- A themeable interface: colour customiser with palette generation, light and
-  dark modes, animated backgrounds, frosted glass, floating windows, and
-  per-animation toggles. Works well on a phone.
-- Keyboard shortcuts for the things you do constantly (press `?` for the list),
-  quick-add syntax (`water plants every 2 weeks #home`), an installable home
-  screen app, and a preference to turn off anything above you'd rather not have.
+  and how that compares to the routine you claimed you'd keep.
+- Filters with live counts — all, due soon, overdue, never done, snoozed,
+  archived — bulk actions over a selection, and pinning for the ones that should
+  stay at the top whatever the sort.
+- Tags with search and filtering, folders, and sorting by name or last-done.
+- Multiple users with per-user data, local passwords, and optional OIDC SSO
+  (tested against Authentik and Pocket ID) including group-to-admin mapping.
+  `TASKRR_LITE=true` hides the whole multi-user surface if you're the only one.
+- Share a single task, or a whole folder — anything you add to a shared folder
+  later is included automatically. Optional "whose turn is it" rota, per-user
+  opt-out, and an admin switch for the feature as a whole.
+- An admin area in the UI: users, registration with an approval queue, active
+  sessions, live logs, backups with one-click restore, instance settings.
+- Webhook reminders when something's due — ntfy, Gotify, Apprise, Home
+  Assistant, a Discord webhook, anything that takes JSON. Lead time is global
+  with a per-task override.
+- API tokens for the other direction: log a task from a script, an NFC tag, or
+  an automation. A token reaches tasks and history and nothing else — not the
+  admin area, not your password.
+- Export everything as JSON or CSV. Import a JSON export back, or bring a CSV
+  from another tracker and match up the columns.
+- Themeable: colour customiser with palette generation, light and dark, animated
+  backgrounds, frosted glass, floating windows, per-animation toggles. Every
+  contrast pair clears WCAG AA in all five presets, including whatever accent
+  you pick.
+- Keyboard shortcuts (`?` for the list), quick-add syntax
+  (`water plants every 2 weeks #home`), installable to a phone home screen, and
+  a preference to switch off anything above that isn't for you.
 
 ## Configuration
 
-Everything is environment variables — `.env.example` documents each one with
-working examples. The short version:
+All environment variables; [`.env.example`](./.env.example) documents each one
+with working examples. The ones that matter:
 
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `TASKRR_ADDR` | `:8787` | Listen address |
 | `TASKRR_DB_PATH` | `./data/taskrr.db` | SQLite file (directory is created) |
 | `TASKRR_ADMIN_USERNAME` | `admin` | Bootstrap admin, created on first start |
-| `TASKRR_ADMIN_PASSWORD` | — | Its password; leave unset to choose one on first sign-in |
+| `TASKRR_ADMIN_PASSWORD` | — | Its password; unset means you choose one on first sign-in |
 | `TASKRR_ADMIN_PASSWORD_HASH` | — | Pre-hashed alternative; wins over the plaintext |
 | `TASKRR_SESSION_TTL` | `720h` | Session length; sessions slide while in use |
 | `TASKRR_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
-| `TASKRR_TRUST_PROXY_HEADERS` | `true` | Read the client IP from proxy headers; set `false` if Taskrr is exposed directly |
-| `TASKRR_SECRET_KEY` | — | Encrypt the OIDC client secret at rest, so it isn't stored — or backed up — in plaintext |
-| `TASKRR_LITE` | `false` | Single-person mode: disables registration and extra accounts |
-| `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop checks for due tasks |
-| `TASKRR_SAFETY_BACKUP` | `true` | Snapshot the DB before a restore (so a mistaken restore is undoable); set `false` to skip it |
-| `TASKRR_UPDATE_CHECK_URL` | project package.json | Source the admin changelog's update check reads for the latest version; set empty to disable |
+| `TASKRR_TRUST_PROXY_HEADERS` | `true` | Take the client IP from proxy headers; `false` if Taskrr is exposed directly |
+| `TASKRR_SECRET_KEY` | — | Encrypts the OIDC client secret at rest, so it isn't sitting in plaintext in your backups |
+| `TASKRR_LITE` | `false` | Single-person mode: no registration, no extra accounts |
+| `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop looks for due tasks |
+| `TASKRR_SAFETY_BACKUP` | `true` | Snapshot before a restore, so a mistaken restore is undoable |
+| `TASKRR_UPDATE_CHECK_URL` | project package.json | Where the admin update check looks; empty disables it |
 | `TASKRR_OIDC_*` | — | Issuer, client id/secret, redirect URL — also editable later in the admin UI |
-
-Running behind a reverse proxy with HTTPS is the intended setup for anything
-beyond your own LAN: set `TASKRR_COOKIE_SECURE=true` there.
 
 ## Building from source
 
-Needs Go 1.25+ and Node 22+:
+Go 1.25+ and Node 22+:
 
 ```bash
 git clone https://github.com/unmaykr-a/taskrr.git
 cd taskrr
 make build           # frontend + backend -> bin/taskrr
-./bin/taskrr         # serves on :8787, data in ./data
+./bin/taskrr         # :8787, data in ./data
 ```
 
-For development: `make dev-backend` and `make dev-frontend` in two terminals,
-`make test` for the test suites, `make install-hooks` for the pre-commit gate,
-and `make docker` to build the image locally.
+`make dev-backend` and `make dev-frontend` in two terminals for development,
+`make test` for both suites, `make install-hooks` for the pre-commit gate,
+`make docker` to build the image.
 
 ```
 cmd/taskrr/          entrypoint

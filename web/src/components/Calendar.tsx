@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useRef, useState } from "react";
+import { type ReactNode, useEffect, useMemo, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import { ChevronDown, ChevronLeft, ChevronRight, Plus } from "lucide-react";
 
@@ -12,7 +12,27 @@ import { Button } from "@/components/ui/button";
 import { useToast } from "@/components/ui/Toast";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { useTaskWindows } from "@/components/useTaskWindows";
+import { useTaskMenu } from "@/components/useTaskActions";
+import { ContextMenu, type ContextMenuEntry } from "@/components/ui/ContextMenu";
 import { useTheme } from "@/components/ThemeProvider";
+
+/**
+ * A day-list row that carries the task context menu when the task is still
+ * around, and is a plain row when it isn't (a completion outlives its task in
+ * the activity feed only until the next refetch, but that window is real).
+ */
+function TaskRow({
+  task,
+  menu,
+  children,
+}: {
+  task: Task | undefined;
+  menu: (task: Task) => () => ContextMenuEntry[];
+  children: ReactNode;
+}) {
+  if (!task) return <>{children}</>;
+  return <ContextMenu entries={menu(task)}>{children}</ContextMenu>;
+}
 
 const WEEKDAYS = ["Su", "Mo", "Tu", "We", "Th", "Fr", "Sa"];
 // Localised short month names for the month/year picker.
@@ -67,6 +87,7 @@ export function Calendar({
   const gridRef = useRef<HTMLDivElement>(null);
 
   const { openManage } = useTaskWindows();
+  const taskMenu = useTaskMenu();
 
   // Jump straight to a month/year from the picker; the grid slides in the
   // chronological direction of the jump.
@@ -75,6 +96,16 @@ export function Calendar({
     setSelected(null);
     setPickerOpen(false);
     setView(new Date(y, m, 1));
+  };
+
+  // Back to today: the current month, with today open, in one press.
+  const goToday = () => {
+    const n = new Date();
+    const target = new Date(n.getFullYear(), n.getMonth(), 1);
+    setNavDir(target >= view ? "right" : "left");
+    setPickerOpen(false);
+    setView(target);
+    setSelected(dayKey(n));
   };
 
   const byId = useMemo(() => new Map(tasks.map((t) => [t.id, t])), [tasks]);
@@ -167,6 +198,8 @@ export function Calendar({
   const daysInMonth = new Date(year, month + 1, 0).getDate();
   const leadingBlanks = monthStart.getDay();
   const todayKey = dayKey(new Date());
+  // Nothing for the Today button to do when today is already the open day.
+  const onToday = selected === todayKey && new Date(todayKey).getMonth() === month;
 
   const cells: (number | null)[] = [
     ...Array.from({ length: leadingBlanks }, () => null),
@@ -251,7 +284,20 @@ export function Calendar({
             )}
           />
         </button>
-        <div className="flex gap-1">
+        <div className="flex items-center gap-1">
+          {/* Getting back is otherwise a hunt: three taps through the picker, or
+              as many presses of the arrow as you wandered. */}
+          <Button
+            variant="ghost"
+            size="sm"
+            className="h-7 px-2 text-xs"
+            aria-label="Go to today"
+            title="Go to today"
+            disabled={onToday}
+            onClick={goToday}
+          >
+            Today
+          </Button>
           <Button
             variant="ghost"
             size="icon"
@@ -452,40 +498,47 @@ export function Calendar({
                 ),
           )}
         >
+          {/* Both lists are tasks like any other, so they get the same
+              right-click menu the cards have — the actions you want after
+              spotting something on a day are exactly the card's actions.
+              An activity row whose task has since been deleted still renders;
+              it just has nothing to offer a menu, hence the lookup. */}
           {detail.acts.map((a) => (
-            <button
-              key={a.completionId}
-              type="button"
-              onClick={() => openTask(a.taskId)}
-              className="flex w-full gap-2 rounded-md p-1 text-left transition-colors hover:bg-accent"
-              title="Open task"
-            >
-              <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
-              <div className="min-w-0">
-                <div className="flex items-center gap-2">
-                  <span className="font-medium">{a.taskName}</span>
-                  <span className="text-muted-foreground">
-                    {formatTime(new Date(a.completedAt))}
-                  </span>
+            <TaskRow key={a.completionId} task={byId.get(a.taskId)} menu={taskMenu}>
+              <button
+                type="button"
+                onClick={() => openTask(a.taskId)}
+                className="flex w-full gap-2 rounded-md p-1 text-left transition-colors hover:bg-accent"
+                title="Open task"
+              >
+                <span className="mt-1.5 h-1.5 w-1.5 shrink-0 rounded-full bg-emerald-500" />
+                <div className="min-w-0">
+                  <div className="flex items-center gap-2">
+                    <span className="font-medium">{a.taskName}</span>
+                    <span className="text-muted-foreground">
+                      {formatTime(new Date(a.completedAt))}
+                    </span>
+                  </div>
+                  {a.note && (
+                    <p className="mt-0.5 break-words text-muted-foreground">{a.note}</p>
+                  )}
                 </div>
-                {a.note && (
-                  <p className="mt-0.5 break-words text-muted-foreground">{a.note}</p>
-                )}
-              </div>
-            </button>
+              </button>
+            </TaskRow>
           ))}
           {detail.dues.map((t) => (
-            <button
-              key={`due-${t.id}`}
-              type="button"
-              onClick={() => openTask(t.id)}
-              className="flex w-full items-center gap-2 rounded-md p-1 text-left transition-colors hover:bg-accent"
-              title="Open task"
-            >
-              <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
-              <span className="font-medium">{t.name}</span>
-              <span className="text-muted-foreground">due</span>
-            </button>
+            <TaskRow key={`due-${t.id}`} task={t} menu={taskMenu}>
+              <button
+                type="button"
+                onClick={() => openTask(t.id)}
+                className="flex w-full items-center gap-2 rounded-md p-1 text-left transition-colors hover:bg-accent"
+                title="Open task"
+              >
+                <span className="h-1.5 w-1.5 shrink-0 rounded-full bg-amber-500" />
+                <span className="font-medium">{t.name}</span>
+                <span className="text-muted-foreground">due</span>
+              </button>
+            </TaskRow>
           ))}
 
           {/* Backdating. Collapsed to a single line until asked for, so the day
