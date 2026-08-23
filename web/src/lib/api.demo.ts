@@ -73,11 +73,13 @@ interface DB {
   /** Bumped whenever the seed data changes, so returning visitors get the
    *  refreshed demo instead of an old cached one. */
   seedVersion?: number;
+  /** Which seasonal task list this sandbox was seeded from. */
+  season?: Season;
 }
 
 // Bump this when SEED below changes so existing visitors are re-seeded. The demo
 // DB is disposable, so re-seeding simply replaces it with the newer sample set.
-const SEED_VERSION = 2;
+const SEED_VERSION = 3;
 
 function loadDB(): DB {
   try {
@@ -90,9 +92,27 @@ function loadDB(): DB {
   } catch {
     // corrupt or unavailable — fall through to a fresh seed
   }
-  const seeded = seed();
+  // First visit picks the season from the calendar, so someone arriving in
+  // December is looking at frozen pipes rather than mowing the lawn.
+  const seeded = seed(seasonNow());
   saveDB(seeded);
   return seeded;
+}
+
+/**
+ * Re-seed the sandbox from a different season's task list.
+ *
+ * The demo DB is disposable by design, so this simply replaces it — which does
+ * mean losing anything the visitor has changed, hence the confirmation in the
+ * banner that offers it.
+ */
+export function reseedDemo(season: Season) {
+  saveDB(seed(season));
+}
+
+/** The season the current sandbox is showing. */
+export function currentDemoSeason(): Season {
+  return loadDB().season ?? seasonNow();
 }
 
 function saveDB(db: DB) {
@@ -124,12 +144,20 @@ interface SeedTask {
   notes?: Record<number, string>;
 }
 
-// A broad sample set: many tasks across several folders and tags, landing
-// across fresh / due-soon / overdue / never-done, with dense history over the
-// last ~30 days so the calendar and activity chart look alive. It exercises the
-// per-account features a single demo user can see: cadences, tags, folders,
-// notes, per-task colours, frozen colours, no-cadence streaks, and archiving.
-const SEED: SeedTask[] = [
+// The sample set is in two halves.
+//
+// YEAR_ROUND is everything that doesn't care what month it is — the household,
+// kitchen, pet, health, tech and money chores. It lands across fresh /
+// due-soon / overdue / never-done with dense history over the last ~30 days, so
+// the calendar and activity chart look alive, and it exercises the features one
+// demo user can see: cadences, tags, folders, notes, per-task colours, frozen
+// colours, no-cadence streaks, and archiving.
+//
+// SEASONAL is the other half, and it is a different list per season. A tracker
+// for "how long since I did that" is at its most recognisable when the list
+// matches the time of year you're reading it, and the seasonal chores are the
+// ones people most often can't remember doing.
+const YEAR_ROUND: SeedTask[] = [
   // --- Home ----------------------------------------------------------------
   {
     name: "Water the plants",
@@ -444,39 +472,7 @@ const SEED: SeedTask[] = [
     log: [6 * DAY, 13 * DAY, 20 * DAY, 27 * DAY],
   },
 
-  // --- Outdoors ------------------------------------------------------------
-  {
-    name: "Mow the lawn",
-    intervalSeconds: 10 * DAY,
-    tags: ["outdoors", "garden"],
-    folder: "Outdoors",
-    log: [13 * DAY, 24 * DAY, 35 * DAY],
-  },
-  {
-    name: "Water the outdoor plants",
-    intervalSeconds: 2 * DAY,
-    tags: ["outdoors", "plants", "garden"],
-    folder: "Outdoors",
-    log: [1 * DAY + 2 * HOUR, 3 * DAY, 5 * DAY, 7 * DAY, 9 * DAY, 11 * DAY, 13 * DAY],
-  },
-  {
-    name: "Winterize the garden hose",
-    description: "Archived until the cold comes back.",
-    intervalSeconds: 365 * DAY,
-    tags: ["outdoors"],
-    folder: "Outdoors",
-    archived: true,
-    log: [190 * DAY],
-  },
-  {
-    name: "Summer AC tune-up",
-    description: "Archived for the season.",
-    intervalSeconds: 365 * DAY,
-    tags: ["home"],
-    folder: "Outdoors",
-    archived: true,
-    log: [250 * DAY],
-  },
+  // The seasonal half of the list lives in SEASONAL below.
 
   // --- No folder (personal) ------------------------------------------------
   {
@@ -516,13 +512,401 @@ const SEED: SeedTask[] = [
   },
 ];
 
-function seed(): DB {
+
+/** Which of the four task lists the demo is showing. */
+export type Season = "spring" | "summer" | "autumn" | "winter";
+
+export const SEASONS: { value: Season; label: string }[] = [
+  { value: "spring", label: "Spring" },
+  { value: "summer", label: "Summer" },
+  { value: "autumn", label: "Autumn" },
+  { value: "winter", label: "Winter" },
+];
+
+/**
+ * The season by the calendar, northern-hemisphere.
+ *
+ * A guess, and a wrong one for half the planet — which is why the banner lets
+ * anyone pick a different list rather than this being the only way in.
+ */
+export function seasonNow(now: Date = new Date()): Season {
+  const m = now.getMonth(); // 0 = January
+  if (m <= 1 || m === 11) return "winter"; // Dec–Feb
+  if (m <= 4) return "spring"; // Mar–May
+  if (m <= 7) return "summer"; // Jun–Aug
+  return "autumn"; // Sep–Nov
+}
+
+// The seasonal half of the sample set. Each list is the same shape as
+// YEAR_ROUND and simply replaces the other one's outdoor chores, so switching
+// season changes what the demo is *about* rather than shuffling the same tasks.
+const SEASONAL: Record<Season, SeedTask[]> = {
+  spring: [
+    {
+      name: "Sow the tomato seeds",
+      description: "Windowsill tray, out to the greenhouse once it warms up.",
+      intervalSeconds: 365 * DAY,
+      tags: ["garden", "outdoors"],
+      folder: "Garden",
+      log: [12 * DAY],
+    },
+    {
+      name: "Prune the roses",
+      intervalSeconds: 365 * DAY,
+      tags: ["garden", "outdoors"],
+      folder: "Garden",
+      log: [26 * DAY],
+      notes: { 0: "took the dead wood out of the climber too" },
+    },
+    {
+      name: "Rake the moss out of the lawn",
+      intervalSeconds: 180 * DAY,
+      tags: ["garden", "outdoors"],
+      folder: "Garden",
+      log: [31 * DAY],
+    },
+    {
+      name: "Service the lawnmower",
+      description: "Blade, spark plug, oil — before the grass gets going.",
+      intervalSeconds: 365 * DAY,
+      tags: ["outdoors", "maintenance"],
+      folder: "Garden",
+      log: [],
+    },
+    {
+      name: "Plant out the seedlings",
+      intervalSeconds: null,
+      tags: ["garden"],
+      folder: "Garden",
+      log: [],
+    },
+    {
+      name: "Clean the windows inside and out",
+      description: "The spring-clean one nobody enjoys.",
+      intervalSeconds: 180 * DAY,
+      tags: ["cleaning", "home"],
+      folder: "Home",
+      log: [40 * DAY],
+    },
+    {
+      name: "Wash the winter coats",
+      intervalSeconds: 365 * DAY,
+      tags: ["home", "cleaning"],
+      folder: "Home",
+      log: [9 * DAY],
+    },
+    {
+      name: "Swap to the summer tyres",
+      intervalSeconds: 180 * DAY,
+      tags: ["car"],
+      folder: "Car",
+      log: [18 * DAY],
+    },
+    {
+      name: "Refill the hay fever tablets",
+      intervalSeconds: 30 * DAY,
+      tags: ["health"],
+      folder: "Health",
+      log: [21 * DAY, 52 * DAY],
+    },
+    {
+      name: "Scrub the barbecue",
+      description: "First decent weekend, ideally before anyone's coming over.",
+      intervalSeconds: 365 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [],
+    },
+    {
+      name: "Grit the front path",
+      description: "Archived until the frost comes back.",
+      intervalSeconds: 365 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      archived: true,
+      log: [80 * DAY],
+    },
+  ],
+
+  summer: [
+    {
+      name: "Mow the lawn",
+      intervalSeconds: 10 * DAY,
+      tags: ["outdoors", "garden"],
+      folder: "Garden",
+      log: [13 * DAY, 24 * DAY, 35 * DAY],
+    },
+    {
+      name: "Water the outdoor plants",
+      intervalSeconds: 2 * DAY,
+      tags: ["outdoors", "plants", "garden"],
+      folder: "Garden",
+      log: [1 * DAY + 2 * HOUR, 3 * DAY, 5 * DAY, 7 * DAY, 9 * DAY, 11 * DAY, 13 * DAY],
+    },
+    {
+      name: "Deadhead the flowers",
+      intervalSeconds: 7 * DAY,
+      tags: ["garden"],
+      folder: "Garden",
+      log: [5 * DAY, 12 * DAY, 20 * DAY],
+    },
+    {
+      name: "Top up the bird bath",
+      intervalSeconds: 3 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [1 * DAY, 4 * DAY, 8 * DAY, 11 * DAY],
+    },
+    {
+      name: "Pick the tomatoes",
+      intervalSeconds: 4 * DAY,
+      tags: ["garden"],
+      folder: "Garden",
+      log: [2 * DAY, 6 * DAY, 10 * DAY],
+      notes: { 0: "first proper handful" },
+    },
+    {
+      name: "Clean the barbecue grill",
+      intervalSeconds: 14 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [17 * DAY, 33 * DAY],
+    },
+    {
+      name: "Air-conditioning filter",
+      intervalSeconds: 30 * DAY,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      log: [28 * DAY, 60 * DAY],
+    },
+    {
+      name: "Check the sunscreen dates",
+      intervalSeconds: 365 * DAY,
+      tags: ["health"],
+      folder: "Health",
+      log: [],
+    },
+    {
+      name: "Water the greenhouse",
+      intervalSeconds: 1 * DAY,
+      tags: ["garden", "plants"],
+      folder: "Garden",
+      log: [10 * HOUR, 1 * DAY + 9 * HOUR, 2 * DAY + 10 * HOUR, 3 * DAY + 8 * HOUR],
+    },
+    {
+      name: "Rinse the paddling pool",
+      intervalSeconds: 5 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [7 * DAY],
+    },
+    {
+      name: "Bleed the radiators",
+      description: "Archived until the heating goes back on.",
+      intervalSeconds: 365 * DAY,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      archived: true,
+      log: [150 * DAY],
+    },
+  ],
+
+  autumn: [
+    {
+      name: "Rake the leaves",
+      intervalSeconds: 7 * DAY,
+      tags: ["outdoors", "garden"],
+      folder: "Garden",
+      log: [4 * DAY, 12 * DAY, 19 * DAY],
+    },
+    {
+      name: "Clear the gutters",
+      description: "Before the first proper downpour, not after.",
+      intervalSeconds: 180 * DAY,
+      tags: ["outdoors", "maintenance"],
+      folder: "Garden",
+      log: [],
+    },
+    {
+      name: "Plant the spring bulbs",
+      intervalSeconds: 365 * DAY,
+      tags: ["garden"],
+      folder: "Garden",
+      log: [],
+    },
+    {
+      name: "Cut back the perennials",
+      intervalSeconds: 365 * DAY,
+      tags: ["garden"],
+      folder: "Garden",
+      log: [22 * DAY],
+    },
+    {
+      name: "Bring in the tender plants",
+      intervalSeconds: 365 * DAY,
+      tags: ["garden", "plants"],
+      folder: "Garden",
+      log: [],
+    },
+    {
+      name: "Service the boiler",
+      description: "Ideally before you need it, not the week you do.",
+      intervalSeconds: 365 * DAY,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      log: [340 * DAY],
+    },
+    {
+      name: "Bleed the radiators",
+      intervalSeconds: 180 * DAY,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      log: [16 * DAY],
+    },
+    {
+      name: "Sweep the chimney",
+      intervalSeconds: 365 * DAY,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      log: [355 * DAY],
+    },
+    {
+      name: "Swap to the winter tyres",
+      intervalSeconds: 180 * DAY,
+      tags: ["car"],
+      folder: "Car",
+      log: [],
+    },
+    {
+      name: "Put the hedgehog food out",
+      intervalSeconds: 2 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [1 * DAY, 3 * DAY, 6 * DAY],
+    },
+    {
+      name: "Flu jab",
+      intervalSeconds: 365 * DAY,
+      tags: ["health"],
+      folder: "Health",
+      log: [],
+    },
+    {
+      name: "Water the outdoor plants",
+      description: "Archived — the rain is doing it now.",
+      intervalSeconds: 2 * DAY,
+      tags: ["outdoors", "plants"],
+      folder: "Garden",
+      archived: true,
+      log: [45 * DAY],
+    },
+  ],
+
+  winter: [
+    {
+      name: "Grit the front path",
+      intervalSeconds: 3 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [1 * DAY, 5 * DAY, 9 * DAY],
+      notes: { 0: "nearly out of grit" },
+    },
+    {
+      name: "Check the pipes haven't frozen",
+      description: "The outside tap and the loft run.",
+      intervalSeconds: 7 * DAY,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      log: [6 * DAY, 14 * DAY],
+    },
+    {
+      name: "Fill the bird feeders",
+      intervalSeconds: 3 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [1 * DAY, 4 * DAY, 7 * DAY, 10 * DAY, 13 * DAY],
+    },
+    {
+      name: "Defrost the freezer",
+      intervalSeconds: 180 * DAY,
+      tags: ["kitchen", "cleaning"],
+      folder: "Kitchen",
+      log: [120 * DAY],
+    },
+    {
+      name: "Check the roof after the storm",
+      intervalSeconds: null,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      log: [8 * DAY],
+    },
+    {
+      name: "Air the house through",
+      description: "Ten minutes, all the windows, even when it's grim.",
+      intervalSeconds: 2 * DAY,
+      tags: ["home"],
+      folder: "Home",
+      log: [1 * DAY, 3 * DAY, 6 * DAY, 8 * DAY],
+    },
+    {
+      name: "Top up the screenwash and antifreeze",
+      intervalSeconds: 30 * DAY,
+      tags: ["car"],
+      folder: "Car",
+      log: [34 * DAY],
+    },
+    {
+      name: "Winterize the garden hose",
+      intervalSeconds: 365 * DAY,
+      tags: ["outdoors"],
+      folder: "Garden",
+      log: [40 * DAY],
+    },
+    {
+      name: "Take the vitamin D",
+      intervalSeconds: 1 * DAY,
+      tags: ["health"],
+      folder: "Health",
+      log: [8 * HOUR, 1 * DAY + 9 * HOUR, 2 * DAY + 8 * HOUR, 4 * DAY + 9 * HOUR],
+    },
+    {
+      name: "Replace the draught excluder",
+      intervalSeconds: null,
+      tags: ["home"],
+      folder: "Home",
+      log: [],
+    },
+    {
+      name: "Check the loft insulation",
+      intervalSeconds: 365 * DAY,
+      tags: ["home", "maintenance"],
+      folder: "Home",
+      log: [],
+    },
+    {
+      name: "Mow the lawn",
+      description: "Archived until it starts growing again.",
+      intervalSeconds: 10 * DAY,
+      tags: ["outdoors", "garden"],
+      folder: "Garden",
+      archived: true,
+      log: [70 * DAY],
+    },
+  ],
+};
+
+/** The full sample set for a season: the year-round chores plus that season's. */
+function tasksFor(season: Season): SeedTask[] {
+  return [...YEAR_ROUND, ...SEASONAL[season]];
+}
+
+function seed(season: Season): DB {
   const tasks: StoredTask[] = [];
   const completions: StoredCompletion[] = [];
   let taskId = 1;
   let completionId = 1;
 
-  for (const s of SEED) {
+  for (const s of tasksFor(season)) {
     const id = taskId++;
     // Created a little before its oldest completion so timestamps stay coherent.
     const oldest = s.log.length ? Math.max(...s.log) : 0;
@@ -552,7 +936,7 @@ function seed(): DB {
     }
   }
 
-  return { tasks, completions, nextTaskId: taskId, nextCompletionId: completionId, seedVersion: SEED_VERSION };
+  return { tasks, completions, nextTaskId: taskId, nextCompletionId: completionId, seedVersion: SEED_VERSION, season };
 }
 
 // --- derivation -------------------------------------------------------------

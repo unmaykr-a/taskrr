@@ -2,7 +2,7 @@ import { useState } from "react";
 import { Github, Info, RotateCcw, X } from "lucide-react";
 
 import { DEMO } from "@/lib/demo";
-import { DEMO_KEYS } from "@/lib/api.demo";
+import { currentDemoSeason, DEMO_KEYS, reseedDemo, SEASONS, type Season } from "@/lib/api.demo";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
@@ -16,7 +16,23 @@ import { Button } from "@/components/ui/button";
  */
 export function DemoBanner() {
   const [dismissed, setDismissed] = useState(false);
+  // Read once: the sandbox is only re-seeded by reloading, so this can't drift.
+  const [season, setSeason] = useState<Season>(() => (DEMO ? currentDemoSeason() : "summer"));
   if (!DEMO || dismissed) return null;
+
+  // Switching season replaces the sandbox, which is the point — but it also
+  // throws away anything the visitor has done, so say so rather than surprising
+  // them. The demo DB is disposable by design; their edits are not obviously so.
+  const switchSeason = (next: Season) => {
+    if (next === season) return;
+    const ok = window.confirm(
+      `Load the ${next} task list?\n\nThis replaces the demo data, so anything you've changed here will go.`,
+    );
+    if (!ok) return;
+    setSeason(next);
+    reseedDemo(next);
+    window.location.reload();
+  };
 
   const reset = () => {
     try {
@@ -48,6 +64,21 @@ export function DemoBanner() {
             There's no server here — everything you do is saved only in this browser.
           </p>
           <div className="mt-2 flex flex-wrap items-center gap-2">
+            <label className="inline-flex items-center gap-1.5">
+              <span className="text-muted-foreground">Season</span>
+              <select
+                value={season}
+                onChange={(e) => switchSeason(e.target.value as Season)}
+                aria-label="Demo season"
+                className="h-7 rounded-md border border-input bg-transparent px-1.5 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              >
+                {SEASONS.map((s) => (
+                  <option key={s.value} value={s.value} className="bg-background">
+                    {s.label}
+                  </option>
+                ))}
+              </select>
+            </label>
             <Button variant="outline" size="sm" className="h-7 px-2 text-xs" onClick={reset}>
               <RotateCcw className="h-3.5 w-3.5" /> Reset demo
             </Button>
