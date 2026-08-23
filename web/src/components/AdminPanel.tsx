@@ -26,9 +26,11 @@ import { useWindows } from "@/components/windows/WindowManager";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 
 /**
  * AdminPanel is the admin-only window body: registration controls + user
@@ -261,35 +263,27 @@ function BrandingSettings() {
             Used for the tab icon, the sidebar, and the login card. Square images work best.
           </p>
         </div>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Hide icon on the login page</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={hideIcon}
-            onChange={(e) => setHideIcon(e.target.checked)}
-          />
-        </label>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">Hide name &amp; tagline on the login page</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={hideText}
-            onChange={(e) => setHideText(e.target.checked)}
-          />
-        </label>
+        <ToggleRow
+          label="Hide icon on the login page"
+          checked={hideIcon}
+          onChange={(v) => setHideIcon(v)}
+        />
+        <ToggleRow
+          label="Hide name &amp; tagline on the login page"
+          checked={hideText}
+          onChange={(v) => setHideText(v)}
+        />
         <div className="space-y-1">
           <Label>Login page layout</Label>
-          <select
-            className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+          <Select
+           
             value={layout}
             onChange={(e) => setLayout(e.target.value as LoginLayout)}
           >
-            <option value="centered" className="bg-background">Centred card</option>
-            <option value="left" className="bg-background">Panel on the left</option>
-            <option value="right" className="bg-background">Panel on the right</option>
-          </select>
+            <option value="centered">Centred card</option>
+            <option value="left">Panel on the left</option>
+            <option value="right">Panel on the right</option>
+          </Select>
           <p className="text-[11px] text-muted-foreground">
             A side panel gives the background effect the rest of the screen. Phones get the same
             full-width form whichever you pick.
@@ -458,48 +452,44 @@ function MergeAccounts() {
       </p>
       <div className="flex flex-wrap items-center gap-2 text-xs">
         <span className="text-muted-foreground">Merge</span>
-        <select
+        <Select
           value={sourceId}
           onChange={(e) => setSourceId(e.target.value ? Number(e.target.value) : "")}
           className={MERGE_SELECT}
         >
-          <option value="" className="bg-background">account…</option>
+          <option value="">account…</option>
           {sourceOptions.map((u) => (
-            <option key={u.id} value={u.id} className="bg-background">{u.username}</option>
+            <option key={u.id} value={u.id}>{u.username}</option>
           ))}
-        </select>
+        </Select>
         <span className="text-muted-foreground">into</span>
-        <select
+        <Select
           value={targetId}
           onChange={(e) => setTargetId(e.target.value ? Number(e.target.value) : "")}
           className={MERGE_SELECT}
         >
-          <option value="" className="bg-background">account…</option>
+          <option value="">account…</option>
           {targetOptions.map((u) => (
-            <option key={u.id} value={u.id} className="bg-background">{u.username}</option>
+            <option key={u.id} value={u.id}>{u.username}</option>
           ))}
-        </select>
+        </Select>
       </div>
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">Move the merged account's tasks over</span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
+      <ToggleRow
+          label="Move the merged account's tasks over"
           checked={moveData}
-          onChange={(e) => setMoveData(e.target.checked)}
+          onChange={(v) => setMoveData(v)}
         />
-      </label>
       <div className="flex items-center gap-2 text-xs">
         <span className="text-muted-foreground">Keep username:</span>
-        <select
+        <Select
           value={keepUsername}
           onChange={(e) => setKeepUsername(e.target.value as "target" | "source")}
           className={MERGE_SELECT}
           disabled={!ready}
         >
-          <option value="target" className="bg-background">{target?.username ?? "kept account"}</option>
-          <option value="source" className="bg-background">{source?.username ?? "merged account"}</option>
-        </select>
+          <option value="target">{target?.username ?? "kept account"}</option>
+          <option value="source">{source?.username ?? "merged account"}</option>
+        </Select>
       </div>
       {/* An account holds one OIDC link, so when both sides have one the
           merged account's identity is dropped — warn before the confirm. */}
@@ -768,37 +758,23 @@ function RegistrationSettings() {
   });
 
   return (
-    <SettingsGroup id="admin.registration" title="Registration" icon={<UserRoundPlus />} summary="Who may sign up">
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">Allow local sign-ups (Register tab)</span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
-          checked={data?.reg_local ?? false}
-          onChange={(e) => save.mutate({ reg_local: e.target.checked })}
-        />
-      </label>
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">Auto-create accounts on OIDC sign-in</span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
-          checked={data?.reg_oidc ?? true}
-          onChange={(e) => save.mutate({ reg_oidc: e.target.checked })}
-        />
-      </label>
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">
-          Require admin approval for sign-ups
-          <span className="block text-xs">New local accounts wait in a queue until you approve them</span>
-        </span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
-          checked={data?.reg_approval ?? false}
-          onChange={(e) => save.mutate({ reg_approval: e.target.checked })}
-        />
-      </label>
+    <SettingsGroup id="admin.registration" title="Registration" icon={<UserRoundPlus />} flat>
+      <ToggleRow
+        label="Allow local sign-ups (Register tab)"
+        checked={data?.reg_local ?? false}
+        onChange={(v) => save.mutate({ reg_local: v })}
+      />
+      <ToggleRow
+        label="Auto-create accounts on OIDC sign-in"
+        checked={data?.reg_oidc ?? true}
+        onChange={(v) => save.mutate({ reg_oidc: v })}
+      />
+      <ToggleRow
+        label="Require admin approval for sign-ups"
+        hint="New local accounts wait in a queue until you approve them"
+        checked={data?.reg_approval ?? false}
+        onChange={(v) => save.mutate({ reg_approval: v })}
+      />
     </SettingsGroup>
   );
 }
@@ -813,36 +789,19 @@ function SharingSettings() {
   });
   return (
     <SettingsGroup id="admin.sharing" title="Sharing" icon={<Share2 />} summary="Tasks and themes">
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">
-          Let users share tasks
-          <span className="block text-xs">
-            Adds a Share action and the Shared / Requests views. Users can opt out individually.
-          </span>
-        </span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 accent-primary"
-          checked={data?.tasks_shareable ?? false}
-          onChange={(e) => save.mutate({ tasks_shareable: e.target.checked })}
-        />
-      </label>
+      <ToggleRow
+        label="Let users share tasks"
+        hint="Adds a Share action and the Shared / Requests views. Users can opt out individually."
+        checked={data?.tasks_shareable ?? false}
+        onChange={(v) => save.mutate({ tasks_shareable: v })}
+      />
 
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">
-          Let users create API tokens
-          <span className="block text-xs">
-            For scripts and home automation. A token reaches tasks and history only — never the
-            admin area. Turning this off stops new tokens; existing ones keep working until revoked.
-          </span>
-        </span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 shrink-0 accent-primary"
-          checked={data?.api_tokens ?? true}
-          onChange={(e) => save.mutate({ api_tokens: e.target.checked })}
-        />
-      </label>
+      <ToggleRow
+        label="Let users create API tokens"
+        hint="For scripts and home automation. A token reaches tasks and history only — never the admin area. Turning this off stops new tokens; existing ones keep working until revoked."
+        checked={data?.api_tokens ?? true}
+        onChange={(v) => save.mutate({ api_tokens: v })}
+      />
     </SettingsGroup>
   );
 }
@@ -915,14 +874,14 @@ function PendingRow({
   return (
     <div className="flex items-center gap-2 rounded-md border border-amber-500/40 px-2.5 py-1.5 text-sm">
       <span className="min-w-0 flex-1 truncate font-medium">{user.username}</span>
-      <select
+      <Select
         value={role}
         onChange={(e) => setRole(e.target.value as "admin" | "user")}
-        className="h-7 rounded border border-input bg-transparent px-1 text-xs"
+        className="h-7 rounded px-1 text-xs"
       >
-        <option value="user" className="bg-background">user</option>
-        <option value="admin" className="bg-background">admin</option>
-      </select>
+        <option value="user">user</option>
+        <option value="admin">admin</option>
+      </Select>
       <Button size="sm" disabled={busy} onClick={() => onApprove(role)}>
         Approve
       </Button>
@@ -980,11 +939,12 @@ function OIDCSettings() {
       id="admin.oidc"
       title="Single sign-on (OIDC)"
       icon={<Link2 />}
-      summary={
-        <span className={data?.oidc_enabled ? "text-emerald-400" : undefined}>
+      badge={
+        <span className={data?.oidc_enabled ? "text-emerald-400" : "text-muted-foreground"}>
           {data?.oidc_enabled ? "enabled" : "not configured"}
         </span>
       }
+      flat
     >
       {field("oidc_issuer", "Issuer URL", "https://auth.example.com/application/o/taskrr/")}
       <div className="grid grid-cols-2 gap-2">
@@ -1006,37 +966,19 @@ function OIDCSettings() {
         you use must be listed in the provider's allowed redirect URIs.
       </p>
       {field("oidc_admin_group", "Admin group (optional)", "taskrr-admins")}
-      <label className="flex items-center justify-between gap-2 text-sm">
-        <span className="text-muted-foreground">
-          Link by username on first sign-in
-          <span className="block text-xs">
-            Off (recommended): a first SSO sign-in matching an existing local username is refused —
-            users connect SSO themselves from Settings. On: it attaches to that account automatically.
-          </span>
-        </span>
-        <input
-          type="checkbox"
-          className="h-4 w-4 shrink-0 accent-primary"
-          checked={data?.oidc_link_username ?? false}
-          onChange={(e) => save.mutate({ oidc_link_username: e.target.checked })}
-        />
-      </label>
+      <ToggleRow
+        label="Link by username on first sign-in"
+        hint="Off (recommended): a first SSO sign-in matching an existing local username is refused — users connect SSO themselves from Settings. On: it attaches to that account automatically."
+        checked={data?.oidc_link_username ?? false}
+        onChange={(v) => save.mutate({ oidc_link_username: v })}
+      />
       {data?.oidc_enabled && (
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            SSO sign-in only
-            <span className="block text-xs">
-              Hides local sign-in; everyone uses single sign-on. The primary admin can
-              still sign in with its password, so a provider outage can't lock you out.
-            </span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 shrink-0 accent-primary"
-            checked={data?.oidc_only ?? false}
-            onChange={(e) => save.mutate({ oidc_only: e.target.checked })}
-          />
-        </label>
+        <ToggleRow
+        label="SSO sign-in only"
+        hint="Hides local sign-in; everyone uses single sign-on. The primary admin can still sign in with its password, so a provider outage can't lock you out."
+        checked={data?.oidc_only ?? false}
+        onChange={(v) => save.mutate({ oidc_only: v })}
+      />
       )}
       <div className="flex justify-end">
         <Button size="sm" disabled={save.isPending} onClick={() => save.mutate(undefined)}>
@@ -1124,14 +1066,14 @@ function Users() {
           Leave the password blank to let the user set their own on first sign-in.
         </p>
         <div className="flex flex-wrap items-center gap-2">
-          <select
+          <Select
             value={role}
             onChange={(e) => setRole(e.target.value as "admin" | "user")}
-            className="h-8 rounded-md border border-input bg-transparent px-2 text-sm"
+            className="h-8"
           >
-            <option value="user" className="bg-background">user</option>
-            <option value="admin" className="bg-background">admin</option>
-          </select>
+            <option value="user">user</option>
+            <option value="admin">admin</option>
+          </Select>
           <Button type="submit" size="sm" className="shrink-0" disabled={create.isPending || !name.trim()}>
             <UserPlus /> Add user
           </Button>
@@ -1173,15 +1115,15 @@ function Users() {
                 )}
               </div>
               <div className="flex shrink-0 items-center gap-2">
-                <select
+                <Select
                   value={u.role}
                   disabled={isSelf || locked}
                   onChange={(e) => update.mutate({ id: u.id, role: e.target.value as "admin" | "user" })}
-                  className="h-7 rounded border border-input bg-transparent px-1 text-xs disabled:opacity-50"
+                  className="h-7 rounded px-1 text-xs disabled:opacity-50"
                 >
-                  <option value="user" className="bg-background">user</option>
-                  <option value="admin" className="bg-background">admin</option>
-                </select>
+                  <option value="user">user</option>
+                  <option value="admin">admin</option>
+                </Select>
                 <button
                   type="button"
                   onClick={() => resetPassword(u)}

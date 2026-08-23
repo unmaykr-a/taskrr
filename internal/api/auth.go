@@ -1414,6 +1414,7 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyBrandIcon:             get(keyBrandIcon),
 		keyLoginHideIcon:         s.boolSetting(ctx, keyLoginHideIcon, false),
 		keyLoginHideText:         s.boolSetting(ctx, keyLoginHideText, false),
+		keyLoginLayout:           s.stringSetting(ctx, keyLoginLayout, defaultLoginLayout),
 		"oidc_client_secret_set": get(keyOIDCClientSecret) != "", // never return the secret
 		"oidc_enabled":           s.oidcEnabled(ctx),
 	})

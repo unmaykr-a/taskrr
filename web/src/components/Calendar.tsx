@@ -9,6 +9,7 @@ import { ensureContrast } from "@/lib/color";
 import { usePrefs } from "@/lib/prefs";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { useToast } from "@/components/ui/Toast";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { useTaskWindows } from "@/components/useTaskWindows";
@@ -548,22 +549,22 @@ export function Calendar({
             <div className="pt-0.5">
               {logOpen ? (
                 <div className="flex flex-wrap items-center gap-1.5">
-                  <select
+                  <Select
                     value={logTaskId}
                     autoFocus
                     onChange={(e) => setLogTaskId(e.target.value ? Number(e.target.value) : "")}
                     aria-label="Task to log"
-                    className="h-8 min-w-0 flex-1 basis-32 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className="h-8 min-w-0 flex-1 basis-32 text-xs"
                   >
-                    <option value="" className="bg-background">
+                    <option value="">
                       Pick a task…
                     </option>
                     {loggable.map((t) => (
-                      <option key={t.id} value={t.id} className="bg-background">
+                      <option key={t.id} value={t.id}>
                         {t.name}
                       </option>
                     ))}
-                  </select>
+                  </Select>
                   <Button
                     size="sm"
                     className="h-8"

@@ -79,7 +79,7 @@ Useful after a password change or to revoke a lost device.
 ## Live logs
 
 A live tail of the server and access logs is available in the admin area, and can
-be **popped out** as a floating window so you can watch it while changing
+be **popped out** into its own panel so you can watch it while changing
 settings. Webhook URLs are stripped from reminder failure messages here.
 
 ## Backups and restore

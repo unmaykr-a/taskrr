@@ -8,6 +8,7 @@ import {
 } from "@/lib/csv";
 import { formatInterval } from "@/lib/time";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 
 /**
  * CsvMapper — the column-mapping step for importing from another tracker.
@@ -95,20 +96,20 @@ export function CsvMapper({
               {f.label}
               {f.hint && <span className="ml-1 text-muted-foreground">({f.hint})</span>}
             </span>
-            <select
+            <Select
               value={mapping[f.key]}
               onChange={(e) => setMapping((m) => ({ ...m, [f.key]: Number(e.target.value) }))}
-              className="h-8 min-w-0 flex-1 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+              className="h-8 min-w-0 flex-1 text-xs"
             >
-              <option value={-1} className="bg-background">
+              <option value={-1}>
                 — skip —
               </option>
               {table.headers.map((h, i) => (
-                <option key={i} value={i} className="bg-background">
+                <option key={i} value={i}>
                   {h || `Column ${i + 1}`}
                 </option>
               ))}
-            </select>
+            </Select>
           </label>
         ))}
       </div>
@@ -118,17 +119,17 @@ export function CsvMapper({
           {hasBareNumbers && (
             <label className="flex items-center gap-1.5">
               Plain numbers in Routine are
-              <select
+              <Select
                 value={bareUnit}
                 onChange={(e) => setBareUnit(e.target.value as typeof bareUnit)}
-                className="h-8 rounded-md border border-input bg-transparent px-2 text-xs shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                className="h-8 text-xs"
               >
                 {BARE_UNITS.map((u) => (
-                  <option key={u.value} value={u.value} className="bg-background">
+                  <option key={u.value} value={u.value}>
                     {u.label}
                   </option>
                 ))}
-              </select>
+              </Select>
             </label>
           )}
           {hasAmbiguousDates && (

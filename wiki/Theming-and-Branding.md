@@ -13,7 +13,10 @@ From the floating theme customiser (a settings window) each user can adjust:
 - **Animated backgrounds** and frosted-glass effects, with per-animation toggles
   so you can dial motion up or down (handy on low-power hardware or for reduced
   motion).
-- **Floating windows** for settings panels.
+- **Floating windows** for settings panels. Turn this off and panels become
+  plain full-screen menus over a dimmed page, with a title and a close button
+  and no taskbar - the same thing phones always get, since a desktop window
+  metaphor with the dragging removed is nobody's idea of a good time.
 
 Saved themes are stored per account on the server (not just in the browser), so
 they follow you across devices and survive sign-out.

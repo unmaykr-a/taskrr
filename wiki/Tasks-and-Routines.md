@@ -58,6 +58,14 @@ As the list grows, three tools keep it tidy:
 - **Sorting** - order by name, or by most / least recently done, from the
   toolbar.
 
+### Tag colours
+
+Tags are one colour by default. Once a list has more than a handful, give the
+ones you scan for their own colour under **Settings -> Preferences -> Tag
+colours**. Only tags you colour are stored, so anything you leave alone keeps
+the plain chip, and the label is nudged to stay readable whatever colour you
+pick.
+
 ## Snoozing and skipping
 
 Two ways to say "not now", both of which stop a task counting as due and stop

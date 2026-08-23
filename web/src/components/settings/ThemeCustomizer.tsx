@@ -35,15 +35,14 @@ import {
 import { useTheme } from "@/components/ThemeProvider";
 import { cn } from "@/lib/utils";
 import { Button } from "@/components/ui/button";
+import { Select } from "@/components/ui/select";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
+import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
-
-const SELECT =
-  "h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring";
 
 const COLOR_FIELDS: { key: keyof ThemeColors; label: string }[] = [
   { key: "background", label: "Background" },
@@ -198,7 +197,7 @@ export function ThemeCustomizer() {
       </section>
 
       {/* Presets: open by default — it's what most visits to this pane are for. */}
-      <SettingsGroup id="theme.presets" title="Presets" icon={<Palette />} defaultOpen>
+      <SettingsGroup id="theme.presets" title="Presets" icon={<Palette />} flat>
       <section className="space-y-2">
         <div className="grid grid-cols-3 gap-2">
           {PRESETS.map((p) => (
@@ -288,27 +287,20 @@ export function ThemeCustomizer() {
       <section className="space-y-2">
         <div className="space-y-1">
           <Label>Font</Label>
-          <select
-            className={SELECT}
+          <Select
             value={theme.font}
             onChange={(e) => patch({ font: e.target.value as FontChoice })}
           >
-            <option value="mono" className="bg-background">Monospace</option>
-            <option value="sans" className="bg-background">Sans-serif</option>
-          </select>
+            <option value="mono">Monospace</option>
+            <option value="sans">Sans-serif</option>
+          </Select>
         </div>
-        <label className="flex items-center justify-between gap-2 text-sm">
-          <span className="text-muted-foreground">
-            Frosted glass
-            <span className="block text-xs">Translucent windows, sidebar, and task cards with a backdrop blur</span>
-          </span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={theme.frosted}
-            onChange={(e) => patch({ frosted: e.target.checked })}
-          />
-        </label>
+        <ToggleRow
+        label="Frosted glass"
+        hint="Translucent windows, sidebar, and task cards with a backdrop blur"
+        checked={theme.frosted}
+        onChange={(v) => patch({ frosted: v })}
+      />
       </section>
 
       {/* Harmony generator + preview */}
@@ -325,16 +317,15 @@ export function ThemeCustomizer() {
           onChange={(hex) => setColor("accent", hex)}
         />
         <div className="flex items-center gap-2">
-          <select
-            className={SELECT}
+          <Select
             value={harmony}
             onChange={(e) => setHarmony(e.target.value as Harmony)}
           >
-            <option value="complementary" className="bg-background">Complementary</option>
-            <option value="analogous" className="bg-background">Analogous</option>
-            <option value="triadic" className="bg-background">Triadic</option>
-            <option value="monochrome" className="bg-background">Monochrome</option>
-          </select>
+            <option value="complementary">Complementary</option>
+            <option value="analogous">Analogous</option>
+            <option value="triadic">Triadic</option>
+            <option value="monochrome">Monochrome</option>
+          </Select>
           <Button type="button" size="sm" onClick={generate}>
             Generate
           </Button>
@@ -355,17 +346,16 @@ export function ThemeCustomizer() {
 
       {/* Background effect */}
       <SettingsGroup id="theme.background" title="Background" icon={<ImageIcon />} summary="Effect, intensity, motion">
-        <select
-          className={SELECT}
+        <Select
           value={theme.background}
           onChange={(e) => patch({ background: e.target.value as BackgroundEffect })}
         >
           {EFFECTS.map((e) => (
-            <option key={e.value} value={e.value} className="bg-background">
+            <option key={e.value} value={e.value}>
               {e.label}
             </option>
           ))}
-        </select>
+        </Select>
         {theme.background !== "none" && (
           <>
             <div className="grid grid-cols-2 gap-3 pt-1">
@@ -409,20 +399,12 @@ export function ThemeCustomizer() {
                 aria-label="Background effect visibility"
               />
             </div>
-            <label className="flex items-center justify-between gap-2 text-sm">
-              <span className="text-muted-foreground">
-                Custom colour
-                <span className="block text-xs">Off = the effect follows the accent</span>
-              </span>
-              <input
-                type="checkbox"
-                className="h-4 w-4 shrink-0 accent-primary"
-                checked={!!theme.bgColor}
-                onChange={(e) =>
-                  patch({ bgColor: e.target.checked ? theme.colors.accent : "" })
-                }
-              />
-            </label>
+            <ToggleRow
+        label="Custom colour"
+        hint="Off = the effect follows the accent"
+        checked={!!theme.bgColor}
+        onChange={(v) => patch({ bgColor: v ? theme.colors.accent : "" })}
+      />
             {!!theme.bgColor && (
               <ColorField
                 label="Effect colour"
@@ -433,15 +415,11 @@ export function ThemeCustomizer() {
           </>
         )}
         {/* Animation controls live here, next to the background they drive. */}
-        <label className="flex items-center justify-between gap-2 pt-1 text-sm">
-          <span className="text-muted-foreground">Animations</span>
-          <input
-            type="checkbox"
-            className="h-4 w-4 accent-primary"
-            checked={prefs.animations}
-            onChange={(e) => setPrefs({ animations: e.target.checked })}
-          />
-        </label>
+        <ToggleRow
+        label="Animations"
+        checked={prefs.animations}
+        onChange={(v) => setPrefs({ animations: v })}
+      />
         {prefs.animations && (
           <div className="space-y-1">
             <Label className="text-xs text-muted-foreground">Animation speed: {prefs.animationSpeed}×</Label>
@@ -547,49 +525,25 @@ export function ThemeCustomizer() {
                   ? "Saving…"
                   : "Set this as the site default"}
             </Button>
-            <label className="flex items-center justify-between gap-2 text-sm">
-              <span className="text-muted-foreground">
-                Use the default for everyone
-                <span className="block text-xs">
-                  Accounts that haven't picked their own theme follow the site default.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                className="h-4 w-4 shrink-0 accent-primary"
-                checked={settings?.default_theme_enforce ?? false}
-                onChange={(e) => saveSetting.mutate({ default_theme_enforce: e.target.checked })}
-              />
-            </label>
-            <label className="flex items-center justify-between gap-2 text-sm">
-              <span className="text-muted-foreground">
-                Allow sharing themes
-                <span className="block text-xs">
-                  Adds a Share button on saved themes to publish them to all users.
-                </span>
-              </span>
-              <input
-                type="checkbox"
-                className="h-4 w-4 shrink-0 accent-primary"
-                checked={settings?.themes_shareable ?? false}
-                onChange={(e) => saveSetting.mutate({ themes_shareable: e.target.checked })}
-              />
-            </label>
+            <ToggleRow
+        label="Use the default for everyone"
+        hint="Accounts that haven't picked their own theme follow the site default."
+        checked={settings?.default_theme_enforce ?? false}
+        onChange={(v) => saveSetting.mutate({ default_theme_enforce: v })}
+      />
+            <ToggleRow
+        label="Allow sharing themes"
+        hint="Adds a Share button on saved themes to publish them to all users."
+        checked={settings?.themes_shareable ?? false}
+        onChange={(v) => saveSetting.mutate({ themes_shareable: v })}
+      />
             {settings?.themes_shareable && (
-              <label className="flex items-center justify-between gap-2 pl-3 text-sm">
-                <span className="text-muted-foreground">
-                  Let everyone share
-                  <span className="block text-xs">
-                    Regular users get the Share button too, not just admins.
-                  </span>
-                </span>
-                <input
-                  type="checkbox"
-                  className="h-4 w-4 shrink-0 accent-primary"
-                  checked={settings?.themes_share_users ?? false}
-                  onChange={(e) => saveSetting.mutate({ themes_share_users: e.target.checked })}
-                />
-              </label>
+              <ToggleRow
+        label="Let everyone share"
+        hint="Regular users get the Share button too, not just admins."
+        checked={settings?.themes_share_users ?? false}
+        onChange={(v) => saveSetting.mutate({ themes_share_users: v })}
+      />
             )}
           </div>
         )}
