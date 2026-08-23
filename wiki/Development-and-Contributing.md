@@ -86,6 +86,13 @@ Run the full set before opening a pull request.
 CI runs Go vet/build/test, the frontend typecheck/test/build, and a multi-arch
 (`amd64`, `arm64`) Docker build. Keep changes green.
 
+Two workflows publish on a push to `main`: the demo to GitHub Pages, and these
+wiki pages to the repository wiki. The wiki is a separate git repository, so a
+page only reaches it once the change lands on `main` - editing `wiki/*.md` in a
+branch is enough, no manual step. `bash wiki/publish.sh` does the same thing by
+hand if you ever need it, and the workflow runs that same script rather than a
+second copy of the logic.
+
 ## Pull requests
 
 Open a pull request against `main`, keep it focused, and make sure CI passes.

@@ -1,0 +1,47 @@
+# Publishes the Markdown pages in wiki/ to the GitHub wiki.
+#
+# The wiki is a separate git repository (<repo>.wiki.git), so it does not update
+# when a push lands here — it was published by hand, which meant the live wiki
+# drifted behind the repo between releases.
+#
+# This runs wiki/publish.sh rather than reimplementing it, so a push publishes
+# exactly what running the script locally would.
+#
+# Auth: the built-in GITHUB_TOKEN with `contents: write` can push to the wiki.
+# If an organisation policy blocks that, add a WIKI_TOKEN secret (a PAT with
+# repo write) and it is used instead — no workflow change needed.
+#
+# Prerequisite: the wiki must have been initialised once (repo -> Wiki -> create
+# any first page), or <repo>.wiki.git does not exist to clone.
+name: Wiki
+
+on:
+  push:
+    branches: [main]
+    paths:
+      - "wiki/**"
+      - ".github/workflows/wiki.yml"
+  workflow_dispatch:
+
+permissions:
+  contents: write
+
+# Two pushes in quick succession would otherwise race to push the same wiki
+# repo; the second waits rather than failing on a non-fast-forward.
+concurrency:
+  group: wiki-publish
+  cancel-in-progress: false
+
+jobs:
+  publish:
+    name: Publish wiki
+    runs-on: ubuntu-latest
+    steps:
+      - uses: actions/checkout@v4
+      - name: Publish pages
+        env:
+          # A PAT when one is configured, the workflow's own token otherwise.
+          WIKI_TOKEN: ${{ secrets.WIKI_TOKEN || github.token }}
+          WIKI_AUTHOR_NAME: github-actions[bot]
+          WIKI_AUTHOR_EMAIL: 41898282+github-actions[bot]@users.noreply.github.com
+        run: bash wiki/publish.sh
