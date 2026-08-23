@@ -7,14 +7,13 @@ import (
 	"time"
 )
 
-// canAccessTask reports whether userID may see/log the task — i.e. they own it
-// or have an accepted share. (Replaces the old owner-only check now that tasks
-// can be shared.)
+// canAccessTask reports whether userID may see/log the task — they own it, have
+// an accepted share of it, or have an accepted share of the folder it sits in.
 func (s *Store) canAccessTask(ctx context.Context, userID, taskID int64) (bool, error) {
 	var n int
 	if err := s.db.QueryRowContext(ctx,
 		`SELECT COUNT(*) FROM tasks t WHERE t.id = ? AND `+visibleTaskCond,
-		taskID, userID, userID,
+		append([]any{taskID}, visibleArgs(userID)...)...,
 	).Scan(&n); err != nil {
 		return false, err
 	}
@@ -64,7 +63,7 @@ func (s *Store) ListCompletions(ctx context.Context, userID, taskID int64) ([]Co
 		 FROM completions c
 		 JOIN tasks t ON t.id = c.task_id
 		 WHERE c.task_id = ? AND `+visibleTaskCond+`
-		 ORDER BY c.completed_at DESC, c.id DESC`, taskID, userID, userID)
+		 ORDER BY c.completed_at DESC, c.id DESC`, append([]any{taskID}, visibleArgs(userID)...)...)
 	if err != nil {
 		return nil, err
 	}
@@ -91,7 +90,7 @@ func (s *Store) ListActivity(ctx context.Context, userID int64, from, to time.Ti
 		 JOIN tasks t ON t.id = c.task_id
 		 WHERE `+visibleTaskCond+` AND c.completed_at >= ? AND c.completed_at < ?
 		 ORDER BY c.completed_at DESC, c.id DESC`,
-		userID, userID, from.UTC().Format(timeLayout), to.UTC().Format(timeLayout),
+		append(visibleArgs(userID), from.UTC().Format(timeLayout), to.UTC().Format(timeLayout))...,
 	)
 	if err != nil {
 		return nil, err

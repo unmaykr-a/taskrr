@@ -30,20 +30,48 @@ var ErrNotFound = errors.New("not found")
 const taskSelect = `
 	SELECT
 		t.id, t.name, t.description, t.interval_seconds,
-		t.color_fresh, t.color_overdue, t.freeze_color, t.tags, t.folder, t.archived_at, t.created_at, t.updated_at, t.owner_id,
+		t.color_fresh, t.color_overdue, t.freeze_color, t.tags, t.folder, t.archived_at,
+		t.snoozed_until, t.pinned, t.rotate, t.reminder_lead_seconds, t.created_at, t.updated_at, t.owner_id,
 		(SELECT MAX(completed_at) FROM completions c WHERE c.task_id = t.id) AS last_completed_at,
 		(SELECT COUNT(*)          FROM completions c WHERE c.task_id = t.id) AS completion_count,
-		EXISTS (SELECT 1 FROM task_shares sh WHERE sh.task_id = t.id AND sh.status = 'accepted') AS shared,
+		` + sharedFlagExpr + ` AS shared,
 		(SELECT u.username FROM completions c JOIN users u ON u.id = c.user_id
 		 WHERE c.task_id = t.id ORDER BY c.completed_at DESC, c.id DESC LIMIT 1) AS last_completed_by
 	FROM tasks t`
 
-// visibleTaskCond is a WHERE fragment matching tasks the given user may see: the
-// ones they own, plus those shared with them and accepted. Bind the user id
-// twice (once per "?"). Relies on the alias `t` for the tasks table.
-const visibleTaskCond = `(t.owner_id = ? OR EXISTS (
-		SELECT 1 FROM task_shares sh
-		WHERE sh.task_id = t.id AND sh.user_id = ? AND sh.status = 'accepted'))`
+// visibleTaskCond is a WHERE fragment matching tasks the given user may see:
+// the ones they own, those shared with them directly and accepted, and those
+// sitting in a folder of someone else's that they've accepted a share of.
+//
+// Relies on the alias `t` for the tasks table. It takes the user id several
+// times, so never hand-write the arguments — use visibleArgs(), which keeps the
+// count in one place. Getting that count wrong would not be a compile error
+// (every parameter is an int64), it would silently shift which rows a query
+// returns, which is the worst possible failure mode for a visibility rule.
+const visibleTaskCond = `(t.owner_id = ?
+		OR EXISTS (
+			SELECT 1 FROM task_shares sh
+			WHERE sh.task_id = t.id AND sh.user_id = ? AND sh.status = 'accepted')
+		OR (t.folder <> '' AND EXISTS (
+			SELECT 1 FROM folder_shares fs
+			WHERE fs.user_id = ? AND fs.status = 'accepted'
+			  AND fs.owner_id = t.owner_id AND fs.folder = t.folder)))`
+
+// visibleArgs returns the bind arguments visibleTaskCond expects, in order.
+// Call sites splice it in with append(), so adding a clause to the condition is
+// a one-place change.
+func visibleArgs(userID int64) []any {
+	return []any{userID, userID, userID}
+}
+
+// sharedFlagExpr reports whether a task has anyone else on it — through a
+// direct share or through a share of its folder. Used for the `shared` column
+// and for the Shared view; the union matters because a task can be reachable
+// both ways at once.
+const sharedFlagExpr = `(EXISTS (SELECT 1 FROM task_shares sh WHERE sh.task_id = t.id AND sh.status = 'accepted')
+		OR (t.folder <> '' AND EXISTS (
+			SELECT 1 FROM folder_shares fs
+			WHERE fs.owner_id = t.owner_id AND fs.folder = t.folder AND fs.status = 'accepted')))`
 
 // ListTasks returns all tasks. Ordering surfaces the most "actionable" first:
 // never-completed tasks, then those whose last completion is furthest in the
@@ -55,7 +83,8 @@ const visibleTaskCond = `(t.owner_id = ? OR EXISTS (
 func (s *Store) ListTasks(ctx context.Context, ownerID int64) ([]Task, error) {
 	rows, err := s.db.QueryContext(ctx, taskSelect+`
 		WHERE `+visibleTaskCond+`
-		ORDER BY last_completed_at IS NOT NULL, last_completed_at ASC, t.name COLLATE NOCASE ASC`, ownerID, ownerID)
+		ORDER BY last_completed_at IS NOT NULL, last_completed_at ASC, t.name COLLATE NOCASE ASC`,
+		visibleArgs(ownerID)...)
 	if err != nil {
 		return nil, err
 	}
@@ -75,7 +104,8 @@ func (s *Store) ListTasks(ctx context.Context, ownerID int64) ([]Task, error) {
 // GetTask returns a single task visible to ownerID (owned or shared+accepted),
 // or ErrNotFound.
 func (s *Store) GetTask(ctx context.Context, ownerID, id int64) (Task, error) {
-	row := s.db.QueryRowContext(ctx, taskSelect+` WHERE t.id = ? AND `+visibleTaskCond, id, ownerID, ownerID)
+	row := s.db.QueryRowContext(ctx, taskSelect+` WHERE t.id = ? AND `+visibleTaskCond,
+		append([]any{id}, visibleArgs(ownerID)...)...)
 	t, err := scanTask(row)
 	if errors.Is(err, sql.ErrNoRows) {
 		return Task{}, ErrNotFound
@@ -87,9 +117,10 @@ func (s *Store) GetTask(ctx context.Context, ownerID, id int64) (Task, error) {
 func (s *Store) CreateTask(ctx context.Context, ownerID int64, in TaskInput) (Task, error) {
 	now := time.Now().UTC().Format(timeLayout)
 	res, err := s.db.ExecContext(ctx,
-		`INSERT INTO tasks (name, description, interval_seconds, color_fresh, color_overdue, freeze_color, tags, folder, owner_id, created_at, updated_at)
-		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
-		in.Name, in.Description, in.IntervalSeconds, in.ColorFresh, in.ColorOverdue, boolToInt(in.FreezeColor), encodeTags(in.Tags), in.Folder, ownerID, now, now,
+		`INSERT INTO tasks (name, description, interval_seconds, color_fresh, color_overdue, freeze_color, tags, folder, pinned, rotate, reminder_lead_seconds, owner_id, created_at, updated_at)
+		 VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?)`,
+		in.Name, in.Description, in.IntervalSeconds, in.ColorFresh, in.ColorOverdue, boolToInt(in.FreezeColor), encodeTags(in.Tags), in.Folder,
+		boolToInt(in.Pinned), boolToInt(in.Rotate), in.ReminderLeadSeconds, ownerID, now, now,
 	)
 	if err != nil {
 		return Task{}, err
@@ -109,9 +140,11 @@ func (s *Store) CreateTask(ctx context.Context, ownerID int64, in TaskInput) (Ta
 func (s *Store) UpdateTask(ctx context.Context, ownerID, id int64, in TaskInput) (Task, error) {
 	res, err := s.db.ExecContext(ctx,
 		`UPDATE tasks
-		 SET name = ?, description = ?, interval_seconds = ?, color_fresh = ?, color_overdue = ?, freeze_color = ?, tags = ?, folder = ?, updated_at = ?
+		 SET name = ?, description = ?, interval_seconds = ?, color_fresh = ?, color_overdue = ?, freeze_color = ?, tags = ?, folder = ?,
+		     pinned = ?, rotate = ?, reminder_lead_seconds = ?, updated_at = ?
 		 WHERE id = ? AND owner_id = ?`,
 		in.Name, in.Description, in.IntervalSeconds, in.ColorFresh, in.ColorOverdue, boolToInt(in.FreezeColor), encodeTags(in.Tags), in.Folder,
+		boolToInt(in.Pinned), boolToInt(in.Rotate), in.ReminderLeadSeconds,
 		time.Now().UTC().Format(timeLayout), id, ownerID,
 	)
 	if err != nil {
@@ -121,6 +154,82 @@ func (s *Store) UpdateTask(ctx context.Context, ownerID, id int64, in TaskInput)
 		return Task{}, ErrNotFound
 	}
 	return s.GetTask(ctx, ownerID, id)
+}
+
+// SetTaskSnoozed holds a task back from being due until `until`, or clears the
+// hold when `until` is nil.
+//
+// One timestamp serves both product ideas. "Snooze until Friday" sets it
+// directly; "skip this cycle" is the caller computing the current due time plus
+// one interval and setting that. Keeping it to a single column means the rest of
+// the app — staleness, filters, the calendar, reminders — only has to learn one
+// rule rather than two.
+//
+// Scoped by owner: a shared task's schedule belongs to whoever owns it, so a
+// member can't quietly push everyone else's due date around.
+func (s *Store) SetTaskSnoozed(ctx context.Context, ownerID, id int64, until *time.Time) (Task, error) {
+	var value any // NULL clears the snooze
+	if until != nil {
+		value = until.UTC().Format(timeLayout)
+	}
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE tasks SET snoozed_until = ?, updated_at = ? WHERE id = ? AND owner_id = ?`,
+		value, time.Now().UTC().Format(timeLayout), id, ownerID,
+	)
+	if err != nil {
+		return Task{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Task{}, ErrNotFound
+	}
+	return s.GetTask(ctx, ownerID, id)
+}
+
+// SetTaskPinned pins or unpins a task, keeping it at the top of the list.
+func (s *Store) SetTaskPinned(ctx context.Context, ownerID, id int64, pinned bool) (Task, error) {
+	res, err := s.db.ExecContext(ctx,
+		`UPDATE tasks SET pinned = ?, updated_at = ? WHERE id = ? AND owner_id = ?`,
+		boolToInt(pinned), time.Now().UTC().Format(timeLayout), id, ownerID,
+	)
+	if err != nil {
+		return Task{}, err
+	}
+	if n, _ := res.RowsAffected(); n == 0 {
+		return Task{}, ErrNotFound
+	}
+	return s.GetTask(ctx, ownerID, id)
+}
+
+// DuplicateTask copies a task's definition into a new task owned by the caller.
+//
+// Deliberately the definition only: no history, no shares, no snooze, and never
+// archived. Duplicating is for "another one like this" — a second plant, a
+// second filter — and copying the completions would start the new task with a
+// past it never had, which is exactly the thing this app is supposed to get
+// right. `name` is the caller's chosen name for the copy.
+func (s *Store) DuplicateTask(ctx context.Context, ownerID, id int64, name string) (Task, error) {
+	src, err := s.GetTask(ctx, ownerID, id)
+	if err != nil {
+		return Task{}, err
+	}
+	// Only the owner may duplicate: GetTask also matches accepted shares, and
+	// copying somebody else's task into your own list is a different feature.
+	if src.OwnerID != ownerID {
+		return Task{}, ErrNotFound
+	}
+	return s.CreateTask(ctx, ownerID, TaskInput{
+		Name:                name,
+		Description:         src.Description,
+		IntervalSeconds:     src.IntervalSeconds,
+		ColorFresh:          src.ColorFresh,
+		ColorOverdue:        src.ColorOverdue,
+		FreezeColor:         src.FreezeColor,
+		Tags:                src.Tags,
+		Folder:              src.Folder,
+		Pinned:              src.Pinned,
+		Rotate:              src.Rotate,
+		ReminderLeadSeconds: src.ReminderLeadSeconds,
+	})
 }
 
 // SetTaskArchived soft-archives (or restores) a task by setting/clearing
@@ -229,6 +338,10 @@ func scanTask(sc scanner) (Task, error) {
 		freezeColor  int
 		tags         string
 		archivedAt   sql.NullString
+		snoozedUntil sql.NullString
+		pinned       int
+		rotate       int
+		reminderLead sql.NullInt64
 		created      string
 		updated      string
 		lastDone     sql.NullString
@@ -237,7 +350,8 @@ func scanTask(sc scanner) (Task, error) {
 	)
 	if err := sc.Scan(
 		&t.ID, &t.Name, &t.Description, &interval,
-		&colorFresh, &colorOverdue, &freezeColor, &tags, &t.Folder, &archivedAt, &created, &updated, &t.OwnerID,
+		&colorFresh, &colorOverdue, &freezeColor, &tags, &t.Folder, &archivedAt,
+		&snoozedUntil, &pinned, &rotate, &reminderLead, &created, &updated, &t.OwnerID,
 		&lastDone, &t.CompletionCount, &shared, &lastBy,
 	); err != nil {
 		return Task{}, err
@@ -263,6 +377,15 @@ func scanTask(sc scanner) (Task, error) {
 	if archivedAt.Valid {
 		when := parseTime(archivedAt.String)
 		t.ArchivedAt = &when
+	}
+	if snoozedUntil.Valid && snoozedUntil.String != "" {
+		when := parseTime(snoozedUntil.String)
+		t.SnoozedUntil = &when
+	}
+	t.Pinned = pinned != 0
+	t.Rotate = rotate != 0
+	if reminderLead.Valid {
+		t.ReminderLeadSeconds = &reminderLead.Int64
 	}
 	t.CreatedAt = parseTime(created)
 	t.UpdatedAt = parseTime(updated)

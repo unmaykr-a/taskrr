@@ -1,10 +1,27 @@
 import { useEffect, useState } from "react";
-import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Clock, Settings2, Users, Zap } from "lucide-react";
+import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
+import {
+  Archive,
+  ArchiveRestore,
+  BellOff,
+  Check,
+  Clock,
+  Copy,
+  Moon,
+  Pin,
+  PinOff,
+  Repeat,
+  Settings2,
+  SkipForward,
+  Trash2,
+  Users,
+  Zap,
+} from "lucide-react";
 
 import { api, type Task } from "@/lib/api";
-import { formatDateTime, formatDue, formatInterval, timeSince } from "@/lib/time";
-import { nextDue, stalenessTint } from "@/lib/staleness";
+import { formatDate, formatDateTime, formatDue, formatInterval, timeSince } from "@/lib/time";
+import { isSnoozed, nextDue, stalenessTint } from "@/lib/staleness";
+import { isMyTurn, nextUp, rotationOrder } from "@/lib/rotation";
 import { ensureContrast } from "@/lib/color";
 import { usePrefs } from "@/lib/prefs";
 import { useNow } from "@/lib/useNow";
@@ -20,7 +37,10 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useTaskWindows } from "@/components/useTaskWindows";
+import { ContextMenu, type ContextMenuEntry } from "@/components/ui/ContextMenu";
+import { SNOOZE_PRESETS, useTaskActions } from "@/components/useTaskActions";
 import { useTheme } from "@/components/ThemeProvider";
+import { useAuth } from "@/components/AuthProvider";
 
 export function TaskCard({
   task,
@@ -65,6 +85,81 @@ export function TaskCard({
   const overdueColor = ensureContrast(status.overdue, surface);
   const queryClient = useQueryClient();
   const { openManage, openComplete } = useTaskWindows();
+  const actions = useTaskActions();
+  const { user } = useAuth();
+  // Scheduling and structure belong to the owner; a member of a shared task
+  // gets only the actions they're actually allowed to perform.
+  const isOwner = user ? task.ownerId === user.id : true;
+  const snoozed = isSnoozed(task, now);
+  const archived = task.archivedAt != null;
+
+  // Rotation: only fetch members for a task that actually uses one. The key is
+  // shared with the Manage window, so opening that costs nothing extra.
+  const rotating = task.rotate && task.shared && !archived;
+  const { data: members } = useQuery({
+    queryKey: ["members", task.id],
+    queryFn: () => api.listMembers(task.id),
+    enabled: rotating,
+  });
+  const order = rotationOrder(members);
+  const turn = rotating ? nextUp(order, task.lastCompletedBy) : null;
+  const myTurn = rotating && isMyTurn(order, task.lastCompletedBy, user?.username);
+
+  // Built lazily by the menu on open, so labels track current state.
+  const menuEntries = (): ContextMenuEntry[] => {
+    const entries: ContextMenuEntry[] = [];
+    if (!archived) {
+      entries.push({ label: "Quick log", icon: <Zap />, onSelect: () => actions.quickLog.mutate(task) });
+      entries.push({ label: "Log with time…", icon: <Clock />, onSelect: () => openComplete(task) });
+    }
+    entries.push({ label: "Manage…", icon: <Settings2 />, onSelect: () => openManage(task) });
+
+    if (isOwner && !archived) {
+      entries.push({ separator: true });
+      if (snoozed) {
+        entries.push({ label: "Wake up now", icon: <BellOff />, onSelect: () => actions.wake.mutate(task) });
+      } else {
+        for (const preset of SNOOZE_PRESETS) {
+          entries.push({
+            label: `Snooze ${preset.label}`,
+            icon: <Moon />,
+            onSelect: () => actions.snooze.mutate({ task, hours: preset.hours }),
+          });
+        }
+      }
+      entries.push({
+        label: "Skip this cycle",
+        icon: <SkipForward />,
+        // Only a routine has a cycle to skip; shown-but-disabled explains why
+        // the action exists without pretending it applies here.
+        disabled: task.intervalSeconds == null,
+        onSelect: () => actions.skip.mutate(task),
+      });
+    }
+
+    if (isOwner) {
+      entries.push({ separator: true });
+      entries.push({
+        label: task.pinned ? "Unpin" : "Pin to top",
+        icon: task.pinned ? <PinOff /> : <Pin />,
+        onSelect: () => actions.pin.mutate({ task, pinned: !task.pinned }),
+      });
+      entries.push({ label: "Duplicate", icon: <Copy />, onSelect: () => actions.duplicate.mutate(task) });
+      entries.push({
+        label: archived ? "Restore" : "Archive",
+        icon: archived ? <ArchiveRestore /> : <Archive />,
+        onSelect: () => actions.archive.mutate({ task, archived: !archived }),
+      });
+      entries.push({ separator: true });
+    }
+    entries.push({
+      label: isOwner ? "Delete" : "Leave task",
+      icon: <Trash2 />,
+      destructive: true,
+      onSelect: () => void actions.confirmDelete(task),
+    });
+    return entries;
+  };
 
   // Quick log: one tap records "done right now". `justLogged` drives the brief
   // success state (check on the button + a pulse ring on the card).
@@ -85,6 +180,7 @@ export function TaskCard({
   });
 
   return (
+    <ContextMenu entries={menuEntries} disabled={selectable}>
     <Card
       data-flip-key={task.id}
       className={cn(
@@ -121,6 +217,9 @@ export function TaskCard({
                 {selected && <Check className="h-3.5 w-3.5" />}
               </span>
             )}
+            {task.pinned && (
+              <Pin className="h-3.5 w-3.5 shrink-0 text-primary" aria-label="Pinned" />
+            )}
             <CardTitle className="truncate text-base">{task.name}</CardTitle>
             {task.shared && (
               <Users className="h-3.5 w-3.5 shrink-0 text-muted-foreground" aria-label="Shared task" />
@@ -153,6 +252,18 @@ export function TaskCard({
           </span>
         </div>
 
+        {turn && (
+          <p
+            className={cn(
+              "flex items-center gap-1 pl-[18px] text-xs",
+              myTurn ? "font-medium text-primary" : "text-muted-foreground",
+            )}
+          >
+            <Repeat className="h-3 w-3 shrink-0" />
+            {myTurn ? "Your turn" : `${turn}'s turn`}
+          </p>
+        )}
+
         {!compact && task.lastCompletedAt && (
           <p className="pl-[18px] text-xs text-muted-foreground">
             {formatDateTime(task.lastCompletedAt)}
@@ -177,7 +288,13 @@ export function TaskCard({
                 />
               </div>
             )}
-            {!compact && (
+            {!compact && snoozed && task.snoozedUntil && (
+              <p className="flex items-center gap-1 text-xs text-muted-foreground">
+                <Moon className="h-3 w-3 shrink-0" />
+                snoozed until {formatDate(new Date(task.snoozedUntil))}
+              </p>
+            )}
+            {!compact && !snoozed && (
               <p className="text-xs text-muted-foreground">
                 every {formatInterval(task.intervalSeconds)}
                 {due && (
@@ -199,6 +316,13 @@ export function TaskCard({
               </p>
             )}
           </div>
+        )}
+
+        {!compact && snoozed && task.snoozedUntil && task.intervalSeconds == null && (
+          <p className="flex items-center gap-1 pl-[18px] text-xs text-muted-foreground">
+            <Moon className="h-3 w-3 shrink-0" />
+            snoozed until {formatDate(new Date(task.snoozedUntil))}
+          </p>
         )}
 
         {task.tags.length > 0 && (
@@ -253,5 +377,6 @@ export function TaskCard({
         </Button>
       </CardFooter>
     </Card>
+    </ContextMenu>
   );
 }

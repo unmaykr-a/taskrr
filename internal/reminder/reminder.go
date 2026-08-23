@@ -124,6 +124,12 @@ func (s *Service) Tick(ctx context.Context) {
 	}
 	for _, c := range cands {
 		due := c.LastCompleted.Add(time.Duration(c.IntervalSecs) * time.Second)
+		// A snooze pushes the effective due time out, so a task someone has
+		// deliberately put off doesn't keep nagging them — the whole point of
+		// snoozing. Skipping a cycle lands here the same way.
+		if !c.SnoozedUntil.IsZero() && c.SnoozedUntil.After(due) {
+			due = c.SnoozedUntil
+		}
 		fireAt := due.Add(-time.Duration(c.LeadSeconds) * time.Second)
 		if now.Before(fireAt) {
 			continue // not due yet

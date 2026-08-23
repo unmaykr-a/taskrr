@@ -27,6 +27,15 @@ export interface Task {
   folder: string;
   /** Non-null when the task is soft-archived (hidden from the normal views). */
   archivedAt: string | null;
+  /** Holds the task back from being due until this time; null = not snoozed.
+   *  Backs both "snooze until" and "skip this cycle". */
+  snoozedUntil: string | null;
+  /** Keeps the task at the top of the list whatever the sort. */
+  pinned: boolean;
+  /** "Whose turn is it" on a shared task. Whose turn stays derived. */
+  rotate: boolean;
+  /** Per-task override for the reminder lead; null uses the account setting. */
+  reminderLeadSeconds: number | null;
   createdAt: string;
   updatedAt: string;
   lastCompletedAt: string | null;
@@ -48,6 +57,35 @@ export interface Completion {
   completedAt: string;
   note: string;
   createdAt: string;
+}
+
+/** A folder-level membership row. */
+export interface FolderShare {
+  ownerId: number;
+  folder: string;
+  userId: number;
+  status: "pending" | "accepted";
+  createdAt: string;
+}
+
+/** A pending folder invitation, described well enough to decide on. */
+export interface FolderShareRequest {
+  ownerId: number;
+  ownerName: string;
+  folder: string;
+  /** How many tasks are currently in the folder. */
+  taskCount: number;
+  createdAt: string;
+}
+
+/** What an import actually did, so a partial restore is visible. */
+export interface ImportResult {
+  mode: string;
+  tasksCreated: number;
+  completionsAdded: number;
+  tasksDeleted: number;
+  /** Anything that could not be restored, with the reason. */
+  skipped: string[];
 }
 
 /** A bearer credential a user minted for automation. The token itself is only
@@ -276,6 +314,12 @@ export interface TaskInput {
   tags?: string[];
   /** Optional single group name (empty = ungrouped). */
   folder?: string;
+  /** Keep the task at the top of the list. */
+  pinned?: boolean;
+  /** Turn on the "whose turn is it" hint for a shared task. */
+  rotate?: boolean;
+  /** Reminder lead override in seconds, or null to use the account setting. */
+  reminderLeadSeconds?: number | null;
 }
 
 async function request<T>(url: string, options?: RequestInit): Promise<T> {
@@ -324,6 +368,59 @@ const httpApi = {
   /** Restore a previously archived task. */
   unarchiveTask: (id: number) =>
     request<Task>(`/api/tasks/${id}/unarchive`, { method: "POST" }),
+
+  // --- folder sharing (the coarser grain of task sharing) ---
+
+  shareFolder: (folder: string, username: string) =>
+    request<FolderShare>(`/api/folders/${encodeURIComponent(folder)}/share`, {
+      method: "POST",
+      body: JSON.stringify({ username }),
+    }),
+
+  respondFolderShare: (folder: string, ownerId: number, accept: boolean) =>
+    request<void>(`/api/folders/${encodeURIComponent(folder)}/share/respond`, {
+      method: "POST",
+      body: JSON.stringify({ ownerId, accept }),
+    }),
+
+  leaveFolder: (folder: string, ownerId: number) =>
+    request<void>(`/api/folders/${encodeURIComponent(folder)}/leave`, {
+      method: "POST",
+      body: JSON.stringify({ ownerId }),
+    }),
+
+  unshareFolder: (folder: string, userId: number) =>
+    request<void>(`/api/folders/${encodeURIComponent(folder)}/share`, {
+      method: "DELETE",
+      body: JSON.stringify({ userId }),
+    }),
+
+  listFolderMembers: (folder: string) =>
+    request<TaskMember[]>(`/api/folders/${encodeURIComponent(folder)}/members`),
+
+  listMyFolderShares: () => request<FolderShare[]>("/api/me/folder-shares"),
+
+  listFolderInvites: () => request<FolderShareRequest[]>("/api/me/folder-invites"),
+
+  /** Hold a task back until `untilISO`, or pass null to clear the snooze. */
+  snoozeTask: (id: number, untilISO: string | null) =>
+    request<Task>(`/api/tasks/${id}/snooze`, {
+      method: "POST",
+      body: JSON.stringify({ until: untilISO ?? "" }),
+    }),
+
+  /** Push a routine task one whole cycle forward without logging anything. */
+  skipTask: (id: number) => request<Task>(`/api/tasks/${id}/skip`, { method: "POST" }),
+
+  pinTask: (id: number, pinned: boolean) =>
+    request<Task>(`/api/tasks/${id}/pin`, { method: "POST", body: JSON.stringify({ pinned }) }),
+
+  /** Copy a task's definition (not its history) into a new task. */
+  duplicateTask: (id: number, name?: string) =>
+    request<Task>(`/api/tasks/${id}/duplicate`, {
+      method: "POST",
+      body: JSON.stringify({ name: name ?? "" }),
+    }),
 
   /** Log a completion with an explicit time and/or note (the Advanced dialog). */
   completeTask: (id: number, input: { note?: string; completedAt?: string }) =>
@@ -467,6 +564,10 @@ const httpApi = {
     if (!res.ok) throw new Error(`Export failed (${res.status})`);
     return res.blob();
   },
+
+  /** Restore an exported JSON document into the signed-in account. */
+  importData: (json: string, mode: "merge" | "replace") =>
+    request<ImportResult>(`/api/me/import?mode=${mode}`, { method: "POST", body: json }),
 
   listAPITokens: () => request<APIToken[]>("/api/me/tokens"),
 

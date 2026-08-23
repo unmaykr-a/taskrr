@@ -71,15 +71,22 @@ type ReminderCandidate struct {
 	// LastRemindedDue is the RFC3339 dueAt we last reminded this recipient for,
 	// or "" if never.
 	LastRemindedDue string
+	// SnoozedUntil holds the task back: its effective due time is the later of
+	// (last completion + interval) and this. Zero when not snoozed.
+	SnoozedUntil time.Time
 }
 
 // ListReminderCandidates returns, for every non-archived cadence task completed
-// at least once, one row per recipient (the owner or an accepted member) who has
-// reminders enabled with a webhook. Each recipient's last-reminded due-time is
+// at least once, one row per recipient — the owner, an accepted member of the
+// task, or an accepted member of its folder — who has reminders enabled with a
+// webhook. Each recipient's last-reminded due-time is
 // looked up per (task, user) so collaborators are reminded independently.
 func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate, error) {
 	rows, err := s.db.QueryContext(ctx, `
-		SELECT t.id, t.owner_id, rs.user_id, t.name, t.interval_seconds, rs.webhook_url, rs.lead_seconds,
+		SELECT t.id, t.owner_id, rs.user_id, t.name, t.interval_seconds, rs.webhook_url,
+		       -- A per-task lead wins over the recipient's account-wide default.
+		       COALESCE(t.reminder_lead_seconds, rs.lead_seconds) AS lead_seconds,
+		       COALESCE(t.snoozed_until, '') AS snoozed_until,
 		       (SELECT MAX(completed_at) FROM completions c WHERE c.task_id = t.id) AS last_completed_at,
 		       COALESCE((SELECT due_at FROM task_reminders tr
 		                  WHERE tr.task_id = t.id AND tr.user_id = rs.user_id), '') AS last_reminded_due
@@ -88,7 +95,12 @@ func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate
 		  ON rs.enabled = 1 AND TRIM(rs.webhook_url) <> ''
 		 AND (rs.user_id = t.owner_id
 		      OR EXISTS (SELECT 1 FROM task_shares sh
-		                  WHERE sh.task_id = t.id AND sh.user_id = rs.user_id AND sh.status = 'accepted'))
+		                  WHERE sh.task_id = t.id AND sh.user_id = rs.user_id AND sh.status = 'accepted')
+		      -- Folder members are recipients too: sharing a folder is meant to
+		      -- be equivalent to sharing each task in it, reminders included.
+		      OR (t.folder <> '' AND EXISTS (SELECT 1 FROM folder_shares fs
+		                  WHERE fs.owner_id = t.owner_id AND fs.folder = t.folder
+		                    AND fs.user_id = rs.user_id AND fs.status = 'accepted')))
 		WHERE t.archived_at IS NULL
 		  AND t.interval_seconds IS NOT NULL AND t.interval_seconds > 0`)
 	if err != nil {
@@ -100,15 +112,19 @@ func (s *Store) ListReminderCandidates(ctx context.Context) ([]ReminderCandidate
 		var (
 			c        ReminderCandidate
 			lastComp sql.NullString
+			snoozed  string
 		)
 		if err := rows.Scan(&c.TaskID, &c.OwnerID, &c.UserID, &c.TaskName, &c.IntervalSecs,
-			&c.WebhookURL, &c.LeadSeconds, &lastComp, &c.LastRemindedDue); err != nil {
+			&c.WebhookURL, &c.LeadSeconds, &snoozed, &lastComp, &c.LastRemindedDue); err != nil {
 			return nil, err
 		}
 		if !lastComp.Valid {
 			continue // never completed → not due yet
 		}
 		c.LastCompleted = parseTime(lastComp.String)
+		if snoozed != "" {
+			c.SnoozedUntil = parseTime(snoozed)
+		}
 		out = append(out, c)
 	}
 	return out, rows.Err()

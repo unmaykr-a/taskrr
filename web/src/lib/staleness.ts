@@ -8,8 +8,9 @@
 import type { Task } from "./api";
 import { mixHex } from "./color";
 
-/** The five staleness buckets a task can be in. */
-export type Staleness = "none" | "fresh" | "ok" | "due-soon" | "overdue";
+/** The staleness buckets a task can be in. "snoozed" is a deliberate hold
+ *  rather than a measurement, so it takes precedence over the rest. */
+export type Staleness = "none" | "fresh" | "ok" | "due-soon" | "overdue" | "snoozed";
 
 export interface StalenessStyle {
   key: Staleness;
@@ -26,6 +27,7 @@ export interface StalenessStyle {
 // independent of the app's rose accent.
 const STYLES: Record<Staleness, StalenessStyle> = {
   none: { key: "none", label: "Never done", bar: "bg-zinc-500/50", dot: "bg-zinc-400", text: "text-zinc-400" },
+  snoozed: { key: "snoozed", label: "Snoozed", bar: "bg-zinc-500/50", dot: "bg-zinc-400", text: "text-zinc-400" },
   fresh: { key: "fresh", label: "Fresh", bar: "bg-emerald-500", dot: "bg-emerald-500", text: "text-emerald-400" },
   ok: { key: "ok", label: "On track", bar: "bg-sky-500", dot: "bg-sky-500", text: "text-sky-400" },
   "due-soon": { key: "due-soon", label: "Due soon", bar: "bg-amber-500", dot: "bg-amber-500", text: "text-amber-400" },
@@ -52,9 +54,22 @@ const SECONDS_PER_DAY = 86_400;
 
 // --- Public API -------------------------------------------------------------
 
-/** Classify a task into a staleness bucket at the given moment. */
+/** Whether a task is currently held back by a snooze (or a skipped cycle). */
+export function isSnoozed(task: Task, now: number = Date.now()): boolean {
+  return task.snoozedUntil != null && new Date(task.snoozedUntil).getTime() > now;
+}
+
+/**
+ * Classify a task into a staleness bucket at the given moment.
+ *
+ * A snooze wins over everything except "never done": the user has said "not
+ * now", so the task should stop presenting itself as due or overdue until the
+ * hold expires. Never-done still reads as never-done, because that is a fact
+ * about history rather than about scheduling.
+ */
 export function taskStaleness(task: Task, now: number = Date.now()): Staleness {
-  if (!task.lastCompletedAt) return "none";
+  if (!task.lastCompletedAt) return isSnoozed(task, now) ? "snoozed" : "none";
+  if (isSnoozed(task, now)) return "snoozed";
 
   const ageSeconds = (now - new Date(task.lastCompletedAt).getTime()) / 1000;
 
@@ -78,10 +93,19 @@ export function stalenessStyle(task: Task, now?: number): StalenessStyle {
   return STYLES[taskStaleness(task, now)];
 }
 
-/** The next due date (lastCompleted + interval), or null if no cadence/history. */
+/**
+ * When a task next wants attention: its cadence due time, held back by any
+ * snooze. Null without a cadence or without history, except that a snoozed task
+ * always has a next date — that is what the snooze is.
+ *
+ * Mirrors effectiveDue() in internal/api/snooze.go; the two have to agree or
+ * the UI and the reminder loop disagree about what "due" means.
+ */
 export function nextDue(task: Task): Date | null {
-  if (!task.lastCompletedAt || !task.intervalSeconds) return null;
-  return new Date(new Date(task.lastCompletedAt).getTime() + task.intervalSeconds * 1000);
+  const snoozed = task.snoozedUntil ? new Date(task.snoozedUntil) : null;
+  if (!task.lastCompletedAt || !task.intervalSeconds) return snoozed;
+  const due = new Date(new Date(task.lastCompletedAt).getTime() + task.intervalSeconds * 1000);
+  return snoozed && snoozed > due ? snoozed : due;
 }
 
 /**
@@ -146,8 +170,11 @@ export function stalenessTint(
   const fresh = task.colorFresh ?? opts.fresh;
   const overdue = task.colorOverdue ?? opts.overdue;
 
-  if (key === "none" || !task.lastCompletedAt) {
-    return { key, label, color: NEUTRAL_COLOR, fresh, overdue, t: 0, progress: null };
+  // Snoozed and never-done both read neutral: neither is a point on the
+  // fresh -> overdue scale, and colouring a snoozed task red would undo the
+  // very thing the user asked for.
+  if (key === "none" || key === "snoozed" || !task.lastCompletedAt) {
+    return { key, label, color: NEUTRAL_COLOR, fresh, overdue, t: 0, progress: cadenceProgress(task, now) };
   }
 
   // "Stay green": pin the colour (and the displayed bucket) to fresh, regardless

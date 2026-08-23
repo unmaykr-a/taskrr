@@ -47,6 +47,9 @@ authenticate either with the web UI's session cookie or with an API token (see
 | POST | `/api/me/wipe` | Delete the user's own tasks and history. |
 | DELETE | `/api/me` | Delete the account. |
 | GET | `/api/me/export` | Download your own data. `?format=csv` for CSV, JSON by default. |
+| POST | `/api/me/import` | Restore a JSON export. `?mode=merge` (default) or `?mode=replace`. |
+| GET | `/api/me/folder-shares` | Folders you have shared out. |
+| GET | `/api/me/folder-invites` | Folder invitations waiting for you. |
 | GET | `/api/me/tokens` | List your API tokens (metadata only). |
 | POST | `/api/me/tokens` | Mint a token. The response is the only time the value is returned. |
 | DELETE | `/api/me/tokens/{id}` | Revoke a token. |
@@ -112,6 +115,21 @@ per-user equivalent for taking your own data with you.
 | DELETE | `/api/completions/{id}` | Delete a completion (owner or author). |
 | GET | `/api/activity` | Completion activity over a date range. |
 
+## Task scheduling (authenticated, owner only)
+
+| Method | Path | Description |
+| --- | --- | --- |
+| POST | `/api/tasks/{id}/snooze` | Hold a task back. Body `{"until": "<RFC3339>"}`; empty clears it. |
+| POST | `/api/tasks/{id}/skip` | Move the next due date on by one routine, logging nothing. |
+| POST | `/api/tasks/{id}/pin` | Pin or unpin. Body `{"pinned": true|false}`. |
+| POST | `/api/tasks/{id}/duplicate` | Copy the definition (not the history). Body `{"name": "..."}` optional. |
+
+Snoozing and skipping share one field, `snoozedUntil`: a task's effective due
+time is the later of (last completion + routine) and that. Skipping is the same
+value computed one routine past the current due time, so a skip never writes a
+completion - the calendar, the activity chart and the per-task statistics all
+treat a completion as "you actually did this".
+
 ## Sharing (authenticated)
 
 | Method | Path | Description |
@@ -120,6 +138,24 @@ per-user equivalent for taking your own data with you.
 | POST | `/api/tasks/{id}/share/respond` | Accept or decline an invite. |
 | POST | `/api/tasks/{id}/leave` | Leave a shared task. |
 | GET | `/api/tasks/{id}/members` | List a task's members. |
+
+## Folder sharing (authenticated)
+
+Sharing a folder covers every task the owner keeps in it, including ones created
+or moved there afterwards - and moving a task out takes the access back. It is
+resolved when tasks are read, not expanded into per-task shares, so membership
+always matches where the tasks actually are. Gated by the same
+`tasks_shareable` setting as per-task sharing.
+
+The folder name is a path segment, so escape it once (`encodeURIComponent`).
+
+| Method | Path | Description |
+| --- | --- | --- |
+| POST | `/api/folders/{folder}/share` | Invite a user. Body `{"username": "..."}`. |
+| POST | `/api/folders/{folder}/share/respond` | Accept or decline. Body `{"ownerId": 1, "accept": true}`. |
+| POST | `/api/folders/{folder}/leave` | Leave a folder shared with you. Body `{"ownerId": 1}`. |
+| DELETE | `/api/folders/{folder}/share` | Remove a member. Body `{"userId": 2}`. |
+| GET | `/api/folders/{folder}/members` | Who is on one of your own folders. |
 
 ## Version
 

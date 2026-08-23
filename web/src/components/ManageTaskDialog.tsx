@@ -1,10 +1,24 @@
 import { useId, useMemo, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
-import { Archive, ArchiveRestore, BarChart3, LogOut, Pencil, Trash2, UserPlus, Users } from "lucide-react";
+import {
+  Archive,
+  ArchiveRestore,
+  BarChart3,
+  LogOut,
+  Moon,
+  Pencil,
+  SkipForward,
+  Trash2,
+  UserPlus,
+  Users,
+} from "lucide-react";
 
 import { api, type Completion, type Task } from "@/lib/api";
 import { formatDate, formatDateTime, formatGap } from "@/lib/time";
 import { PACE_LABELS, paceVerdict, taskStats } from "@/lib/stats";
+import { isSnoozed } from "@/lib/staleness";
+import { useNow } from "@/lib/useNow";
+import { useTaskActions } from "@/components/useTaskActions";
 import { usePrefs } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 import { Button } from "@/components/ui/button";
@@ -51,6 +65,8 @@ export function ManageTaskPanel({ task, onClose }: { task: Task; onClose: () => 
         </div>
       )}
 
+      {isOwner && <ScheduleSection task={task} />}
+
       <ShareSection task={task} isOwner={isOwner} onLeft={onClose} />
 
       <hr className="border-border/60" />
@@ -62,6 +78,68 @@ export function ManageTaskPanel({ task, onClose }: { task: Task; onClose: () => 
           <hr className="border-border/60" />
           <DangerZone task={task} onDeleted={onClose} />
         </>
+      )}
+    </div>
+  );
+}
+
+// ScheduleSection: put a task off without touching what it is.
+//
+// The context menu covers the common cases with fixed presets ("3 days"); this
+// is where an exact date lives, along with the two other scheduling verbs. Skip
+// is deliberately worded as moving the schedule, never as "done" — it writes no
+// history, and the statistics and calendar depend on that staying true.
+function ScheduleSection({ task }: { task: Task }) {
+  const actions = useTaskActions();
+  const now = useNow();
+  const snoozed = isSnoozed(task, now);
+  const [until, setUntil] = useState<Date>(() => new Date(Date.now() + 24 * 3_600_000));
+
+  return (
+    <div className="space-y-2">
+      <hr className="border-border/60" />
+      <p className="flex items-center gap-1.5 text-sm font-medium">
+        <Moon className="h-4 w-4" /> Scheduling
+      </p>
+
+      {snoozed && task.snoozedUntil ? (
+        <div className="flex flex-wrap items-center justify-between gap-2 rounded-md border px-2 py-1.5 text-sm">
+          <span className="text-muted-foreground">
+            Snoozed until <span className="font-medium text-foreground">{formatDateTime(task.snoozedUntil)}</span>
+          </span>
+          <Button size="sm" variant="outline" onClick={() => actions.wake.mutate(task)}>
+            Wake up now
+          </Button>
+        </div>
+      ) : (
+        <div className="space-y-2">
+          <Label className="text-xs text-muted-foreground">Snooze until</Label>
+          <DateTimePicker value={until} onChange={setUntil} />
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={actions.snoozeUntil.isPending}
+            onClick={() => actions.snoozeUntil.mutate({ task, until })}
+          >
+            {actions.snoozeUntil.isPending ? "Snoozing…" : "Snooze"}
+          </Button>
+        </div>
+      )}
+
+      {task.intervalSeconds != null && (
+        <div className="flex flex-wrap items-center justify-between gap-2">
+          <p className="text-xs text-muted-foreground">
+            Skip this cycle — moves the next due date on by one routine without logging anything.
+          </p>
+          <Button
+            size="sm"
+            variant="outline"
+            disabled={actions.skip.isPending}
+            onClick={() => actions.skip.mutate(task)}
+          >
+            <SkipForward className="h-3.5 w-3.5" /> Skip
+          </Button>
+        </div>
       )}
     </div>
   );
@@ -157,6 +235,17 @@ function ShareSection({ task, isOwner, onLeft }: { task: Task; isOwner: boolean;
   );
 }
 
+// Matches the account-wide options in RemindersSection, so a per-task override
+// is picked from the same vocabulary rather than a second, subtly different one.
+const REMINDER_LEADS: { label: string; value: number }[] = [
+  { label: "When it's due", value: 0 },
+  { label: "1 hour before", value: 3600 },
+  { label: "6 hours before", value: 21600 },
+  { label: "1 day before", value: 86400 },
+  { label: "3 days before", value: 259200 },
+  { label: "1 week before", value: 604800 },
+];
+
 function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
   const { prefs } = usePrefs();
   const nameId = useId();
@@ -169,6 +258,9 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
   const [freezeColor, setFreezeColor] = useState(task.freezeColor);
   const [tags, setTags] = useState<string[]>(task.tags);
   const [folder, setFolder] = useState(task.folder);
+  const [pinned, setPinned] = useState(task.pinned);
+  const [rotate, setRotate] = useState(task.rotate);
+  const [reminderLead, setReminderLead] = useState<number | null>(task.reminderLeadSeconds);
   const queryClient = useQueryClient();
   const folderSuggestions = folderNames(queryClient.getQueryData<Task[]>(["tasks"]) ?? []);
 
@@ -184,6 +276,9 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
         freezeColor,
         tags,
         folder: folder.trim(),
+        pinned,
+        rotate,
+        reminderLeadSeconds: intervalSeconds == null ? null : reminderLead,
       }),
     onSuccess: () => {
       queryClient.invalidateQueries({ queryKey: ["tasks"] });
@@ -214,6 +309,63 @@ function EditSection({ task, onDone }: { task: Task; onDone: () => void }) {
         />
       </div>
       <IntervalField value={intervalSeconds} onChange={setIntervalSeconds} />
+
+      {/* A reminder lead only means something for a task with a routine — there
+          is nothing to be early for otherwise — so it appears with one. */}
+      {intervalSeconds != null && (
+        <div className="space-y-1">
+          <Label>Remind me</Label>
+          <select
+            className="h-9 w-full rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+            value={reminderLead == null ? "" : String(reminderLead)}
+            onChange={(e) => setReminderLead(e.target.value === "" ? null : Number(e.target.value))}
+          >
+            <option value="" className="bg-background">
+              Use my account setting
+            </option>
+            {REMINDER_LEADS.map((o) => (
+              <option key={o.value} value={o.value} className="bg-background">
+                {o.label}
+              </option>
+            ))}
+          </select>
+          <p className="text-[11px] text-muted-foreground">
+            Only applies when reminders are switched on in your account.
+          </p>
+        </div>
+      )}
+
+      {/* A rota only means anything once more than one person can log the task,
+          so it appears on shared tasks and nowhere else. */}
+      {task.shared && (
+        <label className="flex items-center justify-between gap-2 text-sm">
+          <span className="text-muted-foreground">
+            Take turns
+            <span className="block text-xs">
+              Shows whose turn it is, moving to the next person each time someone logs it
+            </span>
+          </span>
+          <input
+            type="checkbox"
+            className="h-4 w-4 shrink-0 accent-primary"
+            checked={rotate}
+            onChange={(e) => setRotate(e.target.checked)}
+          />
+        </label>
+      )}
+
+      <label className="flex items-center justify-between gap-2 text-sm">
+        <span className="text-muted-foreground">
+          Pin to top
+          <span className="block text-xs">Keeps this task first, whatever the list is sorted by</span>
+        </span>
+        <input
+          type="checkbox"
+          className="h-4 w-4 shrink-0 accent-primary"
+          checked={pinned}
+          onChange={(e) => setPinned(e.target.checked)}
+        />
+      </label>
 
       <div className="space-y-2">
         <Label>Tags</Label>

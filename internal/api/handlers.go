@@ -60,6 +60,10 @@ type taskRequest struct {
 	FreezeColor     bool     `json:"freezeColor"`
 	Tags            []string `json:"tags"`
 	Folder          string   `json:"folder"`
+	Pinned          bool     `json:"pinned"`
+	Rotate          bool     `json:"rotate"`
+	// ReminderLeadSeconds overrides the account-wide reminder lead; null uses it.
+	ReminderLeadSeconds *int64 `json:"reminderLeadSeconds"`
 }
 
 // normalizeTags trims, drops empties, caps length, and de-duplicates
@@ -116,15 +120,23 @@ func (req taskRequest) toInput() (store.TaskInput, string) {
 	if utf8.RuneCountInString(folder) > maxFolderLen {
 		return store.TaskInput{}, fmt.Sprintf("folder must be at most %d characters", maxFolderLen)
 	}
+	// A negative lead would schedule the reminder *after* the due time, which is
+	// not a reminder. Zero is legitimate — "tell me exactly when it's due".
+	if req.ReminderLeadSeconds != nil && *req.ReminderLeadSeconds < 0 {
+		return store.TaskInput{}, "reminderLeadSeconds must be zero or more, or null"
+	}
 	return store.TaskInput{
-		Name:            name,
-		Description:     strings.TrimSpace(req.Description),
-		IntervalSeconds: req.IntervalSeconds,
-		ColorFresh:      req.ColorFresh,
-		ColorOverdue:    req.ColorOverdue,
-		FreezeColor:     req.FreezeColor,
-		Tags:            tags,
-		Folder:          folder,
+		Name:                name,
+		Description:         strings.TrimSpace(req.Description),
+		IntervalSeconds:     req.IntervalSeconds,
+		ColorFresh:          req.ColorFresh,
+		ColorOverdue:        req.ColorOverdue,
+		FreezeColor:         req.FreezeColor,
+		Tags:                tags,
+		Folder:              folder,
+		Pinned:              req.Pinned,
+		Rotate:              req.Rotate,
+		ReminderLeadSeconds: req.ReminderLeadSeconds,
 	}, ""
 }
 

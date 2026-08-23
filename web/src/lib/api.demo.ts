@@ -47,6 +47,12 @@ interface StoredTask {
   tags: string[];
   folder: string;
   archivedAt: string | null;
+  // Optional so a sandbox saved by an older demo build still loads; the
+  // projection below fills in the defaults.
+  snoozedUntil?: string | null;
+  pinned?: boolean;
+  rotate?: boolean;
+  reminderLeadSeconds?: number | null;
   createdAt: string;
   updatedAt: string;
 }
@@ -567,6 +573,10 @@ function toTask(db: DB, t: StoredTask): Task {
     tags: t.tags ?? [],
     folder: t.folder ?? "",
     archivedAt: t.archivedAt,
+    snoozedUntil: t.snoozedUntil ?? null,
+    pinned: t.pinned ?? false,
+    rotate: t.rotate ?? false,
+    reminderLeadSeconds: t.reminderLeadSeconds ?? null,
     createdAt: t.createdAt,
     updatedAt: t.updatedAt,
     lastCompletedAt: last,
@@ -684,6 +694,10 @@ export const demoApi: Api = {
       tags: input.tags ?? [],
       folder: input.folder ?? "",
       archivedAt: null,
+      snoozedUntil: null,
+      pinned: input.pinned ?? false,
+      rotate: input.rotate ?? false,
+      reminderLeadSeconds: input.reminderLeadSeconds ?? null,
       createdAt: now,
       updatedAt: now,
     };
@@ -703,9 +717,72 @@ export const demoApi: Api = {
     if (input.freezeColor !== undefined) t.freezeColor = input.freezeColor;
     if (input.tags !== undefined) t.tags = input.tags;
     if (input.folder !== undefined) t.folder = input.folder;
+    if (input.pinned !== undefined) t.pinned = input.pinned;
+    if (input.rotate !== undefined) t.rotate = input.rotate;
+    if (input.reminderLeadSeconds !== undefined) t.reminderLeadSeconds = input.reminderLeadSeconds;
     t.updatedAt = new Date().toISOString();
     saveDB(db);
     return tick(toTask(db, t));
+  },
+
+  snoozeTask: (id: number, untilISO: string | null) => {
+    const db = loadDB();
+    const t = findTask(db, id);
+    // Same rule as the server: a snooze already in the past is simply over.
+    t.snoozedUntil = untilISO && new Date(untilISO).getTime() > Date.now() ? untilISO : null;
+    t.updatedAt = new Date().toISOString();
+    saveDB(db);
+    return tick(toTask(db, t));
+  },
+
+  skipTask: (id: number) => {
+    const db = loadDB();
+    const t = findTask(db, id);
+    if (!t.intervalSeconds || t.intervalSeconds <= 0) {
+      return Promise.reject(new Error("only a task with a routine has a cycle to skip"));
+    }
+    const projected = toTask(db, t);
+    const interval = t.intervalSeconds * 1000;
+    // Effective due = max(last completion + interval, current snooze).
+    let due = projected.lastCompletedAt
+      ? new Date(projected.lastCompletedAt).getTime() + interval
+      : Date.now();
+    if (t.snoozedUntil) due = Math.max(due, new Date(t.snoozedUntil).getTime());
+    let next = due + interval;
+    // Skipping something several cycles overdue still has to land ahead of now.
+    while (next <= Date.now()) next += interval;
+    t.snoozedUntil = new Date(next).toISOString();
+    t.updatedAt = new Date().toISOString();
+    saveDB(db);
+    return tick(toTask(db, t));
+  },
+
+  pinTask: (id: number, pinned: boolean) => {
+    const db = loadDB();
+    const t = findTask(db, id);
+    t.pinned = pinned;
+    t.updatedAt = new Date().toISOString();
+    saveDB(db);
+    return tick(toTask(db, t));
+  },
+
+  duplicateTask: (id: number, name?: string) => {
+    const db = loadDB();
+    const src = findTask(db, id);
+    const now = new Date().toISOString();
+    // Definition only: no history, no snooze, never archived.
+    const copy: StoredTask = {
+      ...src,
+      id: db.nextTaskId++,
+      name: (name ?? "").trim() || `${src.name} (copy)`,
+      archivedAt: null,
+      snoozedUntil: null,
+      createdAt: now,
+      updatedAt: now,
+    };
+    db.tasks.push(copy);
+    saveDB(db);
+    return tick(toTask(db, copy));
   },
 
   deleteTask: (id: number) => {
@@ -793,6 +870,16 @@ export const demoApi: Api = {
   },
 
   // --- shared tasks (the demo is single-user, so sharing is hidden/empty) ---
+  // The demo is single-user, so there is nobody to share with. authConfig
+  // reports tasksShareable: false, which hides all of this in the UI.
+  shareFolder: notAvailable,
+  respondFolderShare: notAvailable,
+  leaveFolder: notAvailable,
+  unshareFolder: notAvailable,
+  listFolderMembers: () => tick([]),
+  listMyFolderShares: () => tick([]),
+  listFolderInvites: () => tick([]),
+
   shareTask: notAvailable,
   respondShare: notAvailable,
   leaveTask: notAvailable,
@@ -895,6 +982,81 @@ export const demoApi: Api = {
       tasks,
     };
     return tick(new Blob([JSON.stringify(doc, null, 2)], { type: "application/json" }));
+  },
+
+  // Import works in the demo for the same reason export does: the sandbox is
+  // in the browser, so a file can be restored straight into it.
+  importData: (json: string, mode: "merge" | "replace") => {
+    let doc: { format?: string; tasks?: unknown[] };
+    try {
+      doc = JSON.parse(json);
+    } catch {
+      return Promise.reject(new Error("could not read that file as JSON"));
+    }
+    if (doc.format !== "taskrr-export-v1") {
+      return Promise.reject(new Error("unrecognised file (expected a taskrr-export-v1 export)"));
+    }
+    const incoming = Array.isArray(doc.tasks) ? doc.tasks : [];
+    if (incoming.length === 0) return Promise.reject(new Error("the file contains no tasks"));
+
+    const db = loadDB();
+    let tasksDeleted = 0;
+    if (mode === "replace") {
+      tasksDeleted = db.tasks.length;
+      db.tasks = [];
+      db.completions = [];
+    }
+    const now = new Date().toISOString();
+    const skipped: string[] = [];
+    let tasksCreated = 0;
+    let completionsAdded = 0;
+
+    for (const raw of incoming as Record<string, unknown>[]) {
+      const name = String(raw.name ?? "").trim();
+      if (!name) {
+        skipped.push("a task with no name");
+        continue;
+      }
+      // Ids and owners in the file are ignored, exactly as the server does.
+      const t: StoredTask = {
+        id: db.nextTaskId++,
+        name,
+        description: String(raw.description ?? ""),
+        intervalSeconds: typeof raw.intervalSeconds === "number" ? raw.intervalSeconds : null,
+        colorFresh: typeof raw.colorFresh === "string" ? raw.colorFresh : null,
+        colorOverdue: typeof raw.colorOverdue === "string" ? raw.colorOverdue : null,
+        freezeColor: raw.freezeColor === true,
+        tags: Array.isArray(raw.tags) ? (raw.tags as string[]).map(String) : [],
+        folder: String(raw.folder ?? ""),
+        archivedAt: null,
+        snoozedUntil: null,
+        pinned: raw.pinned === true,
+        rotate: raw.rotate === true,
+        reminderLeadSeconds: null,
+        createdAt: now,
+        updatedAt: now,
+      };
+      db.tasks.push(t);
+      tasksCreated++;
+      const completions = Array.isArray(raw.completions) ? raw.completions : [];
+      for (const c of completions as Record<string, unknown>[]) {
+        const at = typeof c.completedAt === "string" ? c.completedAt : "";
+        if (!at || Number.isNaN(Date.parse(at))) {
+          skipped.push(`a completion of ${name} had no timestamp`);
+          continue;
+        }
+        db.completions.push({
+          id: db.nextCompletionId++,
+          taskId: t.id,
+          completedAt: new Date(at).toISOString(),
+          note: String(c.note ?? ""),
+          createdAt: now,
+        });
+        completionsAdded++;
+      }
+    }
+    saveDB(db);
+    return tick({ mode, tasksCreated, completionsAdded, tasksDeleted, skipped });
   },
 
   // Bearer tokens need a server to authenticate against; the UI is gated off
