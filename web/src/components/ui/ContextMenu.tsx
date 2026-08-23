@@ -82,15 +82,23 @@ export function ContextMenu({
 
   // Keep the menu inside the viewport: flip up/left rather than letting it hang
   // off the edge, which is where a right-click near the bottom usually lands.
+  //
+  // The menu renders at the cursor already (see the style below), so this only
+  // ever *corrects* an overflow, and it runs before paint. Measuring needs the
+  // laid-out box, which is why it can't be done while choosing the point.
   useLayoutEffect(() => {
     if (!at || !menuRef.current) return;
     const el = menuRef.current;
-    const { width, height } = el.getBoundingClientRect();
+    // offsetWidth/Height, not getBoundingClientRect: the zoom-in animation is
+    // already running here, and a rect measured mid-zoom reports 95% of the
+    // real size — enough to conclude the menu fits when it doesn't, and to
+    // leave it hanging off the bottom once the animation settles.
+    const { offsetWidth: width, offsetHeight: height } = el;
     let { x, y } = at;
     if (x + width > window.innerWidth - EDGE_GAP) x = Math.max(EDGE_GAP, x - width);
     if (y + height > window.innerHeight - EDGE_GAP) y = Math.max(EDGE_GAP, y - height);
-    el.style.left = `${x}px`;
-    el.style.top = `${y}px`;
+    if (x !== at.x) el.style.left = `${x}px`;
+    if (y !== at.y) el.style.top = `${y}px`;
   }, [at, items]);
 
   // Dismissal. Scroll and resize close rather than reposition: a menu anchored
@@ -196,11 +204,18 @@ export function ContextMenu({
           aria-orientation="vertical"
           tabIndex={-1}
           autoFocus
-          // Positioned by the layout effect above; the initial offscreen spot
-          // avoids a one-frame flash at the wrong place.
-          style={{ left: -9999, top: -9999 }}
+          // Rendered at the cursor from the very first paint. It used to park
+          // offscreen and get moved by the layout effect, which looked fine in
+          // theory but flew across the screen in practice: `duration-100` sets
+          // transition-duration, transition-property defaults to `all`, and so
+          // the correcting jump from -9999 was itself animated.
+          //
+          // `transition-none` keeps that from coming back the next time an
+          // animation utility lands here.
+          style={{ left: at.x, top: at.y }}
           className={cn(
             "fixed z-[60] w-52 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl outline-none",
+            "transition-none",
             prefs.animWindows && "animate-in fade-in-0 zoom-in-95 duration-100",
           )}
           onKeyDown={(e) => {

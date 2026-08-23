@@ -1,19 +1,12 @@
 import { useEffect, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
-  Archive,
-  ArchiveRestore,
-  BellOff,
   Check,
   Clock,
-  Copy,
   Moon,
   Pin,
-  PinOff,
   Repeat,
   Settings2,
-  SkipForward,
-  Trash2,
   Users,
   Zap,
 } from "lucide-react";
@@ -37,8 +30,8 @@ import {
   CardTitle,
 } from "@/components/ui/card";
 import { useTaskWindows } from "@/components/useTaskWindows";
-import { ContextMenu, type ContextMenuEntry } from "@/components/ui/ContextMenu";
-import { SNOOZE_PRESETS, useTaskActions } from "@/components/useTaskActions";
+import { ContextMenu } from "@/components/ui/ContextMenu";
+import { useTaskMenu } from "@/components/useTaskActions";
 import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -85,11 +78,8 @@ export function TaskCard({
   const overdueColor = ensureContrast(status.overdue, surface);
   const queryClient = useQueryClient();
   const { openManage, openComplete } = useTaskWindows();
-  const actions = useTaskActions();
+  const taskMenu = useTaskMenu();
   const { user } = useAuth();
-  // Scheduling and structure belong to the owner; a member of a shared task
-  // gets only the actions they're actually allowed to perform.
-  const isOwner = user ? task.ownerId === user.id : true;
   const snoozed = isSnoozed(task, now);
   const archived = task.archivedAt != null;
 
@@ -104,62 +94,6 @@ export function TaskCard({
   const order = rotationOrder(members);
   const turn = rotating ? nextUp(order, task.lastCompletedBy) : null;
   const myTurn = rotating && isMyTurn(order, task.lastCompletedBy, user?.username);
-
-  // Built lazily by the menu on open, so labels track current state.
-  const menuEntries = (): ContextMenuEntry[] => {
-    const entries: ContextMenuEntry[] = [];
-    if (!archived) {
-      entries.push({ label: "Quick log", icon: <Zap />, onSelect: () => actions.quickLog.mutate(task) });
-      entries.push({ label: "Log with time…", icon: <Clock />, onSelect: () => openComplete(task) });
-    }
-    entries.push({ label: "Manage…", icon: <Settings2 />, onSelect: () => openManage(task) });
-
-    if (isOwner && !archived) {
-      entries.push({ separator: true });
-      if (snoozed) {
-        entries.push({ label: "Wake up now", icon: <BellOff />, onSelect: () => actions.wake.mutate(task) });
-      } else {
-        for (const preset of SNOOZE_PRESETS) {
-          entries.push({
-            label: `Snooze ${preset.label}`,
-            icon: <Moon />,
-            onSelect: () => actions.snooze.mutate({ task, hours: preset.hours }),
-          });
-        }
-      }
-      entries.push({
-        label: "Skip this cycle",
-        icon: <SkipForward />,
-        // Only a routine has a cycle to skip; shown-but-disabled explains why
-        // the action exists without pretending it applies here.
-        disabled: task.intervalSeconds == null,
-        onSelect: () => actions.skip.mutate(task),
-      });
-    }
-
-    if (isOwner) {
-      entries.push({ separator: true });
-      entries.push({
-        label: task.pinned ? "Unpin" : "Pin to top",
-        icon: task.pinned ? <PinOff /> : <Pin />,
-        onSelect: () => actions.pin.mutate({ task, pinned: !task.pinned }),
-      });
-      entries.push({ label: "Duplicate", icon: <Copy />, onSelect: () => actions.duplicate.mutate(task) });
-      entries.push({
-        label: archived ? "Restore" : "Archive",
-        icon: archived ? <ArchiveRestore /> : <Archive />,
-        onSelect: () => actions.archive.mutate({ task, archived: !archived }),
-      });
-      entries.push({ separator: true });
-    }
-    entries.push({
-      label: isOwner ? "Delete" : "Leave task",
-      icon: <Trash2 />,
-      destructive: true,
-      onSelect: () => void actions.confirmDelete(task),
-    });
-    return entries;
-  };
 
   // Quick log: one tap records "done right now". `justLogged` drives the brief
   // success state (check on the button + a pulse ring on the card).
@@ -180,7 +114,7 @@ export function TaskCard({
   });
 
   return (
-    <ContextMenu entries={menuEntries} disabled={selectable}>
+    <ContextMenu entries={taskMenu(task)} disabled={selectable}>
     <Card
       data-flip-key={task.id}
       className={cn(

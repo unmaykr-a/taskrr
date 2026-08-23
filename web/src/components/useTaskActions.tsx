@@ -1,9 +1,26 @@
 import { useMutation, useQueryClient } from "@tanstack/react-query";
+import {
+  Archive,
+  ArchiveRestore,
+  BellOff,
+  Clock,
+  Copy,
+  Moon,
+  Pin,
+  PinOff,
+  Settings2,
+  SkipForward,
+  Trash2,
+  Zap,
+} from "lucide-react";
 
 import { api, type Task } from "@/lib/api";
-import { nextDue } from "@/lib/staleness";
+import { isSnoozed, nextDue } from "@/lib/staleness";
+import { useAuth } from "@/components/AuthProvider";
 import { useToast } from "@/components/ui/Toast";
 import { useConfirm } from "@/components/ui/ConfirmDialog";
+import { type ContextMenuEntry } from "@/components/ui/ContextMenu";
+import { useTaskWindows } from "@/components/useTaskWindows";
 
 /**
  * useTaskActions — the task verbs that aren't editing a field.
@@ -144,4 +161,82 @@ export function useTaskActions() {
   };
 
   return { quickLog, snooze, snoozeUntil, wake, skip, pin, duplicate, archive, confirmDelete };
+}
+
+/**
+ * useTaskMenu — the right-click menu for a task, wherever it is right-clicked.
+ *
+ * Lives here rather than in TaskCard because the cards are no longer the only
+ * place a task appears: the calendar's day list shows them too, and a menu that
+ * offered a different set of actions depending on which list you found the task
+ * in would be worse than no menu at all.
+ *
+ * Returns a builder rather than the entries themselves — ContextMenu calls it
+ * on open, so labels ("Pin" vs "Unpin") reflect the task as it is now.
+ */
+export function useTaskMenu() {
+  const actions = useTaskActions();
+  const { openManage, openComplete } = useTaskWindows();
+  const { user } = useAuth();
+
+  return (task: Task) => (): ContextMenuEntry[] => {
+    // Scheduling and structure belong to the owner; a member of a shared task
+    // gets only the actions they're actually allowed to perform.
+    const isOwner = user ? task.ownerId === user.id : true;
+    const archived = task.archivedAt != null;
+    const snoozed = isSnoozed(task);
+
+    const entries: ContextMenuEntry[] = [];
+    if (!archived) {
+      entries.push({ label: "Quick log", icon: <Zap />, onSelect: () => actions.quickLog.mutate(task) });
+      entries.push({ label: "Log with time…", icon: <Clock />, onSelect: () => openComplete(task) });
+    }
+    entries.push({ label: "Manage…", icon: <Settings2 />, onSelect: () => openManage(task) });
+
+    if (isOwner && !archived) {
+      entries.push({ separator: true });
+      if (snoozed) {
+        entries.push({ label: "Wake up now", icon: <BellOff />, onSelect: () => actions.wake.mutate(task) });
+      } else {
+        for (const preset of SNOOZE_PRESETS) {
+          entries.push({
+            label: `Snooze ${preset.label}`,
+            icon: <Moon />,
+            onSelect: () => actions.snooze.mutate({ task, hours: preset.hours }),
+          });
+        }
+      }
+      entries.push({
+        label: "Skip this cycle",
+        icon: <SkipForward />,
+        // Only a routine has a cycle to skip; shown-but-disabled explains why
+        // the action exists without pretending it applies here.
+        disabled: task.intervalSeconds == null,
+        onSelect: () => actions.skip.mutate(task),
+      });
+    }
+
+    if (isOwner) {
+      entries.push({ separator: true });
+      entries.push({
+        label: task.pinned ? "Unpin" : "Pin to top",
+        icon: task.pinned ? <PinOff /> : <Pin />,
+        onSelect: () => actions.pin.mutate({ task, pinned: !task.pinned }),
+      });
+      entries.push({ label: "Duplicate", icon: <Copy />, onSelect: () => actions.duplicate.mutate(task) });
+      entries.push({
+        label: archived ? "Restore" : "Archive",
+        icon: archived ? <ArchiveRestore /> : <Archive />,
+        onSelect: () => actions.archive.mutate({ task, archived: !archived }),
+      });
+      entries.push({ separator: true });
+    }
+    entries.push({
+      label: isOwner ? "Delete" : "Leave task",
+      icon: <Trash2 />,
+      destructive: true,
+      onSelect: () => void actions.confirmDelete(task),
+    });
+    return entries;
+  };
 }
