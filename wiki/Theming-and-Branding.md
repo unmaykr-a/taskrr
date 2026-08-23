@@ -18,6 +18,22 @@ From the floating theme customiser (a settings window) each user can adjust:
 Saved themes are stored per account on the server (not just in the browser), so
 they follow you across devices and survive sign-out.
 
+### Readability
+
+Whatever accent you pick, the text drawn in it stays readable. Taskrr keeps two
+versions of your accent: the colour itself, used wherever it is painted as a
+block (buttons, the progress bar, the selected day), and a version nudged just
+far enough to clear the WCAG AA contrast threshold, used wherever the accent is
+drawn as *text* - the selected sidebar item, mostly.
+
+That means a very pale or very dark accent still gives you legible text without
+Taskrr quietly changing the colour you chose. If your accent is already readable
+- most are - the two are the same colour and nothing is adjusted at all.
+
+The same treatment applies to secondary text and to the staleness labels on
+cards, which is why an overdue date on a light theme keeps its red without
+becoming a pale smear.
+
 ### Task colours
 
 Task staleness colours - the fresh-to-overdue shading - are tunable policy:

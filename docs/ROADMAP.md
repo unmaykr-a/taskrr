@@ -26,7 +26,7 @@ For context on what the next batch builds against.
 | Per-user data export | JSON and CSV, owner-scoped. |
 | API tokens | Bearer credentials scoped to tasks and completions only. |
 
-### 1.16.0 — the batch this roadmap planned
+### 1.16.0
 
 | Feature | Notes |
 | --- | --- |
@@ -38,78 +38,70 @@ For context on what the next batch builds against.
 | JSON import | Merge or replace, with nothing structural trusted from the file. |
 | Pin, duplicate, quick add, tab count, web manifest | The quality-of-life batch. |
 
-Two bugs worth remembering, both found by tests rather than by luck: the
-folder grammar in quick add was ambiguous when the folder came first, and
-`IntervalField` ignored its `value` prop after mount — invisible until
-something other than typing tried to set a routine.
+### 1.17.0
+
+| Feature | Notes |
+| --- | --- |
+| Accent-as-text token | `--primary-readable`, applied in the Tailwind config rather than at 40 call sites. Closes the last known AA gap. |
+| Undo on a completion | An action slot on the toast, wired to the completion the log just created. |
+| Bulk snooze and skip | Skip filters the selection to tasks that have a routine. |
+| CSV import | One generic column mapper; produces the same document the JSON importer takes. |
+| Calendar context menu and Today | The day list is tasks like any other, so it gets the same menu. |
+| Demo seasons | Year-round core plus a per-season list, auto-picked by month. |
+
+Three bugs worth remembering from this batch, all in the same 200 lines. The
+right-click menu flew in across the screen because `duration-100` sets
+`transition-duration` while `transition-property` defaults to `all` — so moving
+it from its off-screen parking spot to the cursor was itself a transition. It
+then hung off the bottom of the viewport because the edge-flip measured with
+`getBoundingClientRect` while the zoom-in was still running, and read 95% of the
+real height. And the theme sweep that "passed" for five presets was measuring
+one preset five times, because the browser restores the theme on load and the
+harness never checked what it had actually applied.
 
 ---
 
 ## Next batch
 
-The planned batch is done. What follows is what the work itself surfaced, in
-the order it seems worth doing.
+### 1. Per-tag colours
 
-### 1. An "accent on surface" colour token
+Tags are all one colour. A colour per tag is the cheapest remaining win for
+anyone whose list has grown past a screenful, and the tag input already has the
+picker component it would need.
 
-The one item left open from the contrast work, and now the only known place the
-app falls short of AA: in the `paper` preset the active sidebar item renders the
-user's accent as text at 4.26:1 against the sidebar.
+**Cost.** Low. **Watch for.** Contrast — a user-chosen tag colour drawn as text
+needs the same treatment the accent just got, which is now a helper rather than
+a research problem.
 
-**Shape.** A `--primary-readable` token, derived with the existing
-`ensureContrast()`, used wherever the accent is drawn as *text* (`text-primary`)
-while `bg-primary` keeps the colour the user actually chose. The helper and its
-tests already exist; this is finding the call sites and adding one token.
+### 2. Task templates
 
-**Cost.** Low. **Watch for.** Doing it in the theme engine, not per component,
-or the two will drift.
+"New task like this one" without needing an existing task to duplicate. Falls
+out of duplicate, which already does the copy-without-history part.
 
-### 2. Undo on a completion
+**Cost.** Low-medium, mostly deciding where templates live and whether they sync.
 
-The accident that actually happens: quick log is one tap on a dense grid, and
-undoing the wrong one means opening Manage → History → delete. This was
-identified back when the trash bin was considered and dropped, and it is still
-the cheaper answer to the real problem.
+### 3. Rotation, one step further
 
-**Shape.** An action slot on the existing `Toast`, wired to
-`deleteCompletion` for the completion the log just created.
+Two things the derived rota deliberately cannot do: skipping a member's turn
+without logging for them, and a fixed order the owner arranges rather than join
+order. Both mean storing state the current design avoids, and the point of the
+current version is that nothing can drift — so this stays parked until somebody
+actually asks.
 
-**Cost.** Low. **Watch for.** The toast outliving the component that raised it.
+### 4. A service worker
 
-### 3. Snooze and skip from the bulk bar
+Genuine offline support. A real commitment: caching, invalidation, and update
+prompts, on an app that currently has no cache to get stale. The manifest
+shipped without one on purpose, and that is still the right call until someone
+wants Taskrr on a phone with no signal.
 
-Snoozing exists per task and from the right-click menu, but a selection of
-twelve tasks still has to be done one at a time. The bulk bar already fans out
-over ids and now has the panel pattern for actions that need input.
+### 5. Import, the rest of it
 
-**Cost.** Low, and it closes the gap between the two ways of acting on tasks.
-
-### 4. Import from other trackers
-
-`taskrr-export-v1` round-trips, which covers moving between instances. Coming
-*from* something else is the harder half, and the one that decides whether
-someone tries Taskrr at all.
-
-**Shape.** A CSV importer with a column-mapping step, rather than guessing a
-schema per competitor.
-
-**Cost.** Medium, mostly UI. **Watch for.** Scope: one generic mapper, not a
-per-product adapter for each tracker anyone mentions.
-
-### 5. Rotation, one step further
-
-Two things the derived rota deliberately cannot do, both worth having only if
-people ask: skipping a member's turn without logging for them, and a fixed
-order the owner can arrange rather than join order. Both mean storing state the
-current design avoids, so neither is free — the point of the current version is
-that nothing can drift.
-
-### 6. Quality-of-life, still unbuilt
-
-- **Task templates** — "new task like this one" without an existing task.
-- **A service worker** — genuine offline support. A real commitment: caching,
-  invalidation, and update prompts. The manifest shipped without one on purpose.
-- **Per-tag colours** — tags are all one colour today.
+The CSV mapper covers name, description, folder, tags, cadence and last-done —
+one row, one task. It does not read a column of *history*, which is what a
+tracker being migrated from actually has. Worth doing only if someone turns up
+with a file like that; the shape would be a second mapping mode keyed on a task
+identifier, and that is a lot of UI for a case nobody has reported yet.
 
 ---
 
@@ -123,14 +115,17 @@ Recorded so the same suggestions don't get relitigated every few months.
 | Built-in SMTP / email reminders | Real config surface, a dependency, and deliverability pain. The webhook already reaches ntfy, Gotify, Apprise, Discord and Home Assistant. |
 | Comments or threads on tasks | Notes on completions already carry this weight. |
 | Server-side search | Client-side filtering is comfortable far past any realistic personal list. |
-| A trash / recycle bin | Considered and dropped. Archive already covers "hide but keep", and `DeleteTask` is only destructive for a sole owner — a member leaves, and an owner with members transfers. A second soft-delete concept would cost more in explanation than it saves. An undo affordance on *completions* is the cheaper answer to the accident that actually happens. |
+| A trash / recycle bin | Considered and dropped. Archive already covers "hide but keep", and `DeleteTask` is only destructive for a sole owner — a member leaves, and an owner with members transfers. Undo on a completion turned out to be the cheaper answer to the accident that actually happens, and it shipped in 1.17.0. |
+| A per-product importer for each tracker | One generic CSV mapper, not an adapter per competitor. Every one of those is a schema to track forever. |
 | Native mobile apps | The web UI is responsive and a PWA manifest gets most of the benefit. |
 
 ---
 
 ## Known open items
 
-- **Accent-as-text contrast** — see "Next batch" item 1. Everything else clears
-  AA in all five presets.
 - **No service worker** — the app is installable but not offline-capable, which
-  is deliberate; see the quality-of-life list above.
+  is deliberate; see the next batch.
+- **The demo guesses the northern hemisphere** — a first visit picks its season
+  from the month, which is wrong for half the world. The banner's season picker
+  is the escape hatch; detecting it properly needs a timezone-to-hemisphere
+  guess that would be wrong in its own ways.
