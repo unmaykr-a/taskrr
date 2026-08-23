@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, LogOut, Settings, X } from "lucide-react";
+import { Check, Folder as FolderIcon, LogOut, Settings, X } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
@@ -158,30 +158,50 @@ export function Sidebar({
 
       {/* Folders narrow whichever view is open rather than being a view of their
           own — the same thing clicking a tag on a card does. Only shown when
-          there are folders to pick between. */}
+          there are folders to pick between.
+
+          Set apart from the views above with a rule and a labelled heading: the
+          rows are the same shape as the view rows, so without a break the list
+          just looked like more views with odd names. */}
       {folders.length > 0 && (
-        <div className="mt-4 space-y-1">
-          <p className="px-3 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
-            Folders
-          </p>
-          {folders.map((f) => {
-            const active = activeFolder?.toLowerCase() === f.name.toLowerCase();
-            return (
+        <div className="mt-4 border-t border-border/60 pt-4">
+          <div className="mb-1 flex items-center justify-between gap-2 px-3">
+            <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
+              <FolderIcon className="h-3 w-3" />
+              Folders
+            </span>
+            {/* Only while one is picked: says the list is narrowed, and undoes it
+                without having to remember which folder is on. */}
+            {activeFolder && (
               <button
-                key={f.name}
-                onClick={() => onFolderChange?.(active ? null : f.name)}
-                className={cn(
-                  "flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
-                  active
-                    ? "bg-primary/15 font-medium text-primary"
-                    : "text-muted-foreground hover:bg-accent hover:text-foreground",
-                )}
+                type="button"
+                onClick={() => onFolderChange?.(null)}
+                className="text-[11px] font-medium text-muted-foreground hover:text-foreground"
               >
-                <span className="min-w-0 truncate">{f.name}</span>
-                <span className="shrink-0 text-xs tabular-nums">{f.count}</span>
+                clear
               </button>
-            );
-          })}
+            )}
+          </div>
+          <div className="space-y-1">
+            {folders.map((f) => {
+              const active = activeFolder?.toLowerCase() === f.name.toLowerCase();
+              return (
+                <button
+                  key={f.name}
+                  onClick={() => onFolderChange?.(active ? null : f.name)}
+                  className={cn(
+                    "flex w-full items-center justify-between gap-2 rounded-md px-3 py-1.5 text-sm transition-colors",
+                    active
+                      ? "bg-primary/15 font-medium text-primary"
+                      : "text-muted-foreground hover:bg-accent hover:text-foreground",
+                  )}
+                >
+                  <span className="min-w-0 truncate">{f.name}</span>
+                  <span className="shrink-0 text-xs tabular-nums">{f.count}</span>
+                </button>
+              );
+            })}
+          </div>
         </div>
       )}
 
