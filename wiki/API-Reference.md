@@ -23,7 +23,8 @@ authenticate either with the web UI's session cookie or with an API token (see
 | GET | `/api/auth/config` | Public auth/branding config for the login page. |
 | GET | `/api/auth/me` | The current user, or unauthenticated. |
 | POST | `/api/auth/login` | Sign in with username and password. |
-| POST | `/api/auth/claim` | Claim the bootstrap admin by setting its first password. |
+| POST | `/api/auth/claim` | Set an invited account's first password and sign in. Takes `token` (from the invitation link), `password`, and optionally `username`, which is checked against the invitation. |
+| GET | `/api/auth/invite?token=` | Which account an invitation link opens: `{username, expiresAt}`. |
 | POST | `/api/auth/logout` | End the current session. |
 | POST | `/api/auth/register` | Self-registration (when enabled). |
 | GET | `/api/auth/oidc/login` | Begin OIDC sign-in. |
@@ -237,10 +238,11 @@ The folder name is a path segment, so escape it once (`encodeURIComponent`).
 | Method | Path | Description |
 | --- | --- | --- |
 | GET | `/api/admin/users` | List users. |
-| POST | `/api/admin/users` | Create a user. |
+| POST | `/api/admin/users` | Create a user. Omitting `password` returns an `invite` object (`token`, `url`, `expiresAt`) alongside the user - the only time the token is readable. |
 | PATCH | `/api/admin/users/{id}` | Update a user (role, username, password). |
 | DELETE | `/api/admin/users/{id}` | Delete a user. |
 | GET | `/api/admin/pending` | List users awaiting approval. |
+| POST | `/api/admin/users/{id}/invite` | Issue a fresh invitation for an account that has not been set up yet, retiring any previous one. |
 | POST | `/api/admin/users/{id}/approve` | Approve a pending user. |
 | POST | `/api/admin/merge` | Merge two accounts. |
 | GET | `/api/admin/sessions` | List active sessions. |

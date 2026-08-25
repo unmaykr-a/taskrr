@@ -192,25 +192,37 @@ func (s *Server) startOIDCFlow(w http.ResponseWriter, r *http.Request, link bool
 }
 
 // oidcRedirectURL returns the configured callback URL, or one derived from the
-// incoming request (honouring the reverse proxy's X-Forwarded-* headers) when
-// the admin left it blank — so it "just works" like other OIDC apps.
+// incoming request when the admin left it blank — so it "just works" like other
+// OIDC apps.
 func (s *Server) oidcRedirectURL(r *http.Request, cfg oidcSettings) string {
 	if strings.TrimSpace(cfg.redirectURL) != "" {
 		return strings.TrimSpace(cfg.redirectURL)
 	}
-	return baseURL(r) + "/api/auth/oidc/callback"
+	return s.baseURL(r) + "/api/auth/oidc/callback"
 }
 
-func baseURL(r *http.Request) string {
-	proto := r.Header.Get("X-Forwarded-Proto")
+// baseURL is the scheme and host this instance appears to be reached at, used
+// wherever the server has to write a link back to itself.
+//
+// The forwarding headers are only read when they come from somewhere a proxy
+// plausibly is, because a request carries whatever host its sender chose to put
+// in it. Believed unconditionally, a stranger could decide which host an invite
+// link points at, or which callback address goes to the identity provider.
+func (s *Server) baseURL(r *http.Request) string {
+	trusted := s.trustsProxyHeaders(r)
+	proto := ""
+	host := ""
+	if trusted {
+		proto = r.Header.Get("X-Forwarded-Proto")
+		host = r.Header.Get("X-Forwarded-Host")
+	}
 	if proto == "" {
-		if r.TLS != nil {
+		if r.TLS != nil || s.opts.CookieSecure {
 			proto = "https"
 		} else {
 			proto = "http"
 		}
 	}
-	host := r.Header.Get("X-Forwarded-Host")
 	if host == "" {
 		host = r.Host
 	}

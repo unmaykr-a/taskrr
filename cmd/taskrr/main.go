@@ -99,7 +99,8 @@ func main() {
 			Logs:                  logs,
 			Lite:                  cfg.Lite,
 			Experimental:          cfg.Experimental,
-			TrustProxyHeaders:     cfg.TrustProxyHeaders,
+			TrustProxyHeaders:     api.ParseProxyTrust(cfg.TrustProxyHeaders),
+			WebhookAllowPrivate:   cfg.WebhookAllowPrivate,
 			Secrets:               secrets,
 			SafetyBackupOnRestore: cfg.SafetyBackupOnRestore,
 			UpdateCheckURL:        cfg.UpdateCheckURL,
@@ -121,7 +122,7 @@ func main() {
 	// Background reminder loop: delivers webhook reminders for due tasks. Tied to
 	// its own context so it stops cleanly on shutdown, before the DB is closed.
 	remCtx, remCancel := context.WithCancel(context.Background())
-	go reminder.New(st).Run(remCtx, cfg.ReminderInterval)
+	go reminder.New(st, cfg.WebhookAllowPrivate).Run(remCtx, cfg.ReminderInterval)
 
 	// Hourly sweep of expired sessions. They're already invisible to queries, but
 	// without this they'd only ever be removed at startup (or when the exact token
@@ -174,6 +175,23 @@ func healthProbe(addr string) int {
 	return 0
 }
 
+// adminInviteTTL bounds the first-run link for the bootstrap admin.
+const adminInviteTTL = 7 * 24 * time.Hour
+
+// displayAddr turns a listen address into something that can be pasted into a
+// browser: ":8787" and "0.0.0.0:8787" mean "every interface", which is not an
+// address anyone can open.
+func displayAddr(addr string) string {
+	host, port, err := net.SplitHostPort(addr)
+	if err != nil {
+		return "http://localhost:8787"
+	}
+	if host == "" || host == "0.0.0.0" || host == "::" {
+		host = "localhost"
+	}
+	return "http://" + net.JoinHostPort(host, port)
+}
+
 // bootstrap prepares the database for serving: clears expired sessions and
 // ensures the admin account exists (adopting any pre-auth tasks). Returns the
 // bootstrap admin's id (protected from edits by other admins).
@@ -212,7 +230,25 @@ func bootstrap(st *store.Store, cfg config.Config) (int64, error) {
 		}
 	}
 	if admin.PasswordHash == nil && pwHash == nil {
-		log.Printf("warning: admin %q has no password set (set TASKRR_ADMIN_PASSWORD or _HASH)", cfg.AdminUsername)
+		// Setting a first password takes an invitation, and on a brand-new
+		// instance there is nobody to issue one — so the server issues its own
+		// and prints it. Whoever can read the log is whoever set the server up,
+		// which is exactly the person the account is for.
+		//
+		// A fresh one each start, so the operator never has to hunt back through
+		// the log for the current link, and yesterday's is not still live.
+		token, hash, err := auth.NewSessionToken()
+		if err != nil {
+			return 0, err
+		}
+		if err := st.SetUserInvite(ctx, admin.ID, hash, time.Now().UTC().Add(adminInviteTTL)); err != nil {
+			return 0, err
+		}
+		log.Printf("warning: admin %q has no password yet. Set one by opening:", cfg.AdminUsername)
+		log.Printf("           %s/#invite=%s", displayAddr(cfg.Addr), token)
+		log.Printf("         (or your own address, with that #invite=... on the end). "+
+			"The link lasts %d days and is replaced each time the server starts. "+
+			"Set TASKRR_ADMIN_PASSWORD or _HASH to skip this step.", int(adminInviteTTL/(24*time.Hour)))
 	} else {
 		log.Printf("admin account %q ready", cfg.AdminUsername)
 	}

@@ -20,9 +20,19 @@ mkdir data
 docker compose up -d
 ```
 
-Open <http://localhost:8787> and sign in as `admin`. On the first sign-in you are
-asked to set the admin password (unless you preset one - see
-[Configuration](Configuration)).
+Open <http://localhost:8787> and sign in as `admin`.
+
+If you did not preset a password, the first start prints a one-time setup link:
+
+```bash
+docker compose logs taskrr | grep invite
+```
+
+Open that link (swapping in your own address if you are not on the same
+machine) to choose the admin password. It lasts seven days, and a fresh one is
+printed each time the server starts while the account still has no password.
+Preset `TASKRR_ADMIN_PASSWORD` to skip the step entirely - see
+[Configuration](Configuration).
 
 Your data lives in the plain `./data` folder next to the compose file. Backing up
 or moving the instance is just copying that folder.
@@ -55,7 +65,21 @@ host automatically.
 
 ## Running the binary directly
 
-If you prefer not to use Docker, build from source (Go 1.25+ and Node 22+):
+Every release has prebuilt binaries on the
+[releases page](https://github.com/unmaykr-a/taskrr/releases) for Linux
+(`amd64`, `arm64`, `armv7`), macOS (Intel and Apple silicon) and Windows. Each
+one is the whole application - web UI included - with nothing to install
+alongside it:
+
+```bash
+curl -LO https://github.com/unmaykr-a/taskrr/releases/latest/download/checksums.txt
+curl -LO https://github.com/unmaykr-a/taskrr/releases/latest/download/taskrr_<version>_linux_amd64
+sha256sum --check --ignore-missing checksums.txt
+chmod +x taskrr_*_linux_amd64
+./taskrr_*_linux_amd64      # serves on :8787, data in ./data
+```
+
+Or build from source (Go 1.25+ and Node 22+):
 
 ```bash
 git clone https://github.com/unmaykr-a/taskrr.git
@@ -75,6 +99,9 @@ With Compose:
 docker compose pull
 docker compose up -d
 ```
+
+Running a binary directly, replace it with the one from the newer release and
+restart. The database is untouched by an upgrade.
 
 Schema migrations run automatically on start, in order, and are tracked so they
 only ever run once. There is no in-app auto-update; the admin changelog has an

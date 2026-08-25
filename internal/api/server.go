@@ -74,6 +74,8 @@ type AuthStore interface {
 	UpdateUserRole(ctx context.Context, id int64, role string) error
 	UpdateUsername(ctx context.Context, id int64, username string) error
 	SetUserPassword(ctx context.Context, id int64, hash *string) error
+	SetUserInvite(ctx context.Context, id int64, hash string, expires time.Time) error
+	UserByInvite(ctx context.Context, hash string, now time.Time) (store.User, error)
 	SetUserApproved(ctx context.Context, id int64, approved bool) error
 	ListPendingUsers(ctx context.Context) ([]store.User, error)
 	LinkOIDCSubject(ctx context.Context, id int64, subject string) error
@@ -151,16 +153,18 @@ type Options struct {
 	// Lite disables the multi-user surface (self-registration + creating extra
 	// accounts) for a single-person instance.
 	Lite bool
-	// TrustProxyHeaders allows reading the client IP from CF-Connecting-IP /
-	// X-Forwarded-For. Disable when the server is exposed directly, so those
-	// headers can't be spoofed to dodge the per-IP rate limiter.
-	TrustProxyHeaders bool
+	// TrustProxyHeaders decides when CF-Connecting-IP / X-Forwarded-* may be
+	// believed. See ProxyTrust; the zero value reads as ProxyTrustAuto.
+	TrustProxyHeaders ProxyTrust
 	// Secrets encrypts at-rest secrets (the OIDC client secret). A nil/no-op
 	// cipher keeps the legacy plaintext behaviour.
 	Secrets *auth.SecretCipher
 	// SafetyBackupOnRestore takes a backup of the current DB before a restore
 	// swaps it out (so a mistaken restore is recoverable). Default on.
 	SafetyBackupOnRestore bool
+	// WebhookAllowPrivate mirrors the reminder loop's setting, so the "test
+	// webhook" button reaches exactly what a real reminder would.
+	WebhookAllowPrivate bool
 	// UpdateCheckURL is fetched server-side to report the latest released
 	// version (empty disables the check).
 	UpdateCheckURL string
@@ -222,6 +226,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("GET /api/auth/me", s.handleMe)
 	mux.HandleFunc("POST /api/auth/login", s.handleLogin)
 	mux.HandleFunc("POST /api/auth/claim", s.handleClaim)
+	mux.HandleFunc("GET /api/auth/invite", s.handleInviteInfo)
 	mux.HandleFunc("POST /api/auth/logout", s.handleLogout)
 	mux.HandleFunc("POST /api/auth/register", s.handleRegister)
 	mux.HandleFunc("GET /api/auth/oidc/login", s.handleOIDCLogin)
@@ -302,6 +307,7 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("PATCH /api/admin/users/{id}", s.handleAdminUpdateUser)
 	mux.HandleFunc("DELETE /api/admin/users/{id}", s.handleAdminDeleteUser)
 	mux.HandleFunc("GET /api/admin/pending", s.handleListPending)
+	mux.HandleFunc("POST /api/admin/users/{id}/invite", s.handleAdminInviteUser)
 	mux.HandleFunc("POST /api/admin/users/{id}/approve", s.handleApproveUser)
 	mux.HandleFunc("POST /api/admin/merge", s.handleMergeUsers)
 	mux.HandleFunc("GET /api/admin/sessions", s.handleListSessions)
@@ -360,7 +366,7 @@ func (s *Server) secureHeaders(next http.Handler) http.Handler {
 		h.Set("Referrer-Policy", "same-origin")
 		h.Set("Content-Security-Policy", contentSecurityPolicy)
 		https := s.opts.CookieSecure ||
-			(s.opts.TrustProxyHeaders && r.Header.Get("X-Forwarded-Proto") == "https")
+			(s.trustsProxyHeaders(r) && r.Header.Get("X-Forwarded-Proto") == "https")
 		if https {
 			h.Set("Strict-Transport-Security", "max-age=31536000")
 		}

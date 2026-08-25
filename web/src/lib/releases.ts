@@ -37,6 +37,32 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.24.0",
+    date: "2026-08-25",
+    changes: [
+      feat(
+        "Invitation links for new accounts",
+        "Adding someone without a password now gives you a link to send them. Opening it lets them choose their own password and signs them in. A link works once and lasts a week; there is a button beside each account to issue a new one when it runs out or never arrives. On a brand-new instance with no admin password preset, the server prints its own setup link in the log.",
+      ),
+      fix(
+        "An account waiting to be set up could be claimed by anyone who knew the username",
+        "Usernames are meant to be known - they appear on shared tasks and in folder members - so knowing one was enough to set the password on an account whose owner had not signed in yet. Setting that first password now takes the invitation link.",
+      ),
+      fix(
+        "Reverse-proxy headers believed no matter who sent them",
+        "The client IP is read from X-Forwarded-For and CF-Connecting-IP, which anyone can write. It is now trusted only when the connection came from where a proxy actually runs, so an instance published straight to the internet can no longer be fed an invented address to slip past the sign-in rate limit. Behind a proxy nothing changes.",
+      ),
+      feat(
+        "Reminder webhooks can be kept off your local network",
+        "They can reach your LAN by default, since a local ntfy or Home Assistant is the usual reason to set one up. On an instance where you don't know everyone with an account, TASKRR_WEBHOOK_ALLOW_PRIVATE=false restricts them to the public internet.",
+      ),
+      feat(
+        "Downloadable builds for every release",
+        "Each release now has binaries for Linux, macOS and Windows with checksums, alongside the container image. One file, the web interface included, nothing to install beside it.",
+      ),
+    ],
+  },
+  {
     version: "1.23.2",
     date: "2026-08-25",
     changes: [

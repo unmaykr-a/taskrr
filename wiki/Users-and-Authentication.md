@@ -6,8 +6,9 @@ Sign-in is by local username and password, by OIDC single sign-on, or both.
 ## The bootstrap admin
 
 On first start a single admin account is created (`TASKRR_ADMIN_USERNAME`,
-default `admin`). If you did not preset a password, you set it in the browser on
-the first sign-in. This account is protected - other admins cannot edit or delete
+default `admin`). If you did not preset a password, the server prints a one-time
+setup link in its log - open that to choose one. A fresh link is printed on every
+start until the account has a password, so a missed one is never a lockout. This account is protected - other admins cannot edit or delete
 it, and it always keeps password sign-in as a break-glass path. See
 [Configuration](Configuration).
 
@@ -20,8 +21,9 @@ see and terminate active sessions from the admin area.
 
 Sign-in is rate limited both per username and per source IP, so neither a focused
 account attack nor a password-spray across many usernames runs unbounded. For the
-per-IP limiter to see the real address behind a proxy, keep
-`TASKRR_TRUST_PROXY_HEADERS=true` (see [Reverse Proxy and HTTPS](Reverse-Proxy-and-HTTPS)).
+per-IP limiter to see the real address behind a proxy, leave
+`TASKRR_TRUST_PROXY_HEADERS` at its default `auto` (see
+[Reverse Proxy and HTTPS](Reverse-Proxy-and-HTTPS)).
 
 ## Roles
 
@@ -32,6 +34,32 @@ There are two roles:
 - **user** - their own tasks, account, reminders, and shares.
 
 Admins manage roles from the admin area. There is always at least one admin.
+
+## Adding an account: invitations
+
+An admin can create an account with a password and tell the person what it is,
+or - more usually - leave the password blank. Leaving it blank produces an
+**invitation link**, shown once at the moment the account is created. Send that
+link to the person however you already talk to them; opening it lets them choose
+their own password and signs them straight in.
+
+A few things about the link:
+
+- It works **once**, and lapses after **seven days**.
+- Setting the password spends it. So does an admin setting a password on that
+  account by hand.
+- The secret travels in the URL's `#fragment`, which browsers never send to a
+  server - so it stays out of proxy access logs on the way in, and the sign-in
+  page removes it from the address bar as soon as it is used.
+- Issuing a new link retires the previous one. Use the **invite link** button
+  beside an account in the admin area for a link that ran out, never arrived, or
+  belongs to an account made before invitations existed.
+
+An account with no password and no usable link cannot be signed into at all
+until an admin issues one. That is deliberate: the invitation, not knowledge of
+the username, is what sets the password. Usernames are meant to be known - they
+show up on shared tasks and in folder members - so an account waiting to be set
+up would otherwise be claimable by anyone who could guess the name.
 
 ## Registration controls
 

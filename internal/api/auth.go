@@ -358,6 +358,14 @@ type credentials struct {
 	Password string `json:"password"`
 }
 
+// claimRequest sets an admin-created account's first password. Token is the
+// invitation; Username is what the sign-in page displayed, checked against it.
+type claimRequest struct {
+	Username string `json:"username"`
+	Password string `json:"password"`
+	Token    string `json:"token"`
+}
+
 // maxUsernameLen bounds new usernames — long names only bloat every response
 // that carries them (the JSON body cap is the sole limit otherwise).
 const maxUsernameLen = 64
@@ -428,30 +436,38 @@ func (s *Server) handleLogin(w http.ResponseWriter, r *http.Request) {
 	writeJSON(w, http.StatusOK, u)
 }
 
-// handleClaim lets the owner of an unclaimed local account (one with no password
-// and no linked OIDC identity) set its first password and sign in. This is how
-// admin-created accounts are activated. It's deliberately generic about why a
-// claim fails so it doesn't confirm which usernames are claimable beyond what
-// the login step already reveals.
+// handleClaim sets the first password on an admin-created account and signs in.
+//
+// The invitation is the authority here, not the username: it decides which
+// account is being claimed, and without one there is nothing to claim. A
+// username may be sent along — the sign-in page shows it, having looked it up
+// from the same token — and if it disagrees with the invitation the claim is
+// refused rather than quietly applied to the other account.
 func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 	if s.restoreInProgress(w) {
 		return
 	}
-	var req credentials
+	var req claimRequest
 	if !decodeJSON(w, r, &req) {
 		return
 	}
-	username := strings.TrimSpace(req.Username)
-	if !s.authThrottle(w, r, username) {
+	if !s.authThrottle(w, r, strings.TrimSpace(req.Username)) {
 		return
 	}
 	if s.oidcOnlyActive(r.Context()) {
 		writeError(w, http.StatusForbidden, "local sign-in is disabled — use single sign-on")
 		return
 	}
-	u, err := s.store.GetUserByUsername(r.Context(), username)
-	if err != nil || u.PasswordHash != nil || u.OIDCSubject != nil {
-		writeError(w, http.StatusConflict, "this account is already set up — sign in instead")
+	u, ok := s.userForInvite(w, req.Token, r)
+	if !ok {
+		return
+	}
+	if name := strings.TrimSpace(req.Username); name != "" && !strings.EqualFold(name, u.Username) {
+		writeError(w, http.StatusForbidden, inviteRejected)
+		return
+	}
+	if !u.Approved {
+		writeError(w, http.StatusForbidden, "your account is awaiting admin approval")
 		return
 	}
 	if err := auth.ValidatePassword(req.Password); err != nil {
@@ -463,6 +479,8 @@ func (s *Server) handleClaim(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusInternalServerError, "could not hash password")
 		return
 	}
+	// Setting the password spends the invitation: the link stops working here,
+	// not on the next request.
 	if err := s.store.SetUserPassword(r.Context(), u.ID, &hash); err != nil {
 		writeStoreError(w, err, "could not set password")
 		return
@@ -826,12 +844,13 @@ func newRateLimiter(max int, window time.Duration) *rateLimiter {
 	return &rateLimiter{hits: make(map[string][]time.Time), max: max, window: window, lastSweep: time.Now()}
 }
 
-// clientIP best-effort extracts the originating client IP. With TrustProxyHeaders
-// it honours the common reverse-proxy headers (Cloudflare's CF-Connecting-IP,
-// then X-Forwarded-For's left-most entry); otherwise — or when neither is set —
-// it uses the socket address, which can't be spoofed.
+// clientIP best-effort extracts the originating client IP. When the request's
+// forwarding headers are trusted (see trustsProxyHeaders) it honours the common
+// ones — Cloudflare's CF-Connecting-IP, then X-Forwarded-For's left-most entry;
+// otherwise — or when neither is set — it uses the socket address, which can't
+// be spoofed.
 func (s *Server) clientIP(r *http.Request) string {
-	if s.opts.TrustProxyHeaders {
+	if s.trustsProxyHeaders(r) {
 		if v := strings.TrimSpace(r.Header.Get("CF-Connecting-IP")); v != "" {
 			return v
 		}
@@ -848,11 +867,25 @@ func (s *Server) clientIP(r *http.Request) string {
 	return r.RemoteAddr
 }
 
+// ipThrottle enforces the per-IP attempt limit alone, for auth endpoints that
+// aren't about a named account. It writes a 429 and returns false when the
+// limit is exceeded.
+func (s *Server) ipThrottle(w http.ResponseWriter, r *http.Request) bool {
+	if !s.ipLimiter.allow("ip:" + s.clientIP(r)) {
+		writeError(w, http.StatusTooManyRequests, "too many attempts — wait a few minutes and try again")
+		return false
+	}
+	return true
+}
+
 // authThrottle enforces both the per-IP and per-account attempt limits for the
-// auth endpoints. It writes a 429 and returns false when either is exceeded.
+// auth endpoints. It writes a 429 and returns false when either is exceeded. An
+// empty account key checks the IP alone — sharing one bucket between every
+// caller who didn't name an account would let any of them exhaust it for all.
 func (s *Server) authThrottle(w http.ResponseWriter, r *http.Request, accountKey string) bool {
+	key := strings.ToLower(strings.TrimSpace(accountKey))
 	ipOK := s.ipLimiter.allow("ip:" + s.clientIP(r))
-	userOK := s.loginLimiter.allow("acct:" + strings.ToLower(strings.TrimSpace(accountKey)))
+	userOK := key == "" || s.loginLimiter.allow("acct:"+key)
 	if !ipOK || !userOK {
 		writeError(w, http.StatusTooManyRequests, "too many attempts — wait a few minutes and try again")
 		return false
@@ -1165,7 +1198,27 @@ func (s *Server) handleAdminCreateUser(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusConflict, "that username is taken")
 		return
 	}
-	writeJSON(w, http.StatusCreated, u)
+	// No password means the account is waiting for its owner, so it needs an
+	// invitation to hand over — this is the only time the token is readable.
+	out := adminUserCreated{User: u}
+	if in.PasswordHash == nil {
+		invite, err := s.issueInvite(r, u.ID)
+		if err != nil {
+			writeError(w, http.StatusInternalServerError, "could not create an invitation")
+			return
+		}
+		out.Invite = invite
+		out.User.InviteExpiresAt = invite.ExpiresAt
+	}
+	writeJSON(w, http.StatusCreated, out)
+}
+
+// adminUserCreated is the new account, plus the invitation when it needs one.
+// The user's own fields stay at the top level, where they were before there was
+// anything to put beside them.
+type adminUserCreated struct {
+	store.User
+	Invite *inviteInfo `json:"invite,omitempty"`
 }
 
 func (s *Server) handleAdminUpdateUser(w http.ResponseWriter, r *http.Request) {

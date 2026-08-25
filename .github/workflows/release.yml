@@ -1,5 +1,11 @@
-# Builds and publishes the multi-arch Docker image to GHCR, so users can run
-# Taskrr straight from the compose file with no cloning or building:
+# Publishes a release: the multi-arch Docker image, and — when the version in
+# web/package.json has moved on — a tagged GitHub release with binaries.
+#
+# The version in web/package.json is the trigger, so releasing is merging: no
+# separate tagging step to remember, and no way to publish a release whose
+# changelog entry was forgotten (the notes come from that changelog, and the
+# build fails without one).
+#
 #   - every push to main publishes ghcr.io/<owner>/taskrr:latest AND a tag for
 #     the current version from web/package.json (e.g. :1.5.0), so every released
 #     version stays pullable on the Packages page
@@ -50,3 +56,85 @@ jobs:
           labels: ${{ steps.meta.outputs.labels }}
           cache-from: type=gha
           cache-to: type=gha,mode=max
+
+  release:
+    name: Tag and publish the release
+    runs-on: ubuntu-latest
+    # Tags come from this job, so a tag push must not start it again.
+    if: github.event_name != 'push' || github.ref == 'refs/heads/main'
+    permissions:
+      contents: write
+    steps:
+      - uses: actions/checkout@v5
+        with:
+          fetch-depth: 0 # tags, to tell an already-released version from a new one
+      - uses: actions/setup-node@v5
+        with:
+          node-version: "22"
+          cache: npm
+          cache-dependency-path: web/package-lock.json
+      - uses: actions/setup-go@v6
+        with:
+          go-version: "1.25"
+          cache: true
+
+      # Nothing below runs when this version has already been released, which is
+      # most pushes to main.
+      - id: ver
+        run: |
+          version="$(node -p "require('./web/package.json').version")"
+          echo "version=$version" >> "$GITHUB_OUTPUT"
+          if git rev-parse -q --verify "refs/tags/v$version" >/dev/null; then
+            echo "already released as v$version — nothing to do"
+            echo "new=false" >> "$GITHUB_OUTPUT"
+          else
+            echo "new=true" >> "$GITHUB_OUTPUT"
+          fi
+
+      # A release is the artefact people actually run, so it is built from a
+      # tested tree rather than trusting that the CI workflow got there first.
+      - if: steps.ver.outputs.new == 'true'
+        run: go test ./...
+      - if: steps.ver.outputs.new == 'true'
+        working-directory: web
+        run: |
+          npm ci
+          npm run typecheck
+          npm run test
+          npm run build
+
+      # One binary per platform, each with the frontend embedded, so a download
+      # is the entire application. CGO is off (the SQLite driver is pure Go), so
+      # every target cross-compiles from this one runner.
+      - if: steps.ver.outputs.new == 'true'
+        run: |
+          mkdir -p dist
+          build() {
+            os="$1"; arch="$2"; arm="${3:-}"; ext=""
+            if [ "$os" = "windows" ]; then ext=".exe"; fi
+            name="taskrr_${{ steps.ver.outputs.version }}_${os}_${arch}${arm:+v$arm}"
+            CGO_ENABLED=0 GOOS="$os" GOARCH="$arch" GOARM="$arm" \
+              go build -trimpath -ldflags="-s -w" -o "dist/${name}${ext}" ./cmd/taskrr
+          }
+          build linux amd64
+          build linux arm64
+          build linux arm 7      # Raspberry Pi 2/3 and similar 32-bit boards
+          build darwin amd64
+          build darwin arm64
+          build windows amd64
+          # Name the binaries explicitly: a glob would expand to include
+          # checksums.txt itself, which the redirect has already created.
+          cd dist && sha256sum taskrr_* > checksums.txt && cat checksums.txt
+
+      - if: steps.ver.outputs.new == 'true'
+        run: node --experimental-strip-types scripts/release-notes.mjs > dist/NOTES.md
+
+      - if: steps.ver.outputs.new == 'true'
+        env:
+          GH_TOKEN: ${{ secrets.GITHUB_TOKEN }}
+        run: |
+          gh release create "v${{ steps.ver.outputs.version }}" \
+            --target "$GITHUB_SHA" \
+            --title "v${{ steps.ver.outputs.version }}" \
+            --notes-file dist/NOTES.md \
+            dist/taskrr_* dist/checksums.txt

@@ -53,9 +53,10 @@ That's genuinely all of it. There's a fuller
 [`docker-compose.yml`](./docker-compose.yml) in the repo with a healthcheck and
 an optional `.env` if you'd rather start from that.
 
-Sign in as `admin` and set the password on first run, or preset it with
-`TASKRR_ADMIN_PASSWORD` (or `_HASH` — `.env.example` has a one-liner for
-generating one). Everything lives in the mounted directory as a single SQLite
+Preset the admin password with `TASKRR_ADMIN_PASSWORD` (or `_HASH` —
+`.env.example` has a one-liner for generating one). Without one, the first
+start prints a setup link in the log (`docker compose logs taskrr`) — open it to
+pick a password and sign in. Everything lives in the mounted directory as a single SQLite
 file, so backing it up or moving it to another box is `cp -r`.
 
 Two things that catch people out:
@@ -133,15 +134,16 @@ with working examples. The ones that matter:
 | `TASKRR_ADDR` | `:8787` | Listen address |
 | `TASKRR_DB_PATH` | `./data/taskrr.db` | SQLite file (directory is created) |
 | `TASKRR_ADMIN_USERNAME` | `admin` | Bootstrap admin, created on first start |
-| `TASKRR_ADMIN_PASSWORD` | — | Its password; unset means you choose one on first sign-in |
+| `TASKRR_ADMIN_PASSWORD` | — | Its password; unset means the first start logs a link to set one |
 | `TASKRR_ADMIN_PASSWORD_HASH` | — | Pre-hashed alternative; wins over the plaintext |
 | `TASKRR_SESSION_TTL` | `720h` | Session length; sessions slide while in use |
 | `TASKRR_COOKIE_SECURE` | `false` | Set `true` behind HTTPS |
-| `TASKRR_TRUST_PROXY_HEADERS` | `true` | Take the client IP from proxy headers; `false` if Taskrr is exposed directly |
+| `TASKRR_TRUST_PROXY_HEADERS` | `auto` | Take the client IP from proxy headers, by default only when the connection came from a private address; `always` if your proxy reaches Taskrr from a public one |
 | `TASKRR_SECRET_KEY` | — | Encrypts the OIDC client secret at rest, so it isn't sitting in plaintext in your backups |
 | `TASKRR_LITE` | `false` | Single-person mode: no registration, no extra accounts |
 | `TASKRR_EXPERIMENTAL` | `false` | Offer the experimental flat style and alternative layouts |
 | `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop looks for due tasks |
+| `TASKRR_WEBHOOK_ALLOW_PRIVATE` | `true` | Let reminder webhooks reach your LAN; `false` restricts them to the public internet |
 | `TASKRR_SAFETY_BACKUP` | `true` | Snapshot before a restore, so a mistaken restore is undoable |
 | `TASKRR_UPDATE_CHECK_URL` | project package.json | Where the admin update check looks; empty disables it |
 | `TASKRR_OIDC_*` | — | Issuer, client id/secret, redirect URL — also editable later in the admin UI |
