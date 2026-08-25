@@ -105,3 +105,59 @@ func TestLoginLayoutRoundTrip(t *testing.T) {
 		t.Fatalf("auth config missing the layout: %s", cw.Body.String())
 	}
 }
+
+// TestInterfaceSettingsAreValidated: the instance's style and layout end up as
+// a class name and a layout decision on a page served to signed-out visitors,
+// so an unknown value is dropped rather than stored and handed out.
+func TestInterfaceSettingsAreValidated(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	admin, _ := st.CreateUser(ctx, store.UserInput{Username: "admin", Role: "admin", PasswordHash: ptr("h")})
+	s := NewServer(st, Options{ProtectedUserID: admin.ID, Experimental: true})
+	h := s.Handler()
+	cookie := signIn(t, st, s.opts.SessionTTL, admin)
+
+	put := func(t *testing.T, body string) map[string]any {
+		t.Helper()
+		req := httptest.NewRequest("PUT", "/api/admin/settings", strings.NewReader(body))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != 200 {
+			t.Fatalf("put settings = %d, body %s", rec.Code, rec.Body.String())
+		}
+		var out map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode: %v", err)
+		}
+		return out
+	}
+
+	out := put(t, `{"interface_style":"flat","interface_layout":"rail"}`)
+	if out[keyInterfaceStyle] != "flat" || out[keyInterfaceLayout] != "rail" {
+		t.Fatalf("stored style/layout = %v/%v", out[keyInterfaceStyle], out[keyInterfaceLayout])
+	}
+
+	// And they reach the signed-out config, which is the only way the login
+	// page could know what the instance looks like.
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, httptest.NewRequest("GET", "/api/auth/config", nil))
+	var cfg struct {
+		Branding struct {
+			Style  string `json:"style"`
+			Layout string `json:"layout"`
+		} `json:"branding"`
+	}
+	if err := json.Unmarshal(rec.Body.Bytes(), &cfg); err != nil {
+		t.Fatalf("decode config: %v", err)
+	}
+	if cfg.Branding.Style != "flat" || cfg.Branding.Layout != "rail" {
+		t.Fatalf("auth config style/layout = %q/%q", cfg.Branding.Style, cfg.Branding.Layout)
+	}
+
+	out = put(t, `{"interface_style":"neon","interface_layout":"carousel"}`)
+	if out[keyInterfaceStyle] != "" || out[keyInterfaceLayout] != "" {
+		t.Fatalf("unknown values were stored: %v/%v", out[keyInterfaceStyle], out[keyInterfaceLayout])
+	}
+}

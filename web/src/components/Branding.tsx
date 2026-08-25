@@ -17,6 +17,8 @@ const DEFAULTS: BrandingData = {
   loginHideText: false,
   loginLayout: "centered",
   background: 0,
+  style: "",
+  layout: "",
 };
 
 /** Read the instance branding from auth config (with defaults). Available

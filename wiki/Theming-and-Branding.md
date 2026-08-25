@@ -28,8 +28,10 @@ A picture behind the app, under whichever animated effect is running (set the
 effect to **None** for the picture on its own). Under **Settings -> Theme ->
 Background image** you can:
 
-- **Upload** PNG, JPEG, WebP, AVIF or GIF, up to 8 MB each and 40 MB per
-  account. Uploads are yours alone; nobody else on the instance can see them.
+- **Upload** PNG, JPEG, WebP, AVIF or GIF. The size limits (8 MB an image and
+  40 MB an account by default) are set by the admin - see
+  [Admin Guide](Admin-Guide#background-images). Uploads are yours alone; nobody
+  else on the instance can see them.
 - **Pick** one from your uploads, or **None** to have no picture at all even
   when the instance has one set.
 - Choose how it sits: **fill the screen**, **fit inside**, or **tile**.
@@ -51,17 +53,49 @@ Experimental - available only when the instance is started with
 
 **Soft** is Taskrr as it has always looked: rounded corners, shadowed panels,
 optional frosted glass. **Flat** squares everything off and takes the depth out
-- no drop shadows, no glass, borders doing the separating - which is closer to
-how most self-hosted dashboards look, and easier on the eye if Taskrr sits in a
-tab beside them all day.
+- no drop shadows, no glass, no frosted chrome, borders doing the separating -
+which is closer to how most self-hosted dashboards look, and easier on the eye
+if Taskrr sits in a tab beside them all day. It covers the whole interface:
+dialogs, menus, the taskbar, the toasts and the sign-in page included.
 
 It is a shape, not a palette: any theme can be either, and the two `general`
 presets are simply plain colour schemes that ship set to flat.
 
-The switch is deliberately an environment variable rather than an in-app
-setting, because it restyles every element in the app. With it off, a theme
-that carries the flat style is applied with the ordinary shape and the choice is
-kept - turning the variable back on puts it back.
+Three settings decide what you see, in this order:
+
+1. **Your theme.** Under **Settings -> Theme -> Style**, pick Soft or Flat, or
+   **Instance** to follow whatever the admin set.
+2. **The instance.** Admins set one under **Branding** (below). It covers the
+   sign-in page and everyone who hasn't chosen for themselves.
+3. **The environment.** None of it exists unless the instance runs with
+   `TASKRR_EXPERIMENTAL=true`. With the variable off, a theme carrying the flat
+   style is applied with the ordinary shape and the choice is kept - turning it
+   back on puts it back.
+
+### Layout
+
+Also experimental. Where the navigation lives, under **Settings -> Theme ->
+Layout**:
+
+- **Sidebar** - the full left column, with the folder list. The default, and
+  what Taskrr has always been.
+- **Icon rail** - the same column narrowed to icons with tooltips. Hands about
+  11rem back to the task list, which on a wide screen is often another column
+  of cards.
+- **Top bar** - no side column: the views become tabs across the top and the
+  content gets the full width.
+
+The rail and the top bar have no room for a folder list, so a folder picker
+appears in the toolbar beside the search box - the feature moves rather than
+disappearing.
+
+All three work on a phone: the rail is 4rem of a 24rem screen and the top bar's
+tabs scroll sideways. Only the full sidebar is too wide to sit beside the list,
+so that one (and only that one) is the drawer behind a menu button, as it has
+always been.
+
+Admins can set the instance's layout under **Branding**, and an account that
+picks its own keeps it.
 
 ### Readability
 
@@ -144,6 +178,11 @@ Customise the instance identity from the admin settings:
   at it, so it can be reused personally as well. Removing it here leaves the
   file where it is; the picture currently in use can't be deleted until it is
   cleared.
+- **Interface style** and **Layout** (experimental) - the shape and arrangement
+  the instance uses. Both apply to the sign-in page and to every account that
+  hasn't picked for itself, which is what makes a branded instance look like
+  itself from the login screen onwards. The controls only appear when the
+  instance runs with `TASKRR_EXPERIMENTAL=true`.
 - **Login card toggles** - hide the icon and/or the name and tagline on the login
   page.
 

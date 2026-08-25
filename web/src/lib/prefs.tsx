@@ -69,6 +69,9 @@ export interface Prefs {
   groupByFolder: boolean;
   /** Fixed number of task columns, or 0 for the responsive default. */
   taskColumns: number;
+  /** How the navigation is arranged (experimental). "" follows whatever the
+   *  admin set for the instance; see lib/layout.ts. */
+  appLayout: string;
   /** Collapse the sidebar out of the way, leaving the menu button in the
    *  header to bring it back. Desktop only — on a phone it's a drawer already. */
   sidebarCollapsed: boolean;
@@ -188,6 +191,7 @@ function defaults(): Prefs {
     sortBy: "smart",
     groupByFolder: false,
     taskColumns: 0,
+    appLayout: "",
     sidebarCollapsed: false,
     showCalendar: true,
     showActivity: true,

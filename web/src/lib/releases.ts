@@ -37,6 +37,28 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.23.0",
+    date: "2026-08-25",
+    changes: [
+      feat(
+        "Alternative layouts",
+        "Experimental: keep the sidebar, narrow it to a column of icons, or drop it for a row of tabs across the top with the content full width. All three work on a phone as well. Set your own under Theme \u2192 Layout, or set the instance's under Admin \u2192 Branding.",
+      ),
+      feat(
+        "The instance can set its own style and layout",
+        "Under Branding, alongside the name and the icon. It applies to the sign-in page and to anyone who hasn't picked for themselves, so an instance looks like itself from the login screen onwards.",
+      ),
+      feat(
+        "Background upload limits are yours to set",
+        "Per image and per account, under Admin \u2192 Advanced \u2014 what counts as too big depends on the box it's running on. SVG can be allowed there too; it stays off by default and is served sandboxed when on.",
+      ),
+      fix(
+        "The flat style missing dialogs, menus and the sign-in page",
+        "It squared off what it could see and left the rest: dialogs kept rounded corners because their radius only applies above a screen width, and the sign-in page had no way to know the instance was flat at all. Both follow now, and the whole interface was swept for anything still round or shadowed.",
+      ),
+    ],
+  },
+  {
     version: "1.22.0",
     date: "2026-08-25",
     changes: [

@@ -1043,6 +1043,7 @@ const DEMO_AUTH: AuthConfig = {
   // experimental styles are on here, though — trying them out is the point of a
   // demo, and nothing about them needs a backend.
   userBackgrounds: false,
+  backgroundLimits: { imageMB: 8, totalMB: 40, allowSVG: false },
   experimental: true,
   branding: {
     name: "Taskrr",
@@ -1053,6 +1054,8 @@ const DEMO_AUTH: AuthConfig = {
     loginHideText: false,
     loginLayout: "centered" as const,
     background: 0,
+    style: "" as const,
+    layout: "" as const,
   },
 };
 

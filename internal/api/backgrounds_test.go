@@ -8,6 +8,7 @@ import (
 	"mime/multipart"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"testing"
 
 	"github.com/unmaykr-a/taskrr/internal/store"
@@ -209,6 +210,103 @@ func TestBackgroundUploadsAreValidated(t *testing.T) {
 	// not have turned it off for the instance.
 	if rec := uploadBackground(t, h, adminCookie, "instance.png", tinyPNG); rec.Code != http.StatusCreated {
 		t.Fatalf("admin upload while disabled: got %d, want 201", rec.Code)
+	}
+}
+
+// TestBackgroundLimitsAreConfigurable: the caps are a dial an admin turns, and
+// the turning is clamped rather than trusted.
+func TestBackgroundLimitsAreConfigurable(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	admin, _ := st.CreateUser(ctx, store.UserInput{Username: "admin", Role: "admin", PasswordHash: ptr("h")})
+	s := NewServer(st, Options{})
+	h := s.Handler()
+	cookie := signIn(t, st, s.opts.SessionTTL, admin)
+
+	// A 2 MiB image is fine by default and too big once the cap drops to 1 MiB.
+	big := append(append([]byte{}, tinyPNG...), bytes.Repeat([]byte{0x42}, 2<<20)...)
+	if rec := uploadBackground(t, h, cookie, "big.png", big); rec.Code != http.StatusCreated {
+		t.Fatalf("upload under the default cap: got %d, body %s", rec.Code, rec.Body.String())
+	}
+
+	settings := func(t *testing.T, body string) map[string]any {
+		t.Helper()
+		req := httptest.NewRequest(http.MethodPut, "/api/admin/settings", bytes.NewReader([]byte(body)))
+		req.Header.Set("Content-Type", "application/json")
+		req.AddCookie(cookie)
+		rec := httptest.NewRecorder()
+		h.ServeHTTP(rec, req)
+		if rec.Code != http.StatusOK {
+			t.Fatalf("settings: got %d, body %s", rec.Code, rec.Body.String())
+		}
+		var out map[string]any
+		if err := json.Unmarshal(rec.Body.Bytes(), &out); err != nil {
+			t.Fatalf("decode settings: %v", err)
+		}
+		return out
+	}
+
+	settings(t, `{"bg_max_image_mb":1}`)
+	if rec := uploadBackground(t, h, cookie, "big.png", big); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("upload over the new cap: got %d, want 413", rec.Code)
+	}
+
+	// Nonsense is clamped into range, not stored as given: 0 would make uploads
+	// impossible and a huge number would make one upload able to fill the disk.
+	out := settings(t, `{"bg_max_image_mb":0,"bg_max_total_mb":999999}`)
+	if got := out[keyBGMaxImageMB]; got != float64(1) {
+		t.Fatalf("image cap = %v, want it clamped to 1", got)
+	}
+	if got := out[keyBGMaxTotalMB]; got != float64(maxBGTotalLimitMB) {
+		t.Fatalf("total cap = %v, want it clamped to %d", got, maxBGTotalLimitMB)
+	}
+
+	// The per-account cap refuses the upload that would cross it.
+	settings(t, `{"bg_max_image_mb":8,"bg_max_total_mb":1}`)
+	if rec := uploadBackground(t, h, cookie, "another.png", big); rec.Code != http.StatusRequestEntityTooLarge {
+		t.Fatalf("upload over the account cap: got %d, want 413", rec.Code)
+	}
+}
+
+// TestSVGIsOptInAndSandboxed: refused by default, and when an admin allows it
+// the bytes go out under a policy that makes the script it might carry inert.
+func TestSVGIsOptInAndSandboxed(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	admin, _ := st.CreateUser(ctx, store.UserInput{Username: "admin", Role: "admin", PasswordHash: ptr("h")})
+	s := NewServer(st, Options{})
+	h := s.Handler()
+	cookie := signIn(t, st, s.opts.SessionTTL, admin)
+
+	svg := []byte(`<svg xmlns="http://www.w3.org/2000/svg"><script>alert(1)</script></svg>`)
+	if rec := uploadBackground(t, h, cookie, "art.svg", svg); rec.Code != http.StatusBadRequest {
+		t.Fatalf("SVG with the switch off: got %d, want 400", rec.Code)
+	}
+
+	if err := st.SetSetting(ctx, keyBGAllowSVG, "true"); err != nil {
+		t.Fatalf("SetSetting: %v", err)
+	}
+	rec := uploadBackground(t, h, cookie, "art.svg", svg)
+	if rec.Code != http.StatusCreated {
+		t.Fatalf("SVG with the switch on: got %d, body %s", rec.Code, rec.Body.String())
+	}
+	bg := decodeBackground(t, rec)
+	if bg.Mime != "image/svg+xml" {
+		t.Fatalf("stored mime = %q", bg.Mime)
+	}
+
+	req := httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/backgrounds/%d", bg.ID), nil)
+	req.AddCookie(cookie)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("serve SVG: got %d", rec.Code)
+	}
+	csp := rec.Header().Get("Content-Security-Policy")
+	// `sandbox` is the load-bearing part: it drops a directly-opened SVG into an
+	// opaque origin, where its script has no instance to reach.
+	if !strings.Contains(csp, "sandbox") || !strings.Contains(csp, "default-src 'none'") {
+		t.Fatalf("uploaded bytes served without a sandboxing CSP (got %q)", csp)
 	}
 }
 

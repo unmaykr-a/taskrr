@@ -115,12 +115,23 @@ is what lets the login page show it. The current instance background's id is in
 
 The type is decided by the file's own bytes, not by the `Content-Type` a client
 sends: PNG, JPEG, WebP, AVIF and GIF are accepted and anything else is a `400`.
-SVG is deliberately not on the list - it can carry script, and these bytes are
-served back to other people. Responses carry `X-Content-Type-Options: nosniff`.
+SVG is off unless an admin turns it on (`bg_allow_svg`), because it is the one
+format here that can carry script.
 
-Limits are 8 MB per image and 40 MB per account; over either is a `413`. The
-image currently set as the instance background answers `409` on delete until an
-admin clears it, so the login page can't lose its background to a tidy-up.
+Every response carries `X-Content-Type-Options: nosniff` and
+`Content-Security-Policy: default-src 'none'; style-src 'unsafe-inline';
+img-src data:; sandbox`. The `sandbox` is what makes allowing SVG a real choice:
+an SVG opened directly in a tab lands in an opaque origin, with no script, no
+origin and no cookies to reach for.
+
+Limits are 8 MB per image and 40 MB per account by default, both settable by an
+admin (`bg_max_image_mb`, `bg_max_total_mb`); over either is a `413`. The image
+currently set as the instance background answers `409` on delete until an admin
+clears it, so the login page can't lose its background to a tidy-up.
+
+`GET /api/auth/config` reports what this instance allows, as
+`backgroundLimits: {imageMB, totalMB, allowSVG}`, so a client can say so before
+an upload rather than after.
 
 ## Data export
 

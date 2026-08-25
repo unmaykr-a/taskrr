@@ -47,10 +47,23 @@ behind the app. Off hides the section entirely and keeps everyone on the
 instance background - including anyone who had already set one.
 
 The instance background itself is set under **Branding**, and is shown on the
-signed-out login page too. Uploads are stored in the database (8 MB per image,
-40 MB per account), so they are covered by backups and restores. Admins can
-always upload, whatever the gate says, because that is how the instance picture
-gets there. See [Theming and Branding](Theming-and-Branding#background-image).
+signed-out login page too. Admins can always upload, whatever the gate says,
+because that is how the instance picture gets there.
+
+Uploads are stored in the database, so they are covered by backups and restores
+- and so the limits are also a decision about how big your backups get. Both
+live under **Settings -> Admin -> Advanced**:
+
+- **Per image** (default 8 MB, clamped to 1-128).
+- **Per account** (default 40 MB, clamped to 1-4096).
+- **Accept SVG uploads** (default off). SVG is the one format here that can
+  carry script, and these files are shown to other people - the instance
+  background to everyone, signed out included. Allowed, the bytes are served
+  under a Content-Security-Policy that sandboxes them into an origin of their
+  own, so any script they carry has nothing to reach. A raster image is still
+  the boring choice.
+
+See [Theming and Branding](Theming-and-Branding#background-image).
 
 ## API tokens
 

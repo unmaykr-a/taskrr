@@ -3,11 +3,13 @@ import { describe, expect, it } from "vitest";
 import { AA_CONTRAST, contrastRatio } from "@/lib/color";
 import {
   asPainted,
+  DEFAULT_THEME,
   EXPERIMENTAL_PRESETS,
   generateTheme,
   mutedForeground,
   PRESETS,
   primaryReadable,
+  resolveStyle,
   type ThemeColors,
 } from "@/lib/theme";
 
@@ -79,10 +81,11 @@ describe("theme contrast", () => {
 });
 
 describe("interface styles", () => {
-  it("keeps the ordinary presets on the soft style", () => {
-    // A preset that quietly shipped `flat` would restyle the whole app for
-    // someone who only picked a colour scheme.
-    for (const p of PRESETS) expect(p.style ?? "soft").toBe("soft");
+  it("leaves the ordinary presets without a style of their own", () => {
+    // A preset is a set of colours. One that shipped a style would restyle the
+    // whole app for someone who only wanted a different palette — and would
+    // override the shape the instance's admin chose.
+    for (const p of PRESETS) expect(p.style).toBeUndefined();
   });
 
   it("marks every experimental preset as flat", () => {
@@ -90,5 +93,30 @@ describe("interface styles", () => {
     // One that isn't flat has no business being behind the switch.
     expect(EXPERIMENTAL_PRESETS.length).toBeGreaterThan(0);
     for (const p of EXPERIMENTAL_PRESETS) expect(p.style).toBe("flat");
+  });
+});
+
+describe("resolveStyle", () => {
+  const flat = { ...DEFAULT_THEME, style: "flat" as const };
+  const soft = { ...DEFAULT_THEME, style: "soft" as const };
+  const unset = { ...DEFAULT_THEME, style: undefined };
+
+  it("is soft everywhere without the experimental switch", () => {
+    // Applies to a theme somebody imported or an admin published: an instance
+    // that never opted in is not restyled by a file.
+    expect(resolveStyle(flat, "flat", false)).toBe("soft");
+  });
+
+  it("prefers the theme's own style", () => {
+    expect(resolveStyle(flat, "soft", true)).toBe("flat");
+    expect(resolveStyle(soft, "flat", true)).toBe("soft");
+  });
+
+  it("follows the instance when the theme has no style", () => {
+    // What makes the sign-in page — which has no account, and so no theme of
+    // anyone's — look like the instance it fronts.
+    expect(resolveStyle(unset, "flat", true)).toBe("flat");
+    expect(resolveStyle(unset, "", true)).toBe("soft");
+    expect(resolveStyle(unset, undefined, true)).toBe("soft");
   });
 });

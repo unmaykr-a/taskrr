@@ -282,8 +282,28 @@ export function primaryReadable(c: ThemeColors): string {
   return readable;
 }
 
-/** Write a theme to the document as CSS custom properties. */
-export function applyTheme(theme: Theme) {
+/**
+ * Resolve which interface shape actually gets rendered.
+ *
+ * Three inputs, in order: the flat styles only exist on an instance that opted
+ * in, then whatever the theme says, then whatever the admin set as the instance
+ * default. A theme with no style of its own follows the instance, which is what
+ * lets an admin restyle the login page and every account that hasn't chosen.
+ */
+export function resolveStyle(
+  theme: Theme,
+  instance: string | undefined,
+  experimental: boolean,
+): ThemeStyle {
+  if (!experimental) return "soft";
+  if (theme.style === "soft" || theme.style === "flat") return theme.style;
+  return instance === "flat" ? "flat" : "soft";
+}
+
+/** Write a theme to the document as CSS custom properties. The style is passed
+ *  in rather than read off the theme, because it is resolved against the
+ *  instance's own setting (see resolveStyle). */
+export function applyTheme(theme: Theme, style: ThemeStyle = "soft") {
   const root = document.documentElement;
   const c = theme.colors;
   const set = (token: string, hex: string) => root.style.setProperty(token, hexToHslTriplet(hex));
@@ -314,7 +334,7 @@ export function applyTheme(theme: Theme) {
   // The shape of everything: one class, and index.css does the rest. Flat wins
   // over frosted where they disagree — a flat theme with blurred glass panels
   // would be neither thing.
-  root.classList.toggle("style-flat", theme.style === "flat");
+  root.classList.toggle("style-flat", style === "flat");
   root.style.colorScheme = theme.mode;
 
   setFavicon(c.accent);
@@ -392,7 +412,8 @@ function makeTheme(p: Partial<Theme> & { name: string; colors: ThemeColors; mode
     bgOpacity: 1,
     bgColor: "", // follow the accent
     frosted: false,
-    style: "soft",
+    // No style: an ordinary preset is a set of colours, and the shape it gets
+    // is whatever the instance is set to.
     ...p,
   };
 }

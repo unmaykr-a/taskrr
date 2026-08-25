@@ -21,7 +21,7 @@ When using Docker Compose, put these in a `.env` file next to the compose file.
 | `TASKRR_SESSION_TTL` | `720h` | How long a sign-in lasts (a Go duration such as `720h`, `30m`). Sessions slide - they extend while in use. |
 | `TASKRR_LITE` | `false` | Single-person mode. Disables self-registration and the ability to create extra accounts. See [Users and Authentication](Users-and-Authentication). |
 | `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop wakes to check for due tasks. See [Reminders](Reminders). |
-| `TASKRR_EXPERIMENTAL` | `false` | Offer experimental features. Currently the flat interface styles - see [Theming and Branding](Theming-and-Branding#interface-style). |
+| `TASKRR_EXPERIMENTAL` | `false` | Offer experimental features: the flat interface style and the alternative layouts - see [Theming and Branding](Theming-and-Branding#interface-style). |
 
 ## The bootstrap admin
 

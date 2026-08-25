@@ -187,6 +187,8 @@ export interface AuthConfig {
   apiTokens: boolean;
   /** Admin gate for per-user background images (on by default). */
   userBackgrounds: boolean;
+  /** What this instance allows an upload to be. */
+  backgroundLimits: { imageMB: number; totalMB: number; allowSVG: boolean };
   /** The instance opted in to experimental features (TASKRR_EXPERIMENTAL). */
   experimental: boolean;
   /** Instance branding (name, title, icon, login toggles). */
@@ -223,6 +225,10 @@ export interface Branding {
   /** Instance-wide background image id (0 = none). Served without a session,
    *  so the login page shows it before anyone is signed in. */
   background: number;
+  /** The instance's own interface shape and layout, "" when unset. Both are
+   *  experimental and ignored unless the instance opted in. */
+  style: "" | "soft" | "flat";
+  layout: "" | "sidebar" | "topbar" | "rail";
   /** How the sign-in page is laid out: a centred card, or a full-height panel
    *  down one side with the background filling the rest. */
   loginLayout: LoginLayout;
@@ -289,12 +295,17 @@ export interface AdminSettings {
   tasks_shareable: boolean;
   api_tokens: boolean;
   user_backgrounds: boolean;
+  bg_max_image_mb: number;
+  bg_max_total_mb: number;
+  bg_allow_svg: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
   brand_icon: string;
   /** Id of the instance background image, as a string ("" = none). */
   brand_background: string;
+  interface_style: string;
+  interface_layout: string;
   login_hide_icon: boolean;
   login_hide_text: boolean;
   login_layout: string;
@@ -319,11 +330,16 @@ export type SettingsPatch = Partial<{
   tasks_shareable: boolean;
   api_tokens: boolean;
   user_backgrounds: boolean;
+  bg_max_image_mb: number;
+  bg_max_total_mb: number;
+  bg_allow_svg: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
   brand_icon: string;
   brand_background: string;
+  interface_style: string;
+  interface_layout: string;
   login_hide_icon: boolean;
   login_hide_text: boolean;
   login_layout: string;
