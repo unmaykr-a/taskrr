@@ -1039,6 +1039,11 @@ const DEMO_AUTH: AuthConfig = {
   // No server, so nothing could authenticate a bearer token — the section is
   // hidden rather than shown broken.
   apiTokens: false,
+  // Uploads need somewhere to store them, and the demo has no server. The
+  // experimental styles are on here, though — trying them out is the point of a
+  // demo, and nothing about them needs a backend.
+  userBackgrounds: false,
+  experimental: true,
   branding: {
     name: "Taskrr",
     title: "",
@@ -1047,6 +1052,7 @@ const DEMO_AUTH: AuthConfig = {
     loginHideIcon: false,
     loginHideText: false,
     loginLayout: "centered" as const,
+    background: 0,
   },
 };
 
@@ -1447,6 +1453,10 @@ export const demoApi: Api = {
 
   // Bearer tokens need a server to authenticate against; the UI is gated off
   // by authConfig.apiTokens above, so these are never reached.
+  listBackgrounds: () => tick([]),
+  uploadBackground: notAvailable,
+  deleteBackground: notAvailable,
+
   listAPITokens: () => tick([]),
   createAPIToken: notAvailable,
   deleteAPIToken: notAvailable,

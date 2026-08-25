@@ -10,7 +10,8 @@ From the floating theme customiser (a settings window) each user can adjust:
 - **Colours** - an accent/colour picker with palette generation.
 - **Light and dark** modes.
 - **Fonts**.
-- **Animated backgrounds** and frosted-glass effects, with per-animation toggles
+- **A background image** of their own, plus **animated backgrounds** and
+  frosted-glass effects, with per-animation toggles
   so you can dial motion up or down (handy on low-power hardware or for reduced
   motion).
 - **Floating windows** for settings panels. Turn this off and panels become
@@ -20,6 +21,47 @@ From the floating theme customiser (a settings window) each user can adjust:
 
 Saved themes are stored per account on the server (not just in the browser), so
 they follow you across devices and survive sign-out.
+
+### Background image
+
+A picture behind the app, under whichever animated effect is running (set the
+effect to **None** for the picture on its own). Under **Settings -> Theme ->
+Background image** you can:
+
+- **Upload** PNG, JPEG, WebP, AVIF or GIF, up to 8 MB each and 40 MB per
+  account. Uploads are yours alone; nobody else on the instance can see them.
+- **Pick** one from your uploads, or **None** to have no picture at all even
+  when the instance has one set.
+- Choose how it sits: **fill the screen**, **fit inside**, or **tile**.
+- **Dim** it. Text has to sit on top of a photograph, and this is the dial that
+  makes that readable - the page colour is laid back over the picture at
+  whatever strength you pick.
+
+Images are stored in the database, so they are included in a backup and come
+back with a restore - there is no second folder to remember.
+
+Admins can turn the whole feature off (**Settings -> Admin -> What users may
+do**), which hides the section and keeps everyone on the instance background.
+See [Admin Guide](Admin-Guide).
+
+### Interface style
+
+Experimental - available only when the instance is started with
+`TASKRR_EXPERIMENTAL=true` (see [Configuration](Configuration)).
+
+**Soft** is Taskrr as it has always looked: rounded corners, shadowed panels,
+optional frosted glass. **Flat** squares everything off and takes the depth out
+- no drop shadows, no glass, borders doing the separating - which is closer to
+how most self-hosted dashboards look, and easier on the eye if Taskrr sits in a
+tab beside them all day.
+
+It is a shape, not a palette: any theme can be either, and the two `general`
+presets are simply plain colour schemes that ship set to flat.
+
+The switch is deliberately an environment variable rather than an in-app
+setting, because it restyles every element in the app. With it off, a theme
+that carries the flat style is applied with the ordinary shape and the choice is
+kept - turning the variable back on puts it back.
 
 ### Readability
 
@@ -96,6 +138,12 @@ Customise the instance identity from the admin settings:
   for the favicon, the sidebar mark, and the login card. Without one, Taskrr uses
   a generated accent checkmark. Uploaded icons are validated as images and capped
   in size on the server.
+- **Background image** - a picture for the whole instance, shown behind the app
+  and on the login page for anyone who has not picked their own. Upload it from
+  the same panel; it lands in the admin's own collection and the setting points
+  at it, so it can be reused personally as well. Removing it here leaves the
+  file where it is; the picture currently in use can't be deleted until it is
+  cleared.
 - **Login card toggles** - hide the icon and/or the name and tagline on the login
   page.
 

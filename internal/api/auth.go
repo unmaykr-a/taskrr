@@ -48,6 +48,10 @@ const (
 	// new tokens. Existing tokens keep working until revoked, so flipping this
 	// can't silently break an automation someone already set up.
 	keyAPITokens = "api_tokens"
+	// keyUserBackgrounds: admin gate for per-user background images. On by
+	// default. When off the whole section disappears from Theme settings and
+	// uploads are refused, so nobody is left with an upload button that fails.
+	keyUserBackgrounds = "user_backgrounds"
 
 	// --- branding (admin-editable; shown signed-out, so exposed in authConfig) ---
 	keyBrandName     = "brand_name"      // app name in the sidebar + login
@@ -57,6 +61,9 @@ const (
 	keyLoginHideIcon = "login_hide_icon" // hide the icon on the login card
 	keyLoginHideText = "login_hide_text" // hide the name/tagline on the login card
 	keyLoginLayout   = "login_layout"    // "centered" (default), "left", "right"
+	// keyBrandBackground: the id of the background image used instance-wide,
+	// including on the signed-out login page. "" (or 0) is none.
+	keyBrandBackground = "brand_background"
 )
 
 // Branding defaults (used when a setting is unset/empty).
@@ -194,6 +201,9 @@ func (s *Server) branding(ctx context.Context) map[string]any {
 		"loginHideIcon": s.boolSetting(ctx, keyLoginHideIcon, false),
 		"loginHideText": s.boolSetting(ctx, keyLoginHideText, false),
 		"loginLayout":   s.stringSetting(ctx, keyLoginLayout, defaultLoginLayout),
+		// 0 = none. The SPA turns this into /api/backgrounds/{id}, which is
+		// deliberately readable without a session so the login page can show it.
+		"background": s.instanceBackgroundID(ctx),
 	}
 }
 
@@ -261,7 +271,11 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		"themesShareUsers":    s.boolSetting(ctx, keyThemesShareUsers, false),
 		"tasksShareable":      s.boolSetting(ctx, keyTasksShareable, false),
 		"apiTokens":           s.boolSetting(ctx, keyAPITokens, true),
-		"branding":            s.branding(ctx),
+		"userBackgrounds":     s.boolSetting(ctx, keyUserBackgrounds, true),
+		// Experimental features are off unless the operator opted in with an
+		// environment variable, so they can't be switched on from inside the app.
+		"experimental": s.opts.Experimental,
+		"branding":     s.branding(ctx),
 	})
 }
 
@@ -1431,6 +1445,8 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyLoginHideIcon:         s.boolSetting(ctx, keyLoginHideIcon, false),
 		keyLoginHideText:         s.boolSetting(ctx, keyLoginHideText, false),
 		keyLoginLayout:           s.stringSetting(ctx, keyLoginLayout, defaultLoginLayout),
+		keyUserBackgrounds:       s.boolSetting(ctx, keyUserBackgrounds, true),
+		keyBrandBackground:       get(keyBrandBackground),
 		"oidc_client_secret_set": get(keyOIDCClientSecret) != "", // never return the secret
 		"oidc_enabled":           s.oidcEnabled(ctx),
 	})
@@ -1454,6 +1470,7 @@ type settingsPatch struct {
 	ThemesShareUsers    *bool   `json:"themes_share_users"`
 	TasksShareable      *bool   `json:"tasks_shareable"`
 	APITokens           *bool   `json:"api_tokens"`
+	UserBackgrounds     *bool   `json:"user_backgrounds"`
 	BrandName           *string `json:"brand_name"`
 	BrandTitle          *string `json:"brand_title"`
 	BrandTagline        *string `json:"brand_tagline"`
@@ -1461,6 +1478,7 @@ type settingsPatch struct {
 	LoginHideIcon       *bool   `json:"login_hide_icon"`
 	LoginHideText       *bool   `json:"login_hide_text"`
 	LoginLayout         *string `json:"login_layout"`
+	BrandBackground     *string `json:"brand_background"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -1557,6 +1575,31 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	}
 	if req.LoginHideText != nil && !set(keyLoginHideText, boolStr(*req.LoginHideText)) {
 		return
+	}
+	if req.UserBackgrounds != nil && !set(keyUserBackgrounds, boolStr(*req.UserBackgrounds)) {
+		return
+	}
+	if req.BrandBackground != nil {
+		// An id, or "" for none. Checked against what's actually stored so the
+		// login page can't be pointed at a row that was never an image.
+		raw := strings.TrimSpace(*req.BrandBackground)
+		if raw != "" && raw != "0" {
+			id, err := strconv.ParseInt(raw, 10, 64)
+			if err != nil || id <= 0 {
+				writeError(w, http.StatusBadRequest, "invalid background")
+				return
+			}
+			if _, err := s.store.GetBackground(ctx, id); err != nil {
+				writeStoreError(w, err, "could not set the background")
+				return
+			}
+			raw = strconv.FormatInt(id, 10)
+		} else {
+			raw = ""
+		}
+		if !set(keyBrandBackground, raw) {
+			return
+		}
 	}
 	if req.LoginLayout != nil {
 		// Validated rather than trusted: this string is written into a class

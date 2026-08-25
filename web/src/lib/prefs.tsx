@@ -23,6 +23,7 @@ import { type TaskTemplate } from "@/lib/templates";
 import { type SortKey } from "@/lib/sort";
 
 export type ColorPickerStyle = "wheel" | "native";
+export type BackgroundFit = "cover" | "contain" | "tile";
 export type AddButtonPosition = "top" | "bottom";
 export type CardSize = "comfortable" | "compact";
 export type ClockChoice = "auto" | "12" | "24";
@@ -68,9 +69,23 @@ export interface Prefs {
   groupByFolder: boolean;
   /** Fixed number of task columns, or 0 for the responsive default. */
   taskColumns: number;
+  /** Collapse the sidebar out of the way, leaving the menu button in the
+   *  header to bring it back. Desktop only — on a phone it's a drawer already. */
+  sidebarCollapsed: boolean;
   /** Show the calendar / activity-chart side panels. */
   showCalendar: boolean;
   showActivity: boolean;
+
+  // --- background image ---
+  /** Which picture sits behind the app: "" follows whatever the admin set for
+   *  the instance, "none" is deliberately nothing, anything else is the id of
+   *  one of your own uploads. */
+  bgImage: string;
+  /** How it fills the screen. */
+  bgImageFit: BackgroundFit;
+  /** How much of the page colour is laid back over it, 0–0.9. Text has to sit
+   *  on top of a photograph, and this is what makes that readable. */
+  bgImageDim: number;
 
   // --- motion ---
   /** Master switch for background + UI animations. */
@@ -173,8 +188,12 @@ function defaults(): Prefs {
     sortBy: "smart",
     groupByFolder: false,
     taskColumns: 0,
+    sidebarCollapsed: false,
     showCalendar: true,
     showActivity: true,
+    bgImage: "",
+    bgImageFit: "cover",
+    bgImageDim: 0.35,
     animations: true,
     animationSpeed: 1,
     animGrid: true,
