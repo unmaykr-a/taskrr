@@ -37,6 +37,24 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.24.1",
+    date: "2026-08-25",
+    changes: [
+      fix(
+        "The window tab strip ignoring which layout you were in",
+        "It always started 15rem in, as though the full sidebar were there — leaving a gap beside the icon rail, and a bigger one under the top bar, where there is no column at all. It now starts where the page does, including when the sidebar is folded away.",
+      ),
+      fix(
+        "The changelog opening underneath the windows",
+        "It blocked everything behind it, as a dialog should, while sitting below any window opened after the first — so the thing you had just opened was buried and nothing else would respond.",
+      ),
+      fix(
+        "Signing out flashing the stock look",
+        "The sign-in screen appeared in the built-in colours and name for a moment before redrawing as this instance. Its own look is the server's, not the account's, so it no longer goes away with the account.",
+      ),
+    ],
+  },
+  {
     version: "1.24.0",
     date: "2026-08-25",
     changes: [

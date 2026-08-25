@@ -4,6 +4,20 @@ import { X } from "lucide-react";
 
 import { cn } from "@/lib/utils";
 
+// Stacking order, so a new layer lands somewhere deliberate:
+//
+//   45      the window taskbar
+//   49      the backdrop behind a panel (windows off, or a phone)
+//   50-69   floating windows, one step per window, front-most last
+//   70      dialogs - modal, so above every window rather than among them
+//   80      context menus, which can be opened from inside any of the above
+//   100     toasts
+//   200+    the colour picker's own popover
+//
+// A dialog used to share 50 with the windows, which put it behind any window
+// opened after the first while its backdrop still blocked them: visibly buried,
+// and nothing on screen would respond.
+
 const Dialog = DialogPrimitive.Root;
 const DialogTrigger = DialogPrimitive.Trigger;
 const DialogPortal = DialogPrimitive.Portal;
@@ -16,7 +30,7 @@ const DialogOverlay = React.forwardRef<
   <DialogPrimitive.Overlay
     ref={ref}
     className={cn(
-      "fixed inset-0 z-50 bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
+      "fixed inset-0 z-[70] bg-black/70 backdrop-blur-sm data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0",
       className,
     )}
     {...props}
@@ -39,7 +53,7 @@ const DialogContent = React.forwardRef<
         // slides up a few % on open / down on close. (The old zoom keyframe
         // dropped the centring transform mid-animation, which is what made it
         // fly in diagonally from the corner.)
-        "fixed left-1/2 top-1/2 z-50 grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-left-1/2 data-[state=closed]:slide-out-to-left-1/2 data-[state=open]:slide-in-from-top-[44%] data-[state=closed]:slide-out-to-top-[44%] sm:rounded-xl",
+        "fixed left-1/2 top-1/2 z-[70] grid w-full max-w-lg -translate-x-1/2 -translate-y-1/2 gap-4 border bg-card p-6 shadow-lg duration-200 data-[state=open]:animate-in data-[state=closed]:animate-out data-[state=closed]:fade-out-0 data-[state=open]:fade-in-0 data-[state=open]:slide-in-from-left-1/2 data-[state=closed]:slide-out-to-left-1/2 data-[state=open]:slide-in-from-top-[44%] data-[state=closed]:slide-out-to-top-[44%] sm:rounded-xl",
         className,
       )}
       {...props}

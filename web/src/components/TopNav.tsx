@@ -4,8 +4,8 @@ import { Check, LogOut, Plus, Settings } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
-import { clearStoredPreferences, usePrefs } from "@/lib/prefs";
-import { DEFAULT_THEME } from "@/lib/theme";
+import { usePrefs } from "@/lib/prefs";
+import { endSession } from "@/lib/signOut";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { useBranding } from "@/components/Branding";
@@ -51,10 +51,7 @@ export function TopNav({
     mutationFn: api.logout,
     onSuccess: () => {
       windows.closeAll();
-      clearStoredPreferences();
-      setTheme(DEFAULT_THEME);
-      queryClient.setQueryData(["me"], null);
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+      endSession(queryClient, setTheme);
     },
   });
 
