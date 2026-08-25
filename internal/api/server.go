@@ -112,6 +112,15 @@ type AuthStore interface {
 	ListAPITokens(ctx context.Context, userID int64) ([]store.APIToken, error)
 	DeleteAPIToken(ctx context.Context, userID, id int64) error
 	DeleteAllAPITokens(ctx context.Context, userID int64) (int64, error)
+
+	// Background images: uploads a user picks from, and the one an admin points
+	// the whole instance at.
+	CreateBackground(ctx context.Context, userID int64, name, mime string, data []byte) (store.Background, error)
+	ListBackgrounds(ctx context.Context, userID int64) ([]store.Background, error)
+	BackgroundBytesForUser(ctx context.Context, userID int64) (int64, error)
+	GetBackground(ctx context.Context, id int64) (store.Background, error)
+	GetBackgroundData(ctx context.Context, id int64) ([]byte, string, error)
+	DeleteBackground(ctx context.Context, userID, id int64) error
 	APITokenUser(ctx context.Context, tokenHash string) (store.User, error)
 	TouchAPIToken(ctx context.Context, tokenHash string) error
 
@@ -155,6 +164,11 @@ type Options struct {
 	// UpdateCheckURL is fetched server-side to report the latest released
 	// version (empty disables the check).
 	UpdateCheckURL string
+	// Experimental exposes features that are still finding their shape — at the
+	// moment the flat interface styles, which restyle every element in the app.
+	// Off unless the operator sets TASKRR_EXPERIMENTAL, so nobody stumbles into
+	// one from inside the UI.
+	Experimental bool
 }
 
 // Server holds the dependencies shared by all HTTP handlers.
@@ -225,6 +239,13 @@ func (s *Server) Handler() http.Handler {
 	mux.HandleFunc("POST /api/me/reminders/test", s.handleTestReminder)
 	mux.HandleFunc("GET /api/me/export", s.handleExport)
 	mux.HandleFunc("POST /api/me/import", s.handleImport)
+	// Background images: your own collection, plus the bytes themselves (which
+	// the instance background serves without a session, for the login page).
+	mux.HandleFunc("GET /api/me/backgrounds", s.handleListBackgrounds)
+	mux.HandleFunc("POST /api/me/backgrounds", s.handleUploadBackground)
+	mux.HandleFunc("DELETE /api/me/backgrounds/{id}", s.handleDeleteBackground)
+	mux.HandleFunc("GET /api/backgrounds/{id}", s.handleGetBackground)
+
 	mux.HandleFunc("GET /api/me/tokens", s.handleListAPITokens)
 	mux.HandleFunc("POST /api/me/tokens", s.handleCreateAPIToken)
 	mux.HandleFunc("DELETE /api/me/tokens", s.handleDeleteAllAPITokens)

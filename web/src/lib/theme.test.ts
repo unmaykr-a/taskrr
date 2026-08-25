@@ -3,6 +3,7 @@ import { describe, expect, it } from "vitest";
 import { AA_CONTRAST, contrastRatio } from "@/lib/color";
 import {
   asPainted,
+  EXPERIMENTAL_PRESETS,
   generateTheme,
   mutedForeground,
   PRESETS,
@@ -19,7 +20,10 @@ const surfaces = (c: ThemeColors) => [c.background, c.card, c.sidebar].map(asPai
 const ratio = (fg: string, bg: string) => contrastRatio(asPainted(fg), bg);
 
 describe("theme contrast", () => {
-  describe.each(PRESETS.map((p) => [p.name, p] as const))("%s", (_name, preset) => {
+  // The experimental presets are read the same way as any other, so they are
+  // held to the same contrast floor — being behind a switch is not a licence to
+  // ship an unreadable theme.
+  describe.each([...PRESETS, ...EXPERIMENTAL_PRESETS].map((p) => [p.name, p] as const))("%s", (_name, preset) => {
     it("draws muted text at AA or better on every surface", () => {
       const muted = mutedForeground(preset.colors);
       for (const surface of surfaces(preset.colors)) {
@@ -71,5 +75,20 @@ describe("theme contrast", () => {
         expect(ratio(readable, surface)).toBeGreaterThanOrEqual(AA_CONTRAST);
       }
     });
+  });
+});
+
+describe("interface styles", () => {
+  it("keeps the ordinary presets on the soft style", () => {
+    // A preset that quietly shipped `flat` would restyle the whole app for
+    // someone who only picked a colour scheme.
+    for (const p of PRESETS) expect(p.style ?? "soft").toBe("soft");
+  });
+
+  it("marks every experimental preset as flat", () => {
+    // The reason these are gated at all: they change the shape of everything.
+    // One that isn't flat has no business being behind the switch.
+    expect(EXPERIMENTAL_PRESETS.length).toBeGreaterThan(0);
+    for (const p of EXPERIMENTAL_PRESETS) expect(p.style).toBe("flat");
   });
 });

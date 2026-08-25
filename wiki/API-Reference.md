@@ -54,6 +54,9 @@ authenticate either with the web UI's session cookie or with an API token (see
 | POST | `/api/me/tokens` | Mint a token. The response is the only time the value is returned. |
 | DELETE | `/api/me/tokens/{id}` | Revoke a token. |
 | DELETE | `/api/me/tokens` | Revoke every token you hold. Returns `{"revoked": n}`. |
+| GET | `/api/me/backgrounds` | Your uploaded background images (metadata only). |
+| POST | `/api/me/backgrounds` | Upload one, as multipart with a `file` field. |
+| DELETE | `/api/me/backgrounds/{id}` | Delete one of your own. |
 
 ## API tokens
 
@@ -97,6 +100,27 @@ Tokens are also revoked automatically:
 
 A bearer credential outlives a cookie, so the two go together: signing a browser
 out while leaving a token working would only be half of shutting an account off.
+
+## Background images
+
+A picture behind the app. Uploads are stored in the database and are owner-only:
+`GET /api/backgrounds/{id}` serves the bytes to whoever owns the image, and to
+anyone at all - signed out included - when it is the instance background, which
+is what lets the login page show it. The current instance background's id is in
+`branding.background` on `/api/auth/config` (0 = none).
+
+| Method | Path | Description |
+| --- | --- | --- |
+| GET | `/api/backgrounds/{id}` | The image itself. Owner-only unless it is the instance background. |
+
+The type is decided by the file's own bytes, not by the `Content-Type` a client
+sends: PNG, JPEG, WebP, AVIF and GIF are accepted and anything else is a `400`.
+SVG is deliberately not on the list - it can carry script, and these bytes are
+served back to other people. Responses carry `X-Content-Type-Options: nosniff`.
+
+Limits are 8 MB per image and 40 MB per account; over either is a `413`. The
+image currently set as the instance background answers `409` on delete until an
+admin clears it, so the login page can't lose its background to a tidy-up.
 
 ## Data export
 

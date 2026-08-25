@@ -1,6 +1,6 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Folder as FolderIcon, LogOut, Settings, X } from "lucide-react";
+import { Check, Folder as FolderIcon, LogOut, PanelLeftClose, Settings, X } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
@@ -36,6 +36,7 @@ export function Sidebar({
   onFolderChange,
   shareEnabled = false,
   onClose,
+  onCollapse,
 }: {
   filter: Filter;
   onFilterChange: (f: Filter) => void;
@@ -47,6 +48,8 @@ export function Sidebar({
   /** Whether task sharing is on (shows the Shared + Requests views). */
   shareEnabled?: boolean;
   onClose?: () => void;
+  /** Fold the sidebar away (desktop only — the drawer has its own close). */
+  onCollapse?: () => void;
 }) {
   const windows = useWindows();
   const queryClient = useQueryClient();
@@ -102,6 +105,20 @@ export function Sidebar({
         {onClose && (
           <Button variant="ghost" size="icon" className="md:hidden" onClick={onClose} aria-label="Close menu">
             <X />
+          </Button>
+        )}
+        {/* Desktop: fold the whole thing away. The menu button in the header
+            brings it back, so the way out is where you'd look for it. */}
+        {onCollapse && (
+          <Button
+            variant="ghost"
+            size="icon"
+            className="hidden shrink-0 md:inline-flex"
+            onClick={onCollapse}
+            aria-label="Collapse menu"
+            title="Collapse menu"
+          >
+            <PanelLeftClose />
           </Button>
         )}
       </div>

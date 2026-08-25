@@ -71,9 +71,10 @@ server, so they aren't part of the demo.
 - Export everything as JSON or CSV, restore a JSON export, or bring a CSV from
   another tracker and match up the columns.
 - A themeable interface: colour customiser with palette generation, light and
-  dark modes, animated backgrounds, frosted glass, and per-animation toggles.
+  dark modes, animated backgrounds, a background image of your own (or one the
+  admin sets for the instance), frosted glass, and per-animation toggles.
   Panels float as windows by default and can be switched to plain full-screen
-  menus. Works well on a phone.
+  menus, and the sidebar folds away. Works well on a phone.
 - Keyboard shortcuts with rebindable keys, quick-add syntax
   ("water plants every 2 weeks #home"), and installable to a phone home screen.
 

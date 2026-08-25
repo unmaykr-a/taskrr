@@ -185,8 +185,23 @@ export interface AuthConfig {
   tasksShareable: boolean;
   /** Admin gate for per-user API tokens (on by default). */
   apiTokens: boolean;
+  /** Admin gate for per-user background images (on by default). */
+  userBackgrounds: boolean;
+  /** The instance opted in to experimental features (TASKRR_EXPERIMENTAL). */
+  experimental: boolean;
   /** Instance branding (name, title, icon, login toggles). */
   branding: Branding;
+}
+
+/** One uploaded background image, without its bytes — the picture itself comes
+ *  from /api/backgrounds/{id}. */
+export interface BackgroundImage {
+  id: number;
+  userId: number;
+  name: string;
+  mime: string;
+  size: number;
+  createdAt: string;
 }
 
 /** Customisable instance identity, shown signed-out and signed-in. */
@@ -205,6 +220,9 @@ export interface Branding {
   loginHideIcon: boolean;
   /** Hide the name/tagline on the login card. */
   loginHideText: boolean;
+  /** Instance-wide background image id (0 = none). Served without a session,
+   *  so the login page shows it before anyone is signed in. */
+  background: number;
   /** How the sign-in page is laid out: a centred card, or a full-height panel
    *  down one side with the background filling the rest. */
   loginLayout: LoginLayout;
@@ -270,10 +288,13 @@ export interface AdminSettings {
   themes_share_users: boolean;
   tasks_shareable: boolean;
   api_tokens: boolean;
+  user_backgrounds: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
   brand_icon: string;
+  /** Id of the instance background image, as a string ("" = none). */
+  brand_background: string;
   login_hide_icon: boolean;
   login_hide_text: boolean;
   login_layout: string;
@@ -297,10 +318,12 @@ export type SettingsPatch = Partial<{
   themes_share_users: boolean;
   tasks_shareable: boolean;
   api_tokens: boolean;
+  user_backgrounds: boolean;
   brand_name: string;
   brand_title: string;
   brand_tagline: string;
   brand_icon: string;
+  brand_background: string;
   login_hide_icon: boolean;
   login_hide_text: boolean;
   login_layout: string;
@@ -578,6 +601,20 @@ const httpApi = {
   /** Restore an exported JSON document into the signed-in account. */
   importData: (json: string, mode: "merge" | "replace") =>
     request<ImportResult>(`/api/me/import?mode=${mode}`, { method: "POST", body: json }),
+
+  listBackgrounds: () => request<BackgroundImage[]>("/api/me/backgrounds"),
+
+  /** Uploads one image. Sent as multipart so the file goes over as bytes rather
+   *  than a third larger as base64 — the Content-Type header is left to the
+   *  browser, which has to add the multipart boundary to it. */
+  uploadBackground: (file: File) => {
+    const body = new FormData();
+    body.append("file", file);
+    return request<BackgroundImage>("/api/me/backgrounds", { method: "POST", body, headers: {} });
+  },
+
+  deleteBackground: (id: number) =>
+    request<void>(`/api/me/backgrounds/${id}`, { method: "DELETE" }),
 
   listAPITokens: () => request<APIToken[]>("/api/me/tokens"),
 

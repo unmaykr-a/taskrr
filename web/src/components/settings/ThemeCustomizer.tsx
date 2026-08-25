@@ -4,7 +4,6 @@ import {
   Download,
   Droplet,
   Globe,
-  Image as ImageIcon,
   Moon,
   Palette,
   RotateCcw,
@@ -27,8 +26,10 @@ import {
   type FontChoice,
   generateTheme,
   type Harmony,
+  EXPERIMENTAL_PRESETS,
   PRESETS,
   type Theme,
+  type ThemeStyle,
   type ThemeColors,
   toggledMode,
 } from "@/lib/theme";
@@ -39,6 +40,7 @@ import { Select } from "@/components/ui/select";
 import { ColorField } from "@/components/ui/ColorPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { BackgroundImageSection } from "@/components/settings/BackgroundImageSection";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useToast } from "@/components/ui/Toast";
@@ -142,6 +144,12 @@ export function ThemeCustomizer() {
     applyTheme({ ...theme, colors: { ...theme.colors, [key]: value } });
 
   const applyPreset = (p: Theme) => applyTheme({ ...p });
+
+  // The flat presets only exist on an instance that opted in. Listing them
+  // otherwise would offer a theme that applies as an ordinary one, which reads
+  // as a bug rather than as a switch nobody turned on.
+  const experimental = config?.experimental ?? false;
+  const presets = experimental ? [...PRESETS, ...EXPERIMENTAL_PRESETS] : PRESETS;
   const generate = () => patch({ colors: generateTheme(theme.colors.accent, theme.mode, harmony) });
 
   function save() {
@@ -196,11 +204,45 @@ export function ThemeCustomizer() {
         </div>
       </section>
 
+      {/* Interface shape. Only on an instance that opted in to experimental
+          features, because it restyles every element rather than recolouring. */}
+      {experimental && (
+        <section className="space-y-2">
+          <Label>Style</Label>
+          <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
+            {(
+              [
+                { value: "soft", label: "Soft" },
+                { value: "flat", label: "Flat" },
+              ] as const satisfies readonly { value: ThemeStyle; label: string }[]
+            ).map((o) => (
+              <button
+                key={o.value}
+                type="button"
+                onClick={() => patch({ style: o.value })}
+                className={cn(
+                  "rounded-md py-1.5 transition-colors",
+                  (theme.style ?? "soft") === o.value
+                    ? "bg-primary text-primary-foreground"
+                    : "text-muted-foreground hover:text-foreground",
+                )}
+              >
+                {o.label}
+              </button>
+            ))}
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Flat squares off the corners and drops the shadows and frosted glass —
+            the same colours, without the depth. Experimental.
+          </p>
+        </section>
+      )}
+
       {/* Presets: open by default — it's what most visits to this pane are for. */}
       <SettingsGroup id="theme.presets" title="Presets" icon={<Palette />} flat>
       <section className="space-y-2">
         <div className="grid grid-cols-3 gap-2">
-          {PRESETS.map((p) => (
+          {presets.map((p) => (
             <button
               key={p.name}
               onClick={() => applyPreset(p)}
@@ -344,8 +386,11 @@ export function ThemeCustomizer() {
       </section>
       </SettingsGroup>
 
+      {/* Your own picture behind the app (hidden when the admin disallows it). */}
+      <BackgroundImageSection />
+
       {/* Background effect */}
-      <SettingsGroup id="theme.background" title="Background" icon={<ImageIcon />} summary="Effect, intensity, motion">
+      <SettingsGroup id="theme.background" title="Background effect" icon={<Sparkles />} summary="Effect, intensity, motion">
         <Select
           value={theme.background}
           onChange={(e) => patch({ background: e.target.value as BackgroundEffect })}

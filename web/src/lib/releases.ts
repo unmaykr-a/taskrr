@@ -37,6 +37,28 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.22.0",
+    date: "2026-08-25",
+    changes: [
+      feat(
+        "A picture behind the app",
+        "Upload your own wallpaper under Theme \u2192 Background image, pick how it fills the screen, and dim it until the text on top is comfortable. Admins can set one for the whole instance \u2014 it shows on the login page too \u2014 and can turn the per-user side off entirely.",
+      ),
+      feat(
+        "Flat interface styles",
+        "Experimental, behind TASKRR_EXPERIMENTAL=true: squared-off corners, no shadows, no frosted glass, with two plain presets to go with it. It restyles every element in the app, which is why it takes a deliberate switch rather than arriving with an update.",
+      ),
+      feat(
+        "Fold the sidebar away",
+        "A collapse button in the sidebar, and the menu button in the header brings it back \u2014 worth about another column of tasks on a wide screen.",
+      ),
+      fix(
+        "Auto columns ignoring the room they actually had",
+        "The column count stepped at screen widths, so hiding the calendar gave the list more space without a fourth column ever appearing. It now fits as many as the space in front of it will take, and you can pick up to six by hand.",
+      ),
+    ],
+  },
+  {
     version: "1.21.0",
     date: "2026-08-23",
     changes: [

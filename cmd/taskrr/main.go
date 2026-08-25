@@ -98,6 +98,7 @@ func main() {
 			OnRestart:             requestRestart,
 			Logs:                  logs,
 			Lite:                  cfg.Lite,
+			Experimental:          cfg.Experimental,
 			TrustProxyHeaders:     cfg.TrustProxyHeaders,
 			Secrets:               secrets,
 			SafetyBackupOnRestore: cfg.SafetyBackupOnRestore,

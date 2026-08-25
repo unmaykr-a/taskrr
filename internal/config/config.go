@@ -62,6 +62,12 @@ type Config struct {
 	// safety snapshots on every restore.
 	SafetyBackupOnRestore bool
 
+	// Experimental opts the instance in to features that are still finding
+	// their shape. Right now that is the flat interface styles, which restyle
+	// every element in the app rather than just recolouring it — worth a
+	// deliberate switch rather than a surprise after an update.
+	Experimental bool
+
 	// UpdateCheckURL is fetched (server-side) to report the latest released
 	// version in the changelog menu. It should return JSON with a "version"
 	// field; the default points at the project's package.json on GitHub. Set it
@@ -97,6 +103,7 @@ func Load() Config {
 		SecretKey:         env("TASKRR_SECRET_KEY", ""),
 		ReminderInterval:  envDuration("TASKRR_REMINDER_INTERVAL", time.Minute),
 		Lite:              envBool("TASKRR_LITE", false),
+		Experimental:      envBool("TASKRR_EXPERIMENTAL", false),
 
 		SafetyBackupOnRestore: envBool("TASKRR_SAFETY_BACKUP", true),
 		UpdateCheckURL: envAllowEmpty("TASKRR_UPDATE_CHECK_URL",

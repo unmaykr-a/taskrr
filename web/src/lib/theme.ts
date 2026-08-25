@@ -31,6 +31,18 @@ export type BackgroundEffect =
   | "fireflies"
   | "comets";
 export type FontChoice = "mono" | "sans";
+/**
+ * How the interface is *shaped*, as opposed to coloured.
+ *
+ * "soft" is the app as it has always looked: generous corner radii, shadowed
+ * panels, optional frosted glass. "flat" squares everything off and drops the
+ * depth cues, which is what most self-hosted dashboards look like — and is
+ * easier on the eye if Taskrr sits in a browser tab beside them all day.
+ *
+ * Experimental: it restyles every element rather than recolouring them, so the
+ * flat styles are only offered when the operator opted in (TASKRR_EXPERIMENTAL).
+ */
+export type ThemeStyle = "soft" | "flat";
 
 export interface ThemeColors {
   background: string; // page background
@@ -55,6 +67,9 @@ export interface Theme {
   bgColor: string;
   /** Frosted-glass surfaces: translucent panels with a backdrop blur. */
   frosted: boolean;
+  /** Interface shape. Absent on themes saved before this existed, which is
+   *  exactly the "soft" they were built with. */
+  style?: ThemeStyle;
 }
 
 // --- colour helpers ---------------------------------------------------------
@@ -296,6 +311,10 @@ export function applyTheme(theme: Theme) {
   root.style.setProperty("--font-app", FONT_STACKS[theme.font]);
   root.classList.toggle("dark", theme.mode === "dark");
   root.classList.toggle("frosted", !!theme.frosted);
+  // The shape of everything: one class, and index.css does the rest. Flat wins
+  // over frosted where they disagree — a flat theme with blurred glass panels
+  // would be neither thing.
+  root.classList.toggle("style-flat", theme.style === "flat");
   root.style.colorScheme = theme.mode;
 
   setFavicon(c.accent);
@@ -373,6 +392,7 @@ function makeTheme(p: Partial<Theme> & { name: string; colors: ThemeColors; mode
     bgOpacity: 1,
     bgColor: "", // follow the accent
     frosted: false,
+    style: "soft",
     ...p,
   };
 }
@@ -441,6 +461,44 @@ export const PRESETS: Theme[] = [
       border: "#e6e6e8",
       foreground: "#0b0b0d",
       accent: "#d81b60",
+    },
+  }),
+];
+
+/**
+ * The flat presets, offered only on an instance that opted in to experimental
+ * features. Deliberately plain: greys, one accent, no effect, a sans face —
+ * the point is the shape, not another palette.
+ */
+export const EXPERIMENTAL_PRESETS: Theme[] = [
+  makeTheme({
+    name: "general",
+    mode: "dark",
+    style: "flat",
+    font: "sans",
+    background: "none",
+    colors: {
+      background: "#1b1f22",
+      card: "#22272b",
+      sidebar: "#191d20",
+      border: "#333a3f",
+      foreground: "#e8ebed",
+      accent: "#4b8fd6",
+    },
+  }),
+  makeTheme({
+    name: "general light",
+    mode: "light",
+    style: "flat",
+    font: "sans",
+    background: "none",
+    colors: {
+      background: "#f4f5f7",
+      card: "#ffffff",
+      sidebar: "#eceef1",
+      border: "#d3d7dd",
+      foreground: "#1c1f23",
+      accent: "#2f6fb5",
     },
   }),
 ];

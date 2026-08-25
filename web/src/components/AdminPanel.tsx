@@ -151,7 +151,9 @@ function BrandingSettings() {
   const [hideIcon, setHideIcon] = useState(false);
   const [hideText, setHideText] = useState(false);
   const [layout, setLayout] = useState<LoginLayout>("centered");
+  const [background, setBackground] = useState("");
   const [hydrated, setHydrated] = useState(false);
+  const bgRef = useRef<HTMLInputElement>(null);
 
   // Seed the form from the server once.
   useEffect(() => {
@@ -163,6 +165,7 @@ function BrandingSettings() {
       setHideIcon(data.login_hide_icon ?? false);
       setHideText(data.login_hide_text ?? false);
       setLayout((data.login_layout as LoginLayout) || "centered");
+      setBackground(data.brand_background ?? "");
       setHydrated(true);
     }
   }, [data, hydrated]);
@@ -177,11 +180,25 @@ function BrandingSettings() {
         login_hide_icon: hideIcon,
         login_hide_text: hideText,
         login_layout: layout,
+        brand_background: background,
       }),
     onSuccess: (next) => {
       queryClient.setQueryData(["settings"], next);
       queryClient.invalidateQueries({ queryKey: ["auth-config"] }); // refresh live branding
       toast("Branding saved", { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  // The instance background is a normal upload in the admin's own collection —
+  // the setting just points at it — so there is no second storage path for
+  // "the admin's picture", and the admin can reuse it for themselves too.
+  const uploadBackground = useMutation({
+    mutationFn: (file: File) => api.uploadBackground(file),
+    onSuccess: (bg) => {
+      setBackground(String(bg.id));
+      queryClient.invalidateQueries({ queryKey: ["backgrounds"] });
+      toast("Uploaded — save to apply it", { tone: "success" });
     },
     onError: (e) => toast((e as Error).message, { tone: "error" }),
   });
@@ -273,6 +290,56 @@ function BrandingSettings() {
           checked={hideText}
           onChange={(v) => setHideText(v)}
         />
+        <div className="space-y-1">
+          <Label className="text-xs text-muted-foreground">Background image</Label>
+          <div className="flex flex-wrap items-center gap-2">
+            {background ? (
+              <img
+                src={`/api/backgrounds/${background}`}
+                alt=""
+                className="h-9 w-16 shrink-0 rounded border object-cover"
+              />
+            ) : (
+              <div className="flex h-9 w-16 shrink-0 items-center justify-center rounded border text-[10px] text-muted-foreground">
+                none
+              </div>
+            )}
+            <Button
+              type="button"
+              variant="outline"
+              size="sm"
+              disabled={uploadBackground.isPending}
+              onClick={() => bgRef.current?.click()}
+            >
+              {uploadBackground.isPending ? "Uploading…" : "Upload"}
+            </Button>
+            {background && (
+              <button
+                type="button"
+                onClick={() => setBackground("")}
+                className="text-xs text-muted-foreground hover:text-destructive"
+              >
+                remove
+              </button>
+            )}
+            <input
+              ref={bgRef}
+              type="file"
+              accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+              className="hidden"
+              onChange={(e) => {
+                const f = e.target.files?.[0];
+                e.target.value = "";
+                if (f) uploadBackground.mutate(f);
+              }}
+            />
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Shown behind the app and on the login page, for anyone who hasn&apos;t
+            picked their own. Save to apply; removing it here leaves the file in
+            your own backgrounds.
+          </p>
+        </div>
         <div className="space-y-1">
           <Label>Login page layout</Label>
           <Select
@@ -780,21 +847,35 @@ function RegistrationSettings() {
   );
 }
 
-/** Admin gate for the whole shared-tasks feature. */
+/** The gates on what an account may do for itself: share tasks, set its own
+ *  background, mint API tokens. */
 function SharingSettings() {
   const queryClient = useQueryClient();
   const { data } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
   const save = useMutation({
     mutationFn: (patch: SettingsPatch) => api.putSettings(patch),
-    onSuccess: (next) => queryClient.setQueryData(["settings"], next),
+    onSuccess: (next) => {
+      queryClient.setQueryData(["settings"], next);
+      // These gates are read from auth config all over the app, so the switch
+      // has to reach that cache too or the section it hides stays on screen
+      // until a reload.
+      queryClient.invalidateQueries({ queryKey: ["auth-config"] });
+    },
   });
   return (
-    <SettingsGroup id="admin.sharing" title="Sharing" icon={<Share2 />} summary="Tasks and themes">
+    <SettingsGroup id="admin.sharing" title="What users may do" icon={<Share2 />} summary="Sharing, backgrounds, tokens">
       <ToggleRow
         label="Let users share tasks"
         hint="Adds a Share action and the Shared / Requests views. Users can opt out individually."
         checked={data?.tasks_shareable ?? false}
         onChange={(v) => save.mutate({ tasks_shareable: v })}
+      />
+
+      <ToggleRow
+        label="Let users set their own background"
+        hint="Each account can upload pictures and pick one to sit behind the app. Off hides the section entirely and keeps everyone on the instance background."
+        checked={data?.user_backgrounds ?? true}
+        onChange={(v) => save.mutate({ user_backgrounds: v })}
       />
 
       <ToggleRow

@@ -152,13 +152,18 @@ export function PreferencesSection() {
             </Select>
           </div>
           <div className="space-y-1">
-            <Label className="text-xs text-muted-foreground">Columns</Label>
+            <Label
+              className="text-xs text-muted-foreground"
+              title="Auto fits as many columns as the list actually has room for, which changes when the calendar or the sidebar is hidden"
+            >
+              Columns
+            </Label>
             <Select
               value={prefs.taskColumns}
               onChange={(e) => setPrefs({ taskColumns: Number(e.target.value) })}
             >
               <option value={0}>Auto</option>
-              {[1, 2, 3, 4].map((n) => (
+              {[1, 2, 3, 4, 5, 6].map((n) => (
                 <option key={n} value={n}>
                   {n}
                 </option>

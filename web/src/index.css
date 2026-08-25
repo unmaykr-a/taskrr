@@ -203,3 +203,56 @@ body.win-dragging {
     padding-left: 1rem;
   }
 }
+
+/* Flat interface style (experimental; `.style-flat` on <html>).
+ *
+ * Squares the corners off and takes the depth out: no drop shadows, no frosted
+ * glass, borders doing the separating instead. Colour is left entirely to the
+ * theme — this is about shape, so a flat theme is any palette you like with the
+ * gloss removed.
+ */
+.style-flat {
+  /* Everything radius-driven follows this one token: cards, buttons, inputs,
+     windows, the sliding highlight. Not zero — a hairline of radius keeps
+     borders from looking chipped on a fractional-DPI screen. */
+  --radius: 0.15rem;
+}
+
+/* Neutralise Tailwind's shadow utilities without touching focus rings: both
+   compose into the same box-shadow, and `box-shadow: none` here would take the
+   keyboard focus indicator with it. Blanking the shadow variables leaves
+   --tw-ring-shadow doing its job. */
+.style-flat * {
+  --tw-shadow: 0 0 #0000;
+  --tw-shadow-colored: 0 0 #0000;
+}
+
+/* Flat beats frosted where a theme has both: translucent blurred panels are the
+   materialism this style exists to drop. These come after the .frosted rules so
+   they win at equal specificity. */
+.style-flat .bg-card {
+  background-color: hsl(var(--card));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+.style-flat .bg-sidebar {
+  background-color: hsl(var(--sidebar));
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
+}
+
+/* rounded-lg/md/sm already resolve to --radius through the Tailwind config, so
+   they follow along on their own. These three are literal pixel values, which
+   is why they need naming here: a 1rem corner in the middle of a squared-off
+   interface is the one thing that would give the style away. */
+.style-flat .rounded,
+.style-flat .rounded-xl,
+.style-flat .rounded-2xl {
+  border-radius: var(--radius);
+}
+
+/* Panels read as panels through their edge rather than their lift, so the
+   dividers that are deliberately faint elsewhere come up to full strength. */
+.style-flat .border-border\/60 {
+  border-color: hsl(var(--border));
+}

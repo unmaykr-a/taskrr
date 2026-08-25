@@ -31,6 +31,7 @@ import { Sidebar } from "@/components/Sidebar";
 import { RequestsView } from "@/components/RequestsView";
 import { TaskCard } from "@/components/TaskCard";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
+import { useBackgroundImageUrl } from "@/components/BackgroundImage";
 import { Calendar } from "@/components/Calendar";
 import { ActivityChart } from "@/components/ActivityChart";
 import { BulkBar } from "@/components/BulkBar";
@@ -290,14 +291,23 @@ export default function App() {
     return order.map((folder) => ({ folder, tasks: map.get(folder)! }));
   }, [visible]);
 
-  const gridClassName = cn(
-    "grid gap-4",
-    (prefs.taskColumns === 0 || compact) && "grid-cols-1 sm:grid-cols-2 2xl:grid-cols-3",
-  );
+  // Whether a background picture is up, which a couple of deliberately
+  // transparent controls need to know about (see the search field below).
+  const onPicture = !!useBackgroundImageUrl();
+
+  // Auto columns: fit as many as the space actually has room for, rather than
+  // stepping at viewport widths. The two are not the same question — hiding the
+  // calendar hands the list ~320px back, which is another whole column that a
+  // `2xl:grid-cols-3` rule could never notice, and on a 1080p screen that was
+  // the difference between three roomy columns and the four that fit. minmax
+  // against a per-density floor is the whole rule; min(100%) keeps a single
+  // card from overflowing a phone narrower than the floor.
+  const columnFloor = prefs.cardSize === "compact" ? "16rem" : "20rem";
+  const gridClassName = "grid gap-4";
   const gridStyle =
     prefs.taskColumns > 0 && !compact
       ? { gridTemplateColumns: `repeat(${prefs.taskColumns}, minmax(0, 1fr))` }
-      : undefined;
+      : { gridTemplateColumns: `repeat(auto-fill, minmax(min(100%, ${columnFloor}), 1fr))` };
   const renderCard = (task: Task) => (
     <TaskCard
       key={task.id}
@@ -344,10 +354,13 @@ export default function App() {
           />
         )}
 
-        {/* Sidebar: static column on large screens, off-canvas drawer when compact. */}
+        {/* Sidebar: static column on large screens, off-canvas drawer when
+            compact — and collapsible out of the way on desktop, which hands the
+            task list another 15rem (often another column). */}
         <aside
           className={cn(
             "left-0 will-change-transform",
+            !compact && prefs.sidebarCollapsed && "hidden",
             compact
               ? cn(
                   "fixed inset-y-0 z-50 transition-transform duration-300 ease-in-out",
@@ -376,17 +389,20 @@ export default function App() {
             }}
             shareEnabled={shareEnabled}
             onClose={() => setSidebarOpen(false)}
+            onCollapse={compact ? undefined : () => setPrefs({ sidebarCollapsed: true })}
           />
         </aside>
 
         {/* Main column */}
         <div className={cn("flex min-w-0 flex-1 flex-col", sideBySide && "h-full overflow-hidden")}>
           <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur">
-            {compact && (
+            {(compact || prefs.sidebarCollapsed) && (
               <Button
                 variant="ghost"
                 size="icon"
-                onClick={() => setSidebarOpen(true)}
+                onClick={() =>
+                  compact ? setSidebarOpen(true) : setPrefs({ sidebarCollapsed: false })
+                }
                 aria-label="Open menu"
               >
                 <Menu />
@@ -441,7 +457,14 @@ export default function App() {
                       onChange={(e) => setSearch(e.target.value)}
                       placeholder="Search tasks"
                       aria-label="Search tasks"
-                      className="h-9 w-full rounded-md border border-input bg-transparent pl-8 pr-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                      className={cn(
+                        "h-9 w-full rounded-md border border-input bg-transparent pl-8 pr-3 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                        // These two sit straight on the page rather than on a
+                        // card, and are see-through by design. Over a picture
+                        // that means typing onto a photograph, so they get a
+                        // surface of their own when one is up.
+                        onPicture && "bg-background/70",
+                      )}
                     />
                   </div>
                   {activeFolder && (
@@ -470,7 +493,10 @@ export default function App() {
                     value={prefs.sortBy}
                     onChange={(e) => setPrefs({ sortBy: e.target.value as SortKey })}
                     aria-label="Sort tasks"
-                    className="h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"
+                    className={cn(
+                      "h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring",
+                      onPicture && "bg-background/70",
+                    )}
                   >
                     {SORT_OPTIONS.map((o) => (
                       <option key={o.key} value={o.key}>

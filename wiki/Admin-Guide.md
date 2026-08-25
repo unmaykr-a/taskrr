@@ -39,6 +39,19 @@ The **Task sharing** gate (`tasks_shareable`) turns the whole shared-tasks
 feature on or off for the instance. While off, the share UI is hidden and the
 server refuses new shares. See [Shared Tasks](Shared-Tasks).
 
+## Background images
+
+The **Let users set their own background** gate (`user_backgrounds`, on by
+default) controls whether accounts can upload pictures and pick one to sit
+behind the app. Off hides the section entirely and keeps everyone on the
+instance background - including anyone who had already set one.
+
+The instance background itself is set under **Branding**, and is shown on the
+signed-out login page too. Uploads are stored in the database (8 MB per image,
+40 MB per account), so they are covered by backups and restores. Admins can
+always upload, whatever the gate says, because that is how the instance picture
+gets there. See [Theming and Branding](Theming-and-Branding#background-image).
+
 ## API tokens
 
 The **Let users create API tokens** gate (`api_tokens`, on by default) controls
