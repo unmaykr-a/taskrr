@@ -272,6 +272,30 @@ func (s *Server) handleGetBackground(w http.ResponseWriter, r *http.Request) {
 		}
 	}
 
+	bg, err := s.store.GetBackground(ctx, id)
+	if err != nil {
+		if errors.Is(err, store.ErrNotFound) {
+			writeError(w, http.StatusNotFound, "not found")
+			return
+		}
+		writeError(w, http.StatusInternalServerError, "could not read that image")
+		return
+	}
+
+	// An id is not a stable name for a picture across a restore: the restored
+	// database's autoincrement counter is wherever it was when the backup was
+	// taken, so the next upload can land on an id a browser still has cached —
+	// and paint the old wallpaper for a week. So the tag identifies the *row*,
+	// and the browser is asked to check before reusing what it has. A hit costs
+	// a 304 and no bytes; a restore is visible immediately.
+	etag := fmt.Sprintf(`"%d-%d-%d"`, bg.ID, bg.CreatedAt.UnixNano(), bg.Size)
+	w.Header().Set("ETag", etag)
+	w.Header().Set("Cache-Control", "private, no-cache")
+	if match := r.Header.Get("If-None-Match"); match != "" && strings.Contains(match, etag) {
+		w.WriteHeader(http.StatusNotModified)
+		return
+	}
+
 	data, mime, err := s.store.GetBackgroundData(ctx, id)
 	if err != nil {
 		if errors.Is(err, store.ErrNotFound) {
@@ -290,9 +314,6 @@ func (s *Server) handleGetBackground(w http.ResponseWriter, r *http.Request) {
 	// has no business fetching.
 	w.Header().Set("Content-Security-Policy",
 		"default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox")
-	// An image's bytes never change — a new upload is a new id — so this can be
-	// cached hard. That matters for a full-screen picture on every page load.
-	w.Header().Set("Cache-Control", "private, max-age=604800, immutable")
 	w.Header().Set("Content-Length", strconv.Itoa(len(data)))
 	_, _ = w.Write(data)
 }

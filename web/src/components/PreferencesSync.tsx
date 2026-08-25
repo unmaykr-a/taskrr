@@ -26,7 +26,7 @@ interface StoredPrefs {
 export function PreferencesSync() {
   const { user } = useAuth();
   const { theme, setTheme } = useTheme();
-  const { prefs, setPrefs } = usePrefs();
+  const { prefs, setPrefs, replacePrefs } = usePrefs();
 
   const loadedFor = useRef<number | null>(null);
   const hydrated = useRef(false);
@@ -54,7 +54,11 @@ export function PreferencesSync() {
         const stored = (data ?? {}) as StoredPrefs;
         const hasStored = Boolean(stored.theme || stored.prefs);
         if (stored.theme) setTheme({ ...DEFAULT_THEME, ...stored.theme } as Theme);
-        if (stored.prefs) setPrefs(stored.prefs);
+        // Replace rather than merge: what this account has saved is the whole
+        // truth about it. Merging kept whatever the browser happened to hold
+        // for any key the stored copy didn't mention, which is how a setting
+        // survived a restore of a backup that predated it.
+        if (stored.prefs) replacePrefs(stored.prefs);
         // One-time migration: saved themes used to live in localStorage and were
         // wiped on logout. If this account has none stored yet, adopt whatever is
         // still in localStorage so it isn't lost — it then syncs to the account.
@@ -75,7 +79,7 @@ export function PreferencesSync() {
     return () => {
       cancelled = true;
     };
-  }, [user?.id, user, setTheme, setPrefs]);
+  }, [user?.id, user, setTheme, setPrefs, replacePrefs]);
 
   // Persist changes back to the account (debounced), once we've hydrated so we
   // never overwrite the just-loaded values with stale local ones.

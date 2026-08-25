@@ -37,6 +37,24 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.23.1",
+    date: "2026-08-25",
+    changes: [
+      fix(
+        "A background surviving a restore that predates it",
+        "Restoring an older backup left the picture on screen, with the settings saying it was on while the list of images was empty. Preferences the restored account has never heard of now go back to their defaults instead of lingering from the browser, a pick that points at a missing image falls back on its own, and images are revalidated rather than cached for a week under an id a restore can hand to a different picture.",
+      ),
+      fix(
+        "The sign-in card keeping round corners on a phone under the flat style",
+        "The rule that squares everything off read the card's `sm:rounded-none` as if the card were already square, and skipped it — so it stayed round at the width where that variant doesn't apply.",
+      ),
+      fix(
+        "Nowhere to find the version in the rail and top-bar layouts",
+        "It sits at the foot of the settings window in the layouts without a sidebar footer, and still opens the changelog.",
+      ),
+    ],
+  },
+  {
     version: "1.23.0",
     date: "2026-08-25",
     changes: [

@@ -310,6 +310,67 @@ func TestSVGIsOptInAndSandboxed(t *testing.T) {
 	}
 }
 
+// TestBackgroundBytesAreRevalidated: an id is not a stable name for a picture
+// across a restore, so the browser has to ask before reusing what it cached.
+func TestBackgroundBytesAreRevalidated(t *testing.T) {
+	ctx := context.Background()
+	st := openStore(t)
+	u, _ := st.CreateUser(ctx, store.UserInput{Username: "u", Role: "user", PasswordHash: ptr("h")})
+	s := NewServer(st, Options{})
+	h := s.Handler()
+	cookie := signIn(t, st, s.opts.SessionTTL, u)
+
+	bg := decodeBackground(t, uploadBackground(t, h, cookie, "wall.png", tinyPNG))
+	path := fmt.Sprintf("/api/backgrounds/%d", bg.ID)
+
+	req := httptest.NewRequest(http.MethodGet, path, nil)
+	req.AddCookie(cookie)
+	rec := httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	etag := rec.Header().Get("ETag")
+	if etag == "" {
+		t.Fatal("no ETag, so a client has nothing to revalidate against")
+	}
+	if cc := rec.Header().Get("Cache-Control"); !strings.Contains(cc, "no-cache") {
+		t.Fatalf("Cache-Control = %q, want it to force a revalidation", cc)
+	}
+
+	// The same row: a 304 and no bytes.
+	req = httptest.NewRequest(http.MethodGet, path, nil)
+	req.AddCookie(cookie)
+	req.Header.Set("If-None-Match", etag)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusNotModified {
+		t.Fatalf("unchanged image: got %d, want 304", rec.Code)
+	}
+	if rec.Body.Len() != 0 {
+		t.Fatalf("304 carried %d bytes", rec.Body.Len())
+	}
+
+	// A different picture must never satisfy the old tag. This is the case a
+	// restore creates: the restored database's autoincrement counter is
+	// wherever the backup left it, so a later upload can land on an id some
+	// browser still has cached — and the tag is what stops it painting the
+	// wallpaper that used to live there.
+	other := append(append([]byte{}, tinyPNG...), []byte("a different picture")...)
+	second := decodeBackground(t, uploadBackground(t, h, cookie, "other.png", other))
+	req = httptest.NewRequest(http.MethodGet, fmt.Sprintf("/api/backgrounds/%d", second.ID), nil)
+	req.AddCookie(cookie)
+	req.Header.Set("If-None-Match", etag)
+	rec = httptest.NewRecorder()
+	h.ServeHTTP(rec, req)
+	if rec.Code != http.StatusOK {
+		t.Fatalf("a different picture answered the old tag: got %d, want 200", rec.Code)
+	}
+	if !bytes.Equal(rec.Body.Bytes(), other) {
+		t.Fatal("served the wrong bytes for a tag that doesn't match")
+	}
+	if rec.Header().Get("ETag") == etag {
+		t.Fatal("two different pictures share an ETag")
+	}
+}
+
 // TestBackgroundNameFromFilename covers the label an upload gets: the extension
 // goes (the type is sniffed), and nothing exotic survives.
 func TestBackgroundNameFromFilename(t *testing.T) {

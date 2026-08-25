@@ -129,6 +129,13 @@ admin (`bg_max_image_mb`, `bg_max_total_mb`); over either is a `413`. The image
 currently set as the instance background answers `409` on delete until an admin
 clears it, so the login page can't lose its background to a tidy-up.
 
+Responses carry an `ETag` and `Cache-Control: private, no-cache`, so a client
+revalidates and gets a `304` with no body when nothing changed. An id is not a
+stable name for a picture across a restore - the restored database's
+autoincrement counter is wherever the backup left it, so a later upload can land
+on an id a browser already has - which is why these are revalidated rather than
+cached outright.
+
 `GET /api/auth/config` reports what this instance allows, as
 `backgroundLimits: {imageMB, totalMB, allowSVG}`, so a client can say so before
 an upload rather than after.
