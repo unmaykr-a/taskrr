@@ -27,24 +27,53 @@ import (
 // per-file and per-account caps below.
 
 const (
-	// maxBackgroundBytes bounds one upload. A 4K JPEG comfortably fits; this is
-	// mostly here to stop someone dropping a RAW photo into a SQLite row.
-	maxBackgroundBytes = 8 << 20 // 8 MiB
-	// maxBackgroundTotal bounds what one account can keep. Enough for a small
-	// set to rotate between, not enough to fill a Pi's SD card by accident.
-	maxBackgroundTotal = 40 << 20 // 40 MiB
-	maxBackgroundName  = 60
+	// Defaults for the two limits an admin can change (Admin -> Advanced). A 4K
+	// JPEG fits comfortably in 8 MiB, and 40 MiB is enough for a small set to
+	// rotate between without filling a Pi's SD card by accident.
+	defaultBGMaxImageMB = 8
+	defaultBGMaxTotalMB = 40
+	// Ceilings on what those settings may be set to. A limit is a dial, not a
+	// licence: one row of a SQLite database is read into memory whole.
+	maxBGImageLimitMB = 128
+	maxBGTotalLimitMB = 4096
+
+	maxBackgroundName = 60
 )
+
+// backgroundLimits is what this instance currently allows.
+type backgroundLimits struct {
+	imageBytes int64
+	totalBytes int64
+	allowSVG   bool
+}
+
+func (s *Server) backgroundLimits(ctx context.Context) backgroundLimits {
+	const mib = 1 << 20
+	return backgroundLimits{
+		imageBytes: int64(clampInt(s.intSetting(ctx, keyBGMaxImageMB, defaultBGMaxImageMB), 1, maxBGImageLimitMB)) * mib,
+		totalBytes: int64(clampInt(s.intSetting(ctx, keyBGMaxTotalMB, defaultBGMaxTotalMB), 1, maxBGTotalLimitMB)) * mib,
+		allowSVG:   s.boolSetting(ctx, keyBGAllowSVG, false),
+	}
+}
 
 // sniffImageType identifies an upload from its own bytes rather than trusting
 // the Content-Type the browser attached, and returns "" for anything not on the
 // allowlist.
 //
-// An allowlist, and served back with X-Content-Type-Options: nosniff, because
-// these bytes are uploaded by one person and displayed to another — the
-// instance background is shown to everyone, signed out included. An SVG is a
-// script-execution surface dressed as a picture, so it isn't on the list.
-func sniffImageType(data []byte) string {
+// An allowlist, because these bytes are uploaded by one person and displayed to
+// another — the instance background is shown to everyone, signed out included.
+//
+// SVG is off by default and behind its own switch, because it is the one format
+// here that can carry script. Drawn as a background or through <img> a browser
+// already refuses to run that script, but an SVG served from our own origin and
+// opened directly in a tab would not be — so when the switch is on, the bytes go
+// out under a CSP that sandboxes them into an opaque origin (see
+// handleGetBackground). That is what makes allowing it a real choice rather than
+// a hole.
+func sniffImageType(data []byte, allowSVG bool) string {
+	if allowSVG && looksLikeSVG(data) {
+		return "image/svg+xml"
+	}
 	switch {
 	case len(data) >= 8 && string(data[:8]) == "\x89PNG\r\n\x1a\n":
 		return "image/png"
@@ -58,6 +87,17 @@ func sniffImageType(data []byte) string {
 		return "image/gif"
 	}
 	return ""
+}
+
+// looksLikeSVG checks for an <svg> root, skipping any XML declaration, comments
+// or doctype in front of it. Only the shape is checked — the CSP is what makes
+// the content safe, not this.
+func looksLikeSVG(data []byte) bool {
+	head := data
+	if len(head) > 1024 {
+		head = head[:1024]
+	}
+	return strings.Contains(strings.ToLower(string(head)), "<svg")
 }
 
 // userBackgroundsEnabled reports the admin's switch for per-user backgrounds.
@@ -105,27 +145,42 @@ func (s *Server) handleUploadBackground(w http.ResponseWriter, r *http.Request) 
 		return
 	}
 
-	r.Body = http.MaxBytesReader(w, r.Body, maxBackgroundBytes+(1<<20)) // + multipart overhead
+	limits := s.backgroundLimits(r.Context())
+	r.Body = http.MaxBytesReader(w, r.Body, limits.imageBytes+(1<<20)) // + multipart overhead
 	file, header, err := r.FormFile("file")
 	if err != nil {
+		// Too big is the likely reason for a body that won't parse, and the
+		// reader cuts it off before the form does — without this, an oversized
+		// upload comes back as "expected a multipart 'file' field", which sends
+		// people looking in entirely the wrong place.
+		var tooBig *http.MaxBytesError
+		if errors.As(err, &tooBig) {
+			writeError(w, http.StatusRequestEntityTooLarge,
+				fmt.Sprintf("images must be %d MiB or smaller", limits.imageBytes>>20))
+			return
+		}
 		writeError(w, http.StatusBadRequest, "expected a multipart 'file' field")
 		return
 	}
 	defer file.Close()
 
-	data, err := io.ReadAll(io.LimitReader(file, maxBackgroundBytes+1))
+	data, err := io.ReadAll(io.LimitReader(file, limits.imageBytes+1))
 	if err != nil {
 		writeError(w, http.StatusBadRequest, "could not read the upload")
 		return
 	}
-	if len(data) > maxBackgroundBytes {
+	if int64(len(data)) > limits.imageBytes {
 		writeError(w, http.StatusRequestEntityTooLarge,
-			fmt.Sprintf("images must be %d MiB or smaller", maxBackgroundBytes>>20))
+			fmt.Sprintf("images must be %d MiB or smaller", limits.imageBytes>>20))
 		return
 	}
-	mime := sniffImageType(data)
+	mime := sniffImageType(data, limits.allowSVG)
 	if mime == "" {
-		writeError(w, http.StatusBadRequest, "that isn't a PNG, JPEG, WebP, AVIF or GIF")
+		kinds := "PNG, JPEG, WebP, AVIF or GIF"
+		if limits.allowSVG {
+			kinds = "PNG, JPEG, WebP, AVIF, GIF or SVG"
+		}
+		writeError(w, http.StatusBadRequest, "that isn't a "+kinds)
 		return
 	}
 
@@ -134,9 +189,9 @@ func (s *Server) handleUploadBackground(w http.ResponseWriter, r *http.Request) 
 		writeError(w, http.StatusInternalServerError, "could not save the image")
 		return
 	}
-	if used+int64(len(data)) > maxBackgroundTotal {
+	if used+int64(len(data)) > limits.totalBytes {
 		writeError(w, http.StatusRequestEntityTooLarge,
-			fmt.Sprintf("your backgrounds would exceed %d MiB — remove one first", maxBackgroundTotal>>20))
+			fmt.Sprintf("your backgrounds would exceed %d MiB — remove one first", limits.totalBytes>>20))
 		return
 	}
 
@@ -228,6 +283,13 @@ func (s *Server) handleGetBackground(w http.ResponseWriter, r *http.Request) {
 	}
 	w.Header().Set("Content-Type", mime)
 	w.Header().Set("X-Content-Type-Options", "nosniff")
+	// Uploaded by one person, displayed to others: pin these bytes to being a
+	// picture and nothing else. `sandbox` drops them into an opaque origin, so
+	// even an SVG opened directly in a tab has no script, no origin and no
+	// cookies to reach for; the rest of the policy denies everything a picture
+	// has no business fetching.
+	w.Header().Set("Content-Security-Policy",
+		"default-src 'none'; style-src 'unsafe-inline'; img-src data:; sandbox")
 	// An image's bytes never change — a new upload is a new id — so this can be
 	// cached hard. That matters for a full-screen picture on every page load.
 	w.Header().Set("Cache-Control", "private, max-age=604800, immutable")

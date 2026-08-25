@@ -159,7 +159,7 @@ export function BulkBar({
     // actions are in it.
     <div
       className={cn(
-        "fixed bottom-4 left-1/2 z-[47] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-2xl border bg-card/95 px-2 py-1.5 shadow-xl backdrop-blur sm:gap-2 sm:rounded-full",
+        "fixed bottom-4 left-1/2 z-[47] flex max-w-[calc(100vw-1rem)] -translate-x-1/2 flex-wrap items-center justify-center gap-1.5 rounded-2xl border bg-card/95 px-2 py-1.5 shadow-xl backdrop-blur sm:gap-2 sm:rounded-full pill-surface",
         prefs.animViews && "animate-in fade-in-0 slide-in-from-left-1/2 slide-in-from-bottom-4 duration-300",
       )}
     >

@@ -52,6 +52,12 @@ const (
 	// default. When off the whole section disappears from Theme settings and
 	// uploads are refused, so nobody is left with an upload button that fails.
 	keyUserBackgrounds = "user_backgrounds"
+	// Background upload limits, in MiB, and the SVG opt-in. Editable because
+	// what counts as "too big" depends on the box: a Pi on an SD card and a
+	// server with a spare terabyte don't want the same number.
+	keyBGMaxImageMB = "bg_max_image_mb"
+	keyBGMaxTotalMB = "bg_max_total_mb"
+	keyBGAllowSVG   = "bg_allow_svg"
 
 	// --- branding (admin-editable; shown signed-out, so exposed in authConfig) ---
 	keyBrandName     = "brand_name"      // app name in the sidebar + login
@@ -64,6 +70,12 @@ const (
 	// keyBrandBackground: the id of the background image used instance-wide,
 	// including on the signed-out login page. "" (or 0) is none.
 	keyBrandBackground = "brand_background"
+	// keyInterfaceStyle / keyInterfaceLayout: the instance's own look, applied
+	// to the signed-out pages and to every account that hasn't chosen for
+	// itself. Both are experimental, so they do nothing unless the operator set
+	// TASKRR_EXPERIMENTAL. "" means "leave it alone".
+	keyInterfaceStyle  = "interface_style"
+	keyInterfaceLayout = "interface_layout"
 )
 
 // Branding defaults (used when a setting is unset/empty).
@@ -190,6 +202,42 @@ func (s *Server) stringSetting(ctx context.Context, key, def string) string {
 	return v
 }
 
+// intSetting reads a whole-number setting, falling back to def for anything
+// unset or unparseable.
+func (s *Server) intSetting(ctx context.Context, key string, def int) int {
+	raw := s.stringSetting(ctx, key, "")
+	if raw == "" {
+		return def
+	}
+	n, err := strconv.Atoi(raw)
+	if err != nil {
+		return def
+	}
+	return n
+}
+
+// oneOf normalises a setting to one of the values it may hold, or "" for
+// anything else — which every reader treats as "unset".
+func oneOf(v string, allowed ...string) string {
+	v = strings.ToLower(strings.TrimSpace(v))
+	for _, a := range allowed {
+		if v == a {
+			return v
+		}
+	}
+	return ""
+}
+
+func clampInt(n, lo, hi int) int {
+	if n < lo {
+		return lo
+	}
+	if n > hi {
+		return hi
+	}
+	return n
+}
+
 // branding gathers the instance's customisable identity for the SPA. It's part
 // of authConfig because the login screen (signed out) needs it.
 func (s *Server) branding(ctx context.Context) map[string]any {
@@ -204,6 +252,11 @@ func (s *Server) branding(ctx context.Context) map[string]any {
 		// 0 = none. The SPA turns this into /api/backgrounds/{id}, which is
 		// deliberately readable without a session so the login page can show it.
 		"background": s.instanceBackgroundID(ctx),
+		// The instance's own shape and layout, "" when it hasn't picked one.
+		// Part of branding because the login page is branded too, and a login
+		// page that doesn't match the app it fronts looks like a different site.
+		"style":  s.stringSetting(ctx, keyInterfaceStyle, ""),
+		"layout": s.stringSetting(ctx, keyInterfaceLayout, ""),
 	}
 }
 
@@ -272,6 +325,11 @@ func (s *Server) handleAuthConfig(w http.ResponseWriter, r *http.Request) {
 		"tasksShareable":      s.boolSetting(ctx, keyTasksShareable, false),
 		"apiTokens":           s.boolSetting(ctx, keyAPITokens, true),
 		"userBackgrounds":     s.boolSetting(ctx, keyUserBackgrounds, true),
+		"backgroundLimits": map[string]any{
+			"imageMB":  s.intSetting(ctx, keyBGMaxImageMB, defaultBGMaxImageMB),
+			"totalMB":  s.intSetting(ctx, keyBGMaxTotalMB, defaultBGMaxTotalMB),
+			"allowSVG": s.boolSetting(ctx, keyBGAllowSVG, false),
+		},
 		// Experimental features are off unless the operator opted in with an
 		// environment variable, so they can't be switched on from inside the app.
 		"experimental": s.opts.Experimental,
@@ -1446,7 +1504,12 @@ func (s *Server) handleGetSettings(w http.ResponseWriter, r *http.Request) {
 		keyLoginHideText:         s.boolSetting(ctx, keyLoginHideText, false),
 		keyLoginLayout:           s.stringSetting(ctx, keyLoginLayout, defaultLoginLayout),
 		keyUserBackgrounds:       s.boolSetting(ctx, keyUserBackgrounds, true),
+		keyBGMaxImageMB:          s.intSetting(ctx, keyBGMaxImageMB, defaultBGMaxImageMB),
+		keyBGMaxTotalMB:          s.intSetting(ctx, keyBGMaxTotalMB, defaultBGMaxTotalMB),
+		keyBGAllowSVG:            s.boolSetting(ctx, keyBGAllowSVG, false),
 		keyBrandBackground:       get(keyBrandBackground),
+		keyInterfaceStyle:        get(keyInterfaceStyle),
+		keyInterfaceLayout:       get(keyInterfaceLayout),
 		"oidc_client_secret_set": get(keyOIDCClientSecret) != "", // never return the secret
 		"oidc_enabled":           s.oidcEnabled(ctx),
 	})
@@ -1471,6 +1534,9 @@ type settingsPatch struct {
 	TasksShareable      *bool   `json:"tasks_shareable"`
 	APITokens           *bool   `json:"api_tokens"`
 	UserBackgrounds     *bool   `json:"user_backgrounds"`
+	BGMaxImageMB        *int    `json:"bg_max_image_mb"`
+	BGMaxTotalMB        *int    `json:"bg_max_total_mb"`
+	BGAllowSVG          *bool   `json:"bg_allow_svg"`
 	BrandName           *string `json:"brand_name"`
 	BrandTitle          *string `json:"brand_title"`
 	BrandTagline        *string `json:"brand_tagline"`
@@ -1479,6 +1545,8 @@ type settingsPatch struct {
 	LoginHideText       *bool   `json:"login_hide_text"`
 	LoginLayout         *string `json:"login_layout"`
 	BrandBackground     *string `json:"brand_background"`
+	InterfaceStyle      *string `json:"interface_style"`
+	InterfaceLayout     *string `json:"interface_layout"`
 }
 
 func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
@@ -1579,6 +1647,22 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 	if req.UserBackgrounds != nil && !set(keyUserBackgrounds, boolStr(*req.UserBackgrounds)) {
 		return
 	}
+	// Clamped rather than rejected: these are a dial, and the ends of the dial
+	// are the point — 0 would make uploads impossible and a number with no
+	// ceiling would make one upload able to fill the disk.
+	if req.BGMaxImageMB != nil {
+		if !set(keyBGMaxImageMB, strconv.Itoa(clampInt(*req.BGMaxImageMB, 1, maxBGImageLimitMB))) {
+			return
+		}
+	}
+	if req.BGMaxTotalMB != nil {
+		if !set(keyBGMaxTotalMB, strconv.Itoa(clampInt(*req.BGMaxTotalMB, 1, maxBGTotalLimitMB))) {
+			return
+		}
+	}
+	if req.BGAllowSVG != nil && !set(keyBGAllowSVG, boolStr(*req.BGAllowSVG)) {
+		return
+	}
 	if req.BrandBackground != nil {
 		// An id, or "" for none. Checked against what's actually stored so the
 		// login page can't be pointed at a row that was never an image.
@@ -1598,6 +1682,19 @@ func (s *Server) handlePutSettings(w http.ResponseWriter, r *http.Request) {
 			raw = ""
 		}
 		if !set(keyBrandBackground, raw) {
+			return
+		}
+	}
+	// Both are validated against the known values rather than trusted: they end
+	// up as a class name and a layout decision on a page served to signed-out
+	// visitors, and anything unrecognised means "leave it alone".
+	if req.InterfaceStyle != nil {
+		if !set(keyInterfaceStyle, oneOf(*req.InterfaceStyle, "soft", "flat")) {
+			return
+		}
+	}
+	if req.InterfaceLayout != nil {
+		if !set(keyInterfaceLayout, oneOf(*req.InterfaceLayout, "sidebar", "topbar", "rail")) {
 			return
 		}
 	}

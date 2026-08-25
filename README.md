@@ -116,6 +116,9 @@ single static `bin/taskrr` with everything inside it.
   frosted glass, per-animation toggles, a sidebar that folds away, and panels
   that either float as windows or behave as plain full-screen menus. Every
   contrast pair clears WCAG AA in all five presets, whatever accent you pick.
+  With `TASKRR_EXPERIMENTAL=true` there's also a flat, squared-off style and a
+  choice of layouts — icon rail or top tabs instead of the sidebar — which
+  admins can set for the whole instance, sign-in page included.
 - Keyboard shortcuts (`?` for the list) with rebindable keys, quick-add syntax
   (`water plants every 2 weeks #home`), installable to a phone home screen, and
   a preference to switch off anything above that isn't for you.
@@ -137,7 +140,7 @@ with working examples. The ones that matter:
 | `TASKRR_TRUST_PROXY_HEADERS` | `true` | Take the client IP from proxy headers; `false` if Taskrr is exposed directly |
 | `TASKRR_SECRET_KEY` | — | Encrypts the OIDC client secret at rest, so it isn't sitting in plaintext in your backups |
 | `TASKRR_LITE` | `false` | Single-person mode: no registration, no extra accounts |
-| `TASKRR_EXPERIMENTAL` | `false` | Offer the experimental flat interface styles |
+| `TASKRR_EXPERIMENTAL` | `false` | Offer the experimental flat style and alternative layouts |
 | `TASKRR_REMINDER_INTERVAL` | `1m` | How often the reminder loop looks for due tasks |
 | `TASKRR_SAFETY_BACKUP` | `true` | Snapshot before a restore, so a mistaken restore is undoable |
 | `TASKRR_UPDATE_CHECK_URL` | project package.json | Where the admin update check looks; empty disables it |

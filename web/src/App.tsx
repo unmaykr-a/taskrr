@@ -16,6 +16,7 @@ import {
 
 import { api, type Task } from "@/lib/api";
 import { type Filter, FILTERS, matchesFilter, SHARE_FILTERS } from "@/lib/filters";
+import { resolveLayout } from "@/lib/layout";
 import { type SortKey, SORT_OPTIONS, sortTasks } from "@/lib/sort";
 import { taskStaleness } from "@/lib/staleness";
 import { usePrefs } from "@/lib/prefs";
@@ -32,6 +33,7 @@ import { RequestsView } from "@/components/RequestsView";
 import { TaskCard } from "@/components/TaskCard";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
 import { useBackgroundImageUrl } from "@/components/BackgroundImage";
+import { TopNav } from "@/components/TopNav";
 import { Calendar } from "@/components/Calendar";
 import { ActivityChart } from "@/components/ActivityChart";
 import { BulkBar } from "@/components/BulkBar";
@@ -295,6 +297,27 @@ export default function App() {
   // transparent controls need to know about (see the search field below).
   const onPicture = !!useBackgroundImageUrl();
 
+  // How the navigation is arranged: the account's choice, the instance's
+  // default, or the sidebar Taskrr has always had.
+  //
+  // A phone gets the same three. The rail is 4rem of a 24rem screen and the
+  // tabs scroll sideways, so both work at that size — and a layout that
+  // silently became something else on the device you actually carry would be a
+  // strange thing to offer. Only the full sidebar is too wide to sit beside the
+  // list, which is why that one (and only that one) is a drawer when compact.
+  const layout = resolveLayout(
+    prefs.appLayout,
+    authConfig?.branding.layout,
+    authConfig?.experimental ?? false,
+  );
+  const railNav = layout === "rail";
+  const topNav = layout === "topbar";
+  const drawerNav = compact && !railNav && !topNav;
+  // Folders live in the sidebar's own list; the layouts without one get a
+  // picker in the toolbar instead, so the feature never disappears with the
+  // column that happened to hold it.
+  const folderPicker = (railNav || topNav) && folderCounts.length > 0;
+
   // Auto columns: fit as many as the space actually has room for, rather than
   // stepping at viewport widths. The two are not the same question — hiding the
   // calendar hands the list ~320px back, which is another whole column that a
@@ -345,9 +368,26 @@ export default function App() {
           onOpenChange={(o) => !o && setShareFolder(null)}
         />
       )}
-      <div className={cn("relative z-10 flex", sideBySide ? "h-[100dvh] overflow-hidden" : "min-h-[100dvh]")}>
+      <div
+        className={cn(
+          "relative z-10 flex flex-col",
+          sideBySide ? "h-[100dvh] overflow-hidden" : "min-h-[100dvh]",
+        )}
+      >
+        {topNav && (
+          <TopNav
+            filter={filter}
+            onFilterChange={(f) => {
+              setFilter(f);
+              setSelected(new Set());
+            }}
+            counts={counts}
+            shareEnabled={shareEnabled}
+          />
+        )}
+        <div className={cn("flex min-h-0 flex-1", sideBySide && "overflow-hidden")}>
         {/* Mobile/landscape drawer scrim */}
-        {compact && sidebarOpen && (
+        {drawerNav && sidebarOpen && (
           <div
             className="fixed inset-0 z-40 bg-black/60 animate-in fade-in-0 duration-200"
             onClick={() => setSidebarOpen(false)}
@@ -360,15 +400,17 @@ export default function App() {
         <aside
           className={cn(
             "left-0 will-change-transform",
-            !compact && prefs.sidebarCollapsed && "hidden",
-            compact
+            topNav && "hidden",
+            !compact && prefs.sidebarCollapsed && !railNav && "hidden",
+            drawerNav
               ? cn(
                   "fixed inset-y-0 z-50 transition-transform duration-300 ease-in-out",
                   sidebarOpen ? "translate-x-0" : "-translate-x-full",
                 )
-              : // Desktop: stick to the top and always fill the viewport height, so
-                // the nav and footer stay in place instead of scrolling away with
-                // the page on shorter layouts.
+              : // A column of its own: stick to the top and fill the viewport
+                // height, so the nav and footer stay put instead of scrolling
+                // away with the page. The rail takes this branch on a phone
+                // too — it is narrow enough to sit beside the list.
                 "sticky top-0 z-auto h-[100dvh]",
           )}
         >
@@ -388,20 +430,25 @@ export default function App() {
               setSelected(new Set());
             }}
             shareEnabled={shareEnabled}
-            onClose={() => setSidebarOpen(false)}
-            onCollapse={compact ? undefined : () => setPrefs({ sidebarCollapsed: true })}
+            onClose={drawerNav ? () => setSidebarOpen(false) : undefined}
+            // Nothing to fold away in the rail — it is already the folded one.
+            onCollapse={compact || railNav ? undefined : () => setPrefs({ sidebarCollapsed: true })}
+            rail={railNav}
           />
         </aside>
 
         {/* Main column */}
         <div className={cn("flex min-w-0 flex-1 flex-col", sideBySide && "h-full overflow-hidden")}>
           <header className="sticky top-0 z-10 flex items-center gap-3 border-b border-border/60 bg-background/80 px-4 py-3 backdrop-blur">
-            {(compact || prefs.sidebarCollapsed) && (
+            {/* Only when there is something to open: the drawer, or a sidebar
+                the user folded away. The rail and the top bar are always on
+                screen, so a menu button would open nothing. */}
+            {(drawerNav || (!compact && !railNav && !topNav && prefs.sidebarCollapsed)) && (
               <Button
                 variant="ghost"
                 size="icon"
                 onClick={() =>
-                  compact ? setSidebarOpen(true) : setPrefs({ sidebarCollapsed: false })
+                  drawerNav ? setSidebarOpen(true) : setPrefs({ sidebarCollapsed: false })
                 }
                 aria-label="Open menu"
               >
@@ -436,7 +483,9 @@ export default function App() {
                 </Button>
               )}
               {/* Compact: add button in the header unless the user prefers a bottom FAB. */}
-              {compact && prefs.addButton === "top" && <CreateTaskDialog />}
+              {/* The rail and the top bar carry their own "new task" control,
+                  so the header's would be the second one on screen. */}
+              {compact && !topNav && !railNav && prefs.addButton === "top" && <CreateTaskDialog />}
             </div>
           </header>
 
@@ -478,6 +527,27 @@ export default function App() {
                       {activeFolder}
                       <X className="h-3 w-3" />
                     </button>
+                  )}
+                  {folderPicker && (
+                    <select
+                      value={activeFolder ?? ""}
+                      onChange={(e) => {
+                        setActiveFolder(e.target.value || null);
+                        setSelected(new Set());
+                      }}
+                      aria-label="Filter by folder"
+                      className={cn(
+                        "h-9 rounded-md border border-input bg-transparent px-2 text-sm shadow-sm focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring [&>option]:bg-background",
+                        onPicture && "bg-background/70",
+                      )}
+                    >
+                      <option value="">All folders</option>
+                      {folderCounts.map((f) => (
+                        <option key={f.name} value={f.name}>
+                          {f.name} ({f.count})
+                        </option>
+                      ))}
+                    </select>
                   )}
                   {activeTag && (
                     <button
@@ -626,6 +696,7 @@ export default function App() {
             )}
           </main>
         </div>
+        </div>
       </div>
 
       {/* Bulk-action bar while tasks are selected. */}
@@ -640,7 +711,7 @@ export default function App() {
             <Button
               size="icon"
               aria-label="New task"
-              className="fixed bottom-4 right-4 z-[46] h-14 w-14 rounded-full shadow-xl"
+              className="pill-surface fixed bottom-4 right-4 z-[46] h-14 w-14 rounded-full shadow-xl"
             >
               <Plus className="h-6 w-6" />
             </Button>

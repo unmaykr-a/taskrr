@@ -1,4 +1,4 @@
-import { useEffect, useRef, useState } from "react";
+import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
@@ -29,6 +29,7 @@ import { Button } from "@/components/ui/button";
 import { Select } from "@/components/ui/select";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
+import { APP_LAYOUTS } from "@/lib/layout";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 
@@ -142,6 +143,7 @@ function BrandingSettings() {
   const queryClient = useQueryClient();
   const toast = useToast();
   const { data } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
+  const { data: config } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
   const fileRef = useRef<HTMLInputElement>(null);
 
   const [name, setName] = useState("");
@@ -152,6 +154,8 @@ function BrandingSettings() {
   const [hideText, setHideText] = useState(false);
   const [layout, setLayout] = useState<LoginLayout>("centered");
   const [background, setBackground] = useState("");
+  const [style, setStyle] = useState("");
+  const [appLayout, setAppLayout] = useState("");
   const [hydrated, setHydrated] = useState(false);
   const bgRef = useRef<HTMLInputElement>(null);
 
@@ -166,6 +170,8 @@ function BrandingSettings() {
       setHideText(data.login_hide_text ?? false);
       setLayout((data.login_layout as LoginLayout) || "centered");
       setBackground(data.brand_background ?? "");
+      setStyle(data.interface_style ?? "");
+      setAppLayout(data.interface_layout ?? "");
       setHydrated(true);
     }
   }, [data, hydrated]);
@@ -181,6 +187,8 @@ function BrandingSettings() {
         login_hide_text: hideText,
         login_layout: layout,
         brand_background: background,
+        interface_style: style,
+        interface_layout: appLayout,
       }),
     onSuccess: (next) => {
       queryClient.setQueryData(["settings"], next);
@@ -340,6 +348,42 @@ function BrandingSettings() {
             your own backgrounds.
           </p>
         </div>
+        {/* The instance's own look. Experimental, so the controls only exist
+            where the operator opted in — and they set a default rather than a
+            lock: anyone who picks for themselves keeps their choice. */}
+        {config?.experimental && (
+          <>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Interface style</Label>
+              <Select value={style} onChange={(e) => setStyle(e.target.value)}>
+                <option value="">Soft (default)</option>
+                <option value="soft">Soft</option>
+                <option value="flat">Flat</option>
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Applies to the sign-in page and to everyone who hasn&apos;t chosen a
+                style of their own. Flat squares off the corners and drops the
+                shadows and frosted glass.
+              </p>
+            </div>
+            <div className="space-y-1">
+              <Label className="text-xs text-muted-foreground">Layout</Label>
+              <Select value={appLayout} onChange={(e) => setAppLayout(e.target.value)}>
+                <option value="">Sidebar (default)</option>
+                {APP_LAYOUTS.map((l) => (
+                  <option key={l.value} value={l.value}>
+                    {l.label} — {l.hint}
+                  </option>
+                ))}
+              </Select>
+              <p className="text-[11px] text-muted-foreground">
+                Where the navigation lives, for accounts that haven&apos;t picked.
+                The rail and the top bar work on a phone too; the full sidebar is
+                a drawer there.
+              </p>
+            </div>
+          </>
+        )}
         <div className="space-y-1">
           <Label>Login page layout</Label>
           <Select
@@ -736,6 +780,99 @@ function BackupsSection() {
 }
 
 /** Advanced: backups + a danger zone of irreversible, instance-wide deletions. */
+/** What an uploaded background may be. Numbers rather than a fixed policy,
+ *  because "too big" depends on the box this is running on. */
+function BackgroundLimits() {
+  const queryClient = useQueryClient();
+  const toast = useToast();
+  const { data } = useQuery({ queryKey: ["settings"], queryFn: api.getSettings });
+  const [image, setImage] = useState("");
+  const [total, setTotal] = useState("");
+  const [hydrated, setHydrated] = useState(false);
+  // Two number boxes side by side: without the pairing, "3" and "40" are all a
+  // screen reader would have to go on.
+  const imageId = useId();
+  const totalId = useId();
+
+  useEffect(() => {
+    if (data && !hydrated) {
+      setImage(String(data.bg_max_image_mb ?? 8));
+      setTotal(String(data.bg_max_total_mb ?? 40));
+      setHydrated(true);
+    }
+  }, [data, hydrated]);
+
+  const save = useMutation({
+    mutationFn: (patch: SettingsPatch) => api.putSettings(patch),
+    onSuccess: (next) => {
+      queryClient.setQueryData(["settings"], next);
+      queryClient.invalidateQueries({ queryKey: ["auth-config"] });
+      setImage(String(next.bg_max_image_mb));
+      setTotal(String(next.bg_max_total_mb));
+      toast("Saved", { tone: "success" });
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  return (
+    <section className="space-y-2">
+      <p className="text-xs font-semibold">Background images</p>
+      <p className="text-[11px] text-muted-foreground">
+        Uploads are stored in the database, so these are also how much of your
+        backup they can become. Out-of-range values are clamped rather than
+        refused (1–128 MB an image, 1–4096 MB an account).
+      </p>
+      <div className="grid grid-cols-2 gap-2">
+        <div className="space-y-1">
+          <Label htmlFor={imageId} className="text-xs text-muted-foreground">
+            Per image (MB)
+          </Label>
+          <Input
+            id={imageId}
+            type="number"
+            min={1}
+            max={128}
+            value={image}
+            onChange={(e) => setImage(e.target.value)}
+            className="h-8"
+          />
+        </div>
+        <div className="space-y-1">
+          <Label htmlFor={totalId} className="text-xs text-muted-foreground">
+            Per account (MB)
+          </Label>
+          <Input
+            id={totalId}
+            type="number"
+            min={1}
+            max={4096}
+            value={total}
+            onChange={(e) => setTotal(e.target.value)}
+            className="h-8"
+          />
+        </div>
+      </div>
+      <ToggleRow
+        label="Accept SVG uploads"
+        hint="Off by default: an SVG can carry script, and these files are shown to other people. Allowed, they're served under a policy that sandboxes them into an origin of their own, so the script can't reach this instance — but a raster image is still the boring choice."
+        checked={data?.bg_allow_svg ?? false}
+        onChange={(v) => save.mutate({ bg_allow_svg: v })}
+      />
+      <div className="flex justify-end">
+        <Button
+          size="sm"
+          disabled={save.isPending}
+          onClick={() =>
+            save.mutate({ bg_max_image_mb: Number(image) || 1, bg_max_total_mb: Number(total) || 1 })
+          }
+        >
+          {save.isPending ? "Saving…" : "Save limits"}
+        </Button>
+      </div>
+    </section>
+  );
+}
+
 function AdvancedSettings() {
   const queryClient = useQueryClient();
   const { confirm } = useConfirm();
@@ -771,7 +908,9 @@ function AdvancedSettings() {
   const danger = "border-destructive/50 text-destructive hover:bg-destructive/10";
 
   return (
-    <SettingsGroup id="admin.advanced" title="Advanced" icon={<Wrench />} summary="Backups, danger zone">
+    <SettingsGroup id="admin.advanced" title="Advanced" icon={<Wrench />} summary="Limits, backups, danger zone">
+        <BackgroundLimits />
+        <hr className="border-border/60" />
         <BackupsSection />
         <hr className="border-destructive/30" />
         <p className="text-xs font-semibold text-destructive">Danger zone</p>

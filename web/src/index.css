@@ -241,14 +241,32 @@ body.win-dragging {
   -webkit-backdrop-filter: none;
 }
 
-/* rounded-lg/md/sm already resolve to --radius through the Tailwind config, so
-   they follow along on their own. These three are literal pixel values, which
-   is why they need naming here: a 1rem corner in the middle of a squared-off
-   interface is the one thing that would give the style away. */
-.style-flat .rounded,
-.style-flat .rounded-xl,
-.style-flat .rounded-2xl {
+/* One radius, everywhere.
+ *
+ * rounded-lg/md/sm resolve to --radius through the Tailwind config and follow
+ * along on their own, but the literal sizes (rounded, -xl, -2xl) do not — and
+ * naming those classes one by one missed every responsive variant, which is
+ * how dialogs kept their 0.75rem corners (`sm:rounded-xl`) in a squared-off
+ * interface. Matching the attribute catches the variants too.
+ *
+ * rounded-full is left alone because it is load-bearing: the calendar's dots,
+ * the colour-wheel handle, the clock face and the sidebar's active tick are
+ * circles, not decisions about corner style. The two places it means "pill"
+ * rather than "circle" opt in through .pill-surface below.
+ *
+ * rounded-none is left alone too — an element asking for square corners is
+ * already agreeing with us. */
+.style-flat [class*="rounded"]:not([class*="rounded-full"]):not([class*="rounded-none"]),
+.style-flat .pill-surface {
   border-radius: var(--radius);
+}
+
+/* Frosted chrome is the other half of the depth this style drops: the header,
+   the taskbar, the dialog scrim and the login card all blur what's behind
+   them. Flat surfaces sit on the page instead. */
+.style-flat [class*="backdrop-blur"] {
+  backdrop-filter: none;
+  -webkit-backdrop-filter: none;
 }
 
 /* Panels read as panels through their edge rather than their lift, so the

@@ -30,6 +30,17 @@ export function BackgroundImageSection() {
 
   const { data: config } = useQuery({ queryKey: ["auth-config"], queryFn: api.authConfig });
   const enabled = config?.userBackgrounds ?? false;
+  const limits = config?.backgroundLimits;
+  // The accepted types and the size in the hint both come from the instance, so
+  // the file picker and the message can't drift from what the server will take.
+  const accept = [
+    "image/png",
+    "image/jpeg",
+    "image/webp",
+    "image/avif",
+    "image/gif",
+    ...(limits?.allowSVG ? ["image/svg+xml"] : []),
+  ].join(",");
   const { data: images } = useQuery({
     queryKey: ["backgrounds"],
     queryFn: api.listBackgrounds,
@@ -97,7 +108,7 @@ export function BackgroundImageSection() {
         <input
           ref={fileRef}
           type="file"
-          accept="image/png,image/jpeg,image/webp,image/avif,image/gif"
+          accept={accept}
           className="hidden"
           onChange={(e) => {
             const file = e.target.files?.[0];
@@ -114,7 +125,10 @@ export function BackgroundImageSection() {
         >
           <Upload className="h-3.5 w-3.5" /> {upload.isPending ? "Uploading…" : "Upload"}
         </Button>
-        <span className="text-[11px] text-muted-foreground">PNG, JPEG, WebP, AVIF or GIF, up to 8 MB</span>
+        <span className="text-[11px] text-muted-foreground">
+          PNG, JPEG, WebP, AVIF{limits?.allowSVG ? ", GIF or SVG" : " or GIF"}, up to{" "}
+          {limits?.imageMB ?? 8} MB
+        </span>
       </div>
 
       {list.length > 0 && (

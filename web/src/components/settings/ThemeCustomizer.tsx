@@ -17,6 +17,7 @@ import {
 } from "lucide-react";
 
 import { api } from "@/lib/api";
+import { APP_LAYOUTS } from "@/lib/layout";
 import { usePrefs } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
 
@@ -209,20 +210,21 @@ export function ThemeCustomizer() {
       {experimental && (
         <section className="space-y-2">
           <Label>Style</Label>
-          <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
+          <div className="grid grid-cols-3 gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
             {(
               [
+                { value: undefined, label: "Instance" },
                 { value: "soft", label: "Soft" },
                 { value: "flat", label: "Flat" },
-              ] as const satisfies readonly { value: ThemeStyle; label: string }[]
+              ] as const satisfies readonly { value: ThemeStyle | undefined; label: string }[]
             ).map((o) => (
               <button
-                key={o.value}
+                key={o.label}
                 type="button"
                 onClick={() => patch({ style: o.value })}
                 className={cn(
                   "rounded-md py-1.5 transition-colors",
-                  (theme.style ?? "soft") === o.value
+                  theme.style === o.value
                     ? "bg-primary text-primary-foreground"
                     : "text-muted-foreground hover:text-foreground",
                 )}
@@ -233,7 +235,26 @@ export function ThemeCustomizer() {
           </div>
           <p className="text-[11px] text-muted-foreground">
             Flat squares off the corners and drops the shadows and frosted glass —
-            the same colours, without the depth. Experimental.
+            the same colours, without the depth. <strong>Instance</strong> follows
+            whatever the admin set. Experimental.
+          </p>
+
+          <Label>Layout</Label>
+          <Select
+            value={prefs.appLayout}
+            onChange={(e) => setPrefs({ appLayout: e.target.value })}
+            aria-label="App layout"
+          >
+            <option value="">Instance default</option>
+            {APP_LAYOUTS.map((l) => (
+              <option key={l.value} value={l.value}>
+                {l.label} — {l.hint}
+              </option>
+            ))}
+          </Select>
+          <p className="text-[11px] text-muted-foreground">
+            Where the navigation lives. The rail and the top bar work on a phone
+            too; the full sidebar is a drawer there, as it always has been.
           </p>
         </section>
       )}

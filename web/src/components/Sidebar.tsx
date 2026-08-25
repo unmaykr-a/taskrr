@@ -1,6 +1,8 @@
 import { useRef, useState } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
-import { Check, Folder as FolderIcon, LogOut, PanelLeftClose, Settings, X } from "lucide-react";
+import { Check, Folder as FolderIcon, LogOut, PanelLeftClose, Plus, Settings, X } from "lucide-react";
+
+import { VIEW_ICONS } from "@/components/nav/viewIcons";
 
 import { api } from "@/lib/api";
 import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
@@ -37,6 +39,7 @@ export function Sidebar({
   shareEnabled = false,
   onClose,
   onCollapse,
+  rail = false,
 }: {
   filter: Filter;
   onFilterChange: (f: Filter) => void;
@@ -50,6 +53,9 @@ export function Sidebar({
   onClose?: () => void;
   /** Fold the sidebar away (desktop only — the drawer has its own close). */
   onCollapse?: () => void;
+  /** Narrow icons-only variant. Folders move to the toolbar's folder picker,
+   *  since an icon can't say "Kitchen". */
+  rail?: boolean;
 }) {
   const windows = useWindows();
   const queryClient = useQueryClient();
@@ -84,8 +90,13 @@ export function Sidebar({
     // rather than being scrolled off by a long folder list. Padding moved onto
     // the three bands so the scrollbar runs inside the list, not down the edge
     // of the whole sidebar.
-    <div className="flex h-full w-60 flex-col overflow-hidden border-r border-border/60 bg-sidebar">
-      <div className="flex items-center justify-between p-4 pb-0">
+    <div
+      className={cn(
+        "flex h-full flex-col overflow-hidden border-r border-border/60 bg-sidebar",
+        rail ? "w-16 items-center" : "w-60",
+      )}
+    >
+      <div className={cn("flex items-center justify-between p-4 pb-0", rail && "w-full justify-center px-0")}>
         <div className="flex min-w-0 items-center gap-2.5">
           {branding.icon ? (
             <img src={branding.icon} alt="" className="h-9 w-9 shrink-0 rounded-lg object-cover shadow" />
@@ -94,12 +105,14 @@ export function Sidebar({
               <Check className="h-5 w-5" strokeWidth={3} />
             </div>
           )}
-          <div className="min-w-0">
-            <h1 className="truncate text-base font-semibold leading-none tracking-tight">{branding.name}</h1>
-            {branding.tagline && (
-              <p className="truncate text-[11px] text-muted-foreground">{branding.tagline}</p>
-            )}
-          </div>
+          {!rail && (
+            <div className="min-w-0">
+              <h1 className="truncate text-base font-semibold leading-none tracking-tight">{branding.name}</h1>
+              {branding.tagline && (
+                <p className="truncate text-[11px] text-muted-foreground">{branding.tagline}</p>
+              )}
+            </div>
+          )}
         </div>
         {/* Close button only matters in the mobile drawer. */}
         {onClose && (
@@ -109,7 +122,7 @@ export function Sidebar({
         )}
         {/* Desktop: fold the whole thing away. The menu button in the header
             brings it back, so the way out is where you'd look for it. */}
-        {onCollapse && (
+        {onCollapse && !rail && (
           <Button
             variant="ghost"
             size="icon"
@@ -123,16 +136,26 @@ export function Sidebar({
         )}
       </div>
 
-      <div className="px-4 pt-6">
-        <CreateTaskDialog />
+      <div className={cn("px-4 pt-6", rail && "px-2 pt-4")}>
+        {/* The rail has room for the icon and nothing else, so it supplies its
+            own trigger rather than the labelled default. */}
+        <CreateTaskDialog
+          trigger={
+            rail ? (
+              <Button size="icon" className="h-11 w-11" aria-label="New task" title="New task">
+                <Plus />
+              </Button>
+            ) : undefined
+          }
+        />
       </div>
 
       {/* The scrolling band. min-h-0 is what lets it actually shrink inside the
           flex column instead of pushing the footer off the bottom. */}
-      <div className="min-h-0 flex-1 overflow-y-auto px-4">
+      <div className={cn("min-h-0 flex-1 overflow-y-auto px-4", rail && "w-full px-2")}>
       {/* flex+gap (not space-y) so the absolutely-positioned highlight doesn't
           pick up a sibling margin; the bubble glides to the selected view. */}
-      <nav ref={navRef} className="relative mt-6 flex flex-col gap-1">
+      <nav ref={navRef} className={cn("relative mt-6 flex flex-col gap-1", rail && "mt-4 items-center")}>
         <SlidingHighlight containerRef={navRef} activeKey={filter} className="rounded-md bg-primary/15" />
         {(shareEnabled ? [...FILTERS, ...SHARE_FILTERS] : FILTERS).map((f) => {
           const active = filter === f.key;
@@ -143,8 +166,13 @@ export function Sidebar({
               key={f.key}
               data-slide-key={f.key}
               onClick={() => onFilterChange(f.key)}
+              // The label is the only thing that says what an icon means, so in
+              // the rail it becomes the tooltip and the accessible name.
+              title={rail ? `${f.label} (${counts[f.key]})` : undefined}
+              aria-label={rail ? f.label : undefined}
               className={cn(
                 "relative flex w-full items-center justify-between rounded-md px-3 py-2 text-sm transition-colors duration-200",
+                rail && "h-11 w-11 justify-center px-0",
                 active
                   ? "font-medium text-primary"
                   : "text-muted-foreground hover:bg-accent hover:text-foreground",
@@ -158,6 +186,24 @@ export function Sidebar({
                   active ? "scale-y-100 opacity-100" : "scale-y-0 opacity-0",
                 )}
               />
+              {rail ? (
+                <span className="relative [&>svg]:h-[18px] [&>svg]:w-[18px]">
+                  {VIEW_ICONS[f.key]}
+                  {/* A count has nowhere to sit beside an icon, so only the
+                      number that means "something is waiting for you" shows,
+                      as a badge. */}
+                  {counts[f.key] > 0 && (f.key === "requests" || f.key === "overdue") && (
+                    <span
+                      className={cn(
+                        "absolute -right-2 -top-1.5 min-w-[15px] rounded-full bg-primary px-1 text-[9px] font-semibold leading-[15px] text-primary-foreground",
+                        pulse && prefs.animFeedback && "animate-pulse",
+                      )}
+                    >
+                      {counts[f.key]}
+                    </span>
+                  )}
+                </span>
+              ) : (
               <span className="flex items-center gap-1.5">
                 {f.label}
                 {pulse && (
@@ -167,17 +213,20 @@ export function Sidebar({
                   />
                 )}
               </span>
+              )}
               {/* Keyed by the value so a changing count pops in. */}
-              <span
-                key={counts[f.key]}
-                className={cn(
-                  "text-xs tabular-nums",
-                  pulse && "font-medium text-primary",
-                  prefs.animFeedback && "animate-in zoom-in-75 duration-200",
-                )}
-              >
-                {counts[f.key]}
-              </span>
+              {!rail && (
+                <span
+                  key={counts[f.key]}
+                  className={cn(
+                    "text-xs tabular-nums",
+                    pulse && "font-medium text-primary",
+                    prefs.animFeedback && "animate-in zoom-in-75 duration-200",
+                  )}
+                >
+                  {counts[f.key]}
+                </span>
+              )}
             </button>
           );
         })}
@@ -190,7 +239,7 @@ export function Sidebar({
           Set apart from the views above with a rule and a labelled heading: the
           rows are the same shape as the view rows, so without a break the list
           just looked like more views with odd names. */}
-      {folders.length > 0 && (
+      {folders.length > 0 && !rail && (
         <div className="mt-4 border-t border-border/60 pt-4">
           <div className="mb-1 flex items-center justify-between gap-2 px-3">
             <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">
@@ -233,7 +282,38 @@ export function Sidebar({
       )}
       </div>
 
-      <div className="space-y-2 border-t border-border/60 p-4">
+      <div className={cn("space-y-2 border-t border-border/60 p-4", rail && "w-full space-y-1 p-2")}>
+        {/* The rail keeps the same three actions, as icons: who you are is in
+            the tooltip, since a username has nowhere to go at 4rem wide. */}
+        {rail ? (
+          <>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              onClick={() =>
+                windows.open({ id: "settings", title: "Settings", width: 640, content: <SettingsPanel /> })
+              }
+              aria-label="Settings"
+              title="Settings"
+            >
+              <Settings />
+            </Button>
+            <Button
+              variant="ghost"
+              size="icon"
+              className="h-11 w-11"
+              aria-label="Sign out"
+              title={user ? `Sign out (${user.username})` : "Sign out"}
+              disabled={logout.isPending}
+              onClick={() => logout.mutate()}
+            >
+              <LogOut />
+            </Button>
+            <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />
+          </>
+        ) : (
+          <>
         {/* Current account + sign out */}
         <div className="flex items-center justify-between gap-2 rounded-md border px-2 py-1.5">
           <div className="min-w-0">
@@ -277,6 +357,8 @@ export function Sidebar({
           </Button>
         </div>
         <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />
+          </>
+        )}
       </div>
     </div>
   );
