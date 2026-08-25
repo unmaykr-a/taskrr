@@ -13,7 +13,7 @@ import { useBranding } from "@/components/Branding";
 import { Button } from "@/components/ui/button";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
-import { SettingsPanel } from "@/components/SettingsPanel";
+import { SETTINGS_WINDOW, SettingsPanel } from "@/components/SettingsPanel";
 import { ChangelogDialog } from "@/components/ChangelogDialog";
 import { currentRelease, formatReleaseDate } from "@/lib/releases";
 import { useAuth } from "@/components/AuthProvider";
@@ -292,7 +292,7 @@ export function Sidebar({
               size="icon"
               className="h-11 w-11"
               onClick={() =>
-                windows.open({ id: "settings", title: "Settings", width: 640, content: <SettingsPanel /> })
+                windows.open({ id: "settings", ...SETTINGS_WINDOW, content: <SettingsPanel /> })
               }
               aria-label="Settings"
               title="Settings"
@@ -347,8 +347,7 @@ export function Sidebar({
             onClick={() =>
               windows.open({
                 id: "settings",
-                title: "Settings",
-                width: 640,
+                ...SETTINGS_WINDOW,
                 content: <SettingsPanel />,
               })
             }

@@ -46,6 +46,11 @@ export function PreferencesSync() {
     loadedFor.current = user.id;
     hydrated.current = false;
     let cancelled = false;
+    // What the app looked like when the request went out. If any of it has
+    // changed by the time the answer arrives, somebody was already using the
+    // app while it loaded — and their click is more current than the copy the
+    // server had a moment ago.
+    const atRequest = { theme: latest.current.theme, prefs: latest.current.prefs };
 
     api
       .getPreferences()
@@ -53,12 +58,17 @@ export function PreferencesSync() {
         if (cancelled) return;
         const stored = (data ?? {}) as StoredPrefs;
         const hasStored = Boolean(stored.theme || stored.prefs);
-        if (stored.theme) setTheme({ ...DEFAULT_THEME, ...stored.theme } as Theme);
+        // A change made while this was in flight wins over what arrives: a
+        // theme picked a second after sign-in used to snap back to the stored
+        // one, which reads as the click not registering.
+        const themeTouched = latest.current.theme !== atRequest.theme;
+        const prefsTouched = latest.current.prefs !== atRequest.prefs;
+        if (stored.theme && !themeTouched) setTheme({ ...DEFAULT_THEME, ...stored.theme } as Theme);
         // Replace rather than merge: what this account has saved is the whole
         // truth about it. Merging kept whatever the browser happened to hold
         // for any key the stored copy didn't mention, which is how a setting
         // survived a restore of a backup that predated it.
-        if (stored.prefs) replacePrefs(stored.prefs);
+        if (stored.prefs && !prefsTouched) replacePrefs(stored.prefs);
         // One-time migration: saved themes used to live in localStorage and were
         // wiped on logout. If this account has none stored yet, adopt whatever is
         // still in localStorage so it isn't lost — it then syncs to the account.
@@ -67,8 +77,9 @@ export function PreferencesSync() {
           if (legacy.length) setPrefs({ savedThemes: legacy });
         }
         hydrated.current = true;
-        // First time on this account: seed the server with the current values.
-        if (!hasStored) {
+        // Seed the server when this account has nothing stored — and also when
+        // a live edit beat the load, so the change that won is the one saved.
+        if (!hasStored || themeTouched || prefsTouched) {
           api.putPreferences({ theme: latest.current.theme, prefs: latest.current.prefs }).catch(() => {});
         }
       })

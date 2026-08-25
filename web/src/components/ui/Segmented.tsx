@@ -1,4 +1,4 @@
-import { useRef } from "react";
+import { type ReactNode, useRef } from "react";
 
 import { cn } from "@/lib/utils";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
@@ -15,7 +15,9 @@ export function Segmented<T extends string>({
   className,
 }: {
   value: T;
-  options: { value: T; label: string; title?: string }[];
+  /** Labels can be nodes, not just text — an icon beside the word is common
+   *  enough (light/dark) that spelling it out here beats a second component. */
+  options: { value: T; label: ReactNode; title?: string }[];
   onChange: (value: T) => void;
   className?: string;
 }) {
@@ -37,7 +39,7 @@ export function Segmented<T extends string>({
           title={o.title}
           onClick={() => onChange(o.value)}
           className={cn(
-            "relative rounded-md px-2 py-1.5 transition-colors duration-200",
+            "relative flex items-center justify-center gap-1.5 rounded-md px-2 py-1.5 transition-colors duration-200",
             value === o.value ? "font-medium text-primary-foreground" : "text-muted-foreground hover:text-foreground",
           )}
         >
