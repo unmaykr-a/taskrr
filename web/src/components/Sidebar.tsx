@@ -6,8 +6,8 @@ import { VIEW_ICONS } from "@/components/nav/viewIcons";
 
 import { api } from "@/lib/api";
 import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
-import { clearStoredPreferences, usePrefs } from "@/lib/prefs";
-import { DEFAULT_THEME } from "@/lib/theme";
+import { usePrefs } from "@/lib/prefs";
+import { endSession } from "@/lib/signOut";
 import { cn } from "@/lib/utils";
 import { useBranding } from "@/components/Branding";
 import { Button } from "@/components/ui/button";
@@ -75,12 +75,7 @@ export function Sidebar({
     mutationFn: api.logout,
     onSuccess: () => {
       windows.closeAll();
-      clearStoredPreferences();
-      // Reset to the built-in theme so the login screen doesn't keep the previous
-      // user's look on a shared browser (AuthPage then applies the site default).
-      setTheme(DEFAULT_THEME);
-      queryClient.setQueryData(["me"], null);
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+      endSession(queryClient, setTheme);
     },
   });
 

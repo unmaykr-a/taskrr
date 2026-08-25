@@ -214,7 +214,7 @@ export function ContextMenu({
           // animation utility lands here.
           style={{ left: at.x, top: at.y }}
           className={cn(
-            "fixed z-[60] w-52 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl outline-none",
+            "fixed z-[80] w-52 overflow-hidden rounded-lg border bg-popover p-1 text-popover-foreground shadow-xl outline-none",
             "transition-none",
             prefs.animWindows && "animate-in fade-in-0 zoom-in-95 duration-100",
           )}

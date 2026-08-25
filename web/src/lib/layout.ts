@@ -45,3 +45,28 @@ export function resolveLayout(
   }
   return "sidebar";
 }
+
+/** Width in pixels of the navigation column each layout puts down the left of
+ *  the page, for the things that have to sit beside it rather than under it.
+ *
+ *  Only a column that takes space out of the page counts. The full sidebar is a
+ *  drawer when compact — it floats over the content rather than displacing it —
+ *  and it can be folded away entirely on desktop; the top bar has no column at
+ *  all. In each of those cases the page starts at the screen edge, and so does
+ *  anything lining up with it.
+ *
+ *  Kept here rather than measured, because the thing that needs it most (the
+ *  window taskbar) is fixed to the viewport and so is outside the layout that
+ *  would otherwise tell it. */
+export function navColumnWidth(
+  layout: AppLayout,
+  { compact, collapsed }: { compact: boolean; collapsed: boolean },
+): number {
+  if (layout === "topbar") return 0;
+  if (layout === "rail") return RAIL_WIDTH; // narrow enough to stay put on a phone
+  if (compact || collapsed) return 0;
+  return SIDEBAR_WIDTH;
+}
+
+export const SIDEBAR_WIDTH = 240; // w-60
+export const RAIL_WIDTH = 64; // w-16

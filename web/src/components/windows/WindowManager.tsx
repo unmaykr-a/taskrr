@@ -9,11 +9,11 @@ import {
 import { ChevronsDown, ChevronsUp, Square, X, XSquare } from "lucide-react";
 
 import { cn } from "@/lib/utils";
+import { navColumnWidth } from "@/lib/layout";
+import { useAppLayout } from "@/lib/useAppLayout";
 import { useMediaQuery } from "@/lib/useMediaQuery";
 import { usePrefs, type WindowSize } from "@/lib/prefs";
 import { FloatingWindow } from "@/components/windows/FloatingWindow";
-
-const SIDEBAR_WIDTH = 240; // w-60
 
 export interface WindowDef {
   id: string;
@@ -119,11 +119,19 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
   // When everything is already minimised, the bulk button flips to "bring all up".
   const allMinimized = windows.length > 0 && windows.every((w) => minimized.includes(w.id));
 
-  // The taskbar starts at the static sidebar's edge (when it's showing), not the
-  // screen edge. The sidebar is static only on wide, non-landscape-phone layouts.
-  const wideEnough = useMediaQuery("(min-width: 768px)");
+  // The taskbar starts where the page does: at the navigation column's edge
+  // when there is one, and at the screen edge otherwise. Which of those it is
+  // depends on the layout — the rail is narrower than the sidebar, the top bar
+  // has no column at all, and a folded-away or drawer sidebar takes no width —
+  // so ask the same helper the page itself answers to rather than assuming the
+  // sidebar is always there and always 15rem.
+  //
+  // The taskbar is fixed to the viewport, which is why it has to be told: it
+  // sits outside the layout that would otherwise place it.
   const phoneLandscape = useMediaQuery("(orientation: landscape) and (max-height: 600px)");
-  const taskbarLeft = wideEnough && !phoneLandscape ? SIDEBAR_WIDTH : 0;
+  const compact = useMediaQuery("(max-width: 767px)") || phoneLandscape;
+  const layout = useAppLayout();
+  const taskbarLeft = navColumnWidth(layout, { compact, collapsed: !!prefs.sidebarCollapsed });
 
   return (
     <Ctx.Provider value={value}>
@@ -151,7 +159,9 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
           height={w.height}
           savedSize={prefs.windowSizes?.[w.id]}
           onResizeEnd={(size) => rememberSize(w.id, size)}
-          z={50 + order.indexOf(w.id)}
+          // One step per window, front-most last, kept inside the band that
+          // sits below dialogs (see ui/dialog.tsx) however many are open.
+          z={50 + Math.min(order.indexOf(w.id), 19)}
           minimized={minimized.includes(w.id)}
           onClose={() => close(w.id)}
           onMinimize={() => minimize(w.id)}

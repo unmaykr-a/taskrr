@@ -56,6 +56,18 @@ export const RELEASES: Release[] = [
         "Reminder webhooks can be kept off your local network",
         "They can reach your LAN by default, since a local ntfy or Home Assistant is the usual reason to set one up. On an instance where you don't know everyone with an account, TASKRR_WEBHOOK_ALLOW_PRIVATE=false restricts them to the public internet.",
       ),
+      fix(
+        "The window tab strip ignoring which layout you were in",
+        "It always started 15rem in, as though the full sidebar were there — leaving a gap beside the icon rail, and a bigger one under the top bar, where there is no column at all. It now starts where the page does, including when the sidebar is folded away.",
+      ),
+      fix(
+        "The changelog opening underneath the windows",
+        "It blocked everything behind it, as a dialog should, while sitting below any window opened after the first — so the thing you had just opened was buried and nothing else would respond.",
+      ),
+      fix(
+        "Signing out flashing the stock look",
+        "The sign-in screen appeared in the built-in colours and name for a moment before redrawing as this instance. Its own look is the server's, not the account's, so it no longer goes away with the account.",
+      ),
       feat(
         "Downloadable builds for every release",
         "Each release now has binaries for Linux, macOS and Windows with checksums, alongside the container image. One file, the web interface included, nothing to install beside it.",

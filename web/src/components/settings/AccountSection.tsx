@@ -18,7 +18,8 @@ import {
 import { api, type APIToken, type ImportResult } from "@/lib/api";
 import { parseCsv, type CsvTable } from "@/lib/csv";
 import { CsvMapper } from "@/components/settings/CsvMapper";
-import { clearStoredPreferences } from "@/lib/prefs";
+import { endSession } from "@/lib/signOut";
+import { useTheme } from "@/components/ThemeProvider";
 import { useAuth } from "@/components/AuthProvider";
 import { RemindersSection } from "@/components/settings/RemindersSection";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
@@ -33,6 +34,7 @@ import { formatDateTime } from "@/lib/time";
 export function AccountSection() {
   const { user } = useAuth();
   const queryClient = useQueryClient();
+  const { setTheme } = useTheme();
   const toast = useToast();
   const [username, setUsername] = useState(user?.username ?? "");
   const [current, setCurrent] = useState("");
@@ -71,11 +73,10 @@ export function AccountSection() {
   const del = useMutation({
     mutationFn: () => api.deleteAccount(deleteConfirm.trim()),
     onSuccess: () => {
-      // Mirror logout: drop the cached user (flips the app to the login screen)
-      // and clear non-essential local state.
-      clearStoredPreferences();
-      queryClient.setQueryData(["me"], null);
-      queryClient.removeQueries({ predicate: (q) => q.queryKey[0] !== "me" });
+      // The same teardown as signing out: the account is gone, so the app
+      // flips to the sign-in screen wearing this instance's look, not the
+      // account's and not the built-in one.
+      endSession(queryClient, setTheme);
     },
   });
 
