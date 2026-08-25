@@ -63,6 +63,7 @@ export function FloatingWindow({
   children,
   index,
   width,
+  height,
   savedSize,
   onResizeEnd,
   z,
@@ -76,6 +77,8 @@ export function FloatingWindow({
   children: ReactNode;
   index: number;
   width?: number;
+  /** Optional initial height (see WindowDef). A remembered size still wins. */
+  height?: number;
   /** A remembered {w,h} to open at (overrides `width` and the auto height). */
   savedSize?: { w: number; h: number };
   /** Called with the final size when a resize ends, so it can be remembered. */
@@ -105,8 +108,8 @@ export function FloatingWindow({
   // A remembered size wins over the default width; clamp both to the viewport so
   // a size saved on a bigger screen can't open off-screen here.
   const initialW = Math.min(savedSize?.w ?? width ?? WIDTH, vw - 24);
-  const initialH =
-    savedSize?.h != null ? Math.max(MIN_H, Math.min(savedSize.h, vh - 16)) : null;
+  const requestedH = savedSize?.h ?? height ?? null;
+  const initialH = requestedH != null ? Math.max(MIN_H, Math.min(requestedH, vh - 96)) : null;
   const pos = useRef({
     x: Math.max(12, Math.min(vw - initialW - 12, vw / 2 - initialW / 2 + index * 28)),
     y: 72 + index * 28,

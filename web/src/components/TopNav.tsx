@@ -10,7 +10,7 @@ import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { useBranding } from "@/components/Branding";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
-import { SettingsPanel } from "@/components/SettingsPanel";
+import { SETTINGS_WINDOW, SettingsPanel } from "@/components/SettingsPanel";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
@@ -61,8 +61,18 @@ export function TopNav({
   const views = shareEnabled ? [...FILTERS, ...SHARE_FILTERS] : FILTERS;
 
   return (
-    <div className="sticky top-0 z-20 flex items-center gap-3 border-b border-border/60 bg-sidebar px-4 py-2">
-      <div className="flex shrink-0 items-center gap-2.5">
+    <div className="sticky top-0 z-20 flex items-center gap-2 border-b border-border/60 bg-sidebar px-4 py-2">
+      {/* The mark alone, and it does something: this layout has no sidebar to
+          go home to. The name is left to the tab title and the sign-in page —
+          spelled out here it pushed the whole tab row inward, out of line with
+          the heading and the search box directly beneath it. */}
+      <button
+        type="button"
+        onClick={() => onFilterChange("all")}
+        title={branding.name}
+        aria-label={`${branding.name} — all tasks`}
+        className="shrink-0"
+      >
         {branding.icon ? (
           <img src={branding.icon} alt="" className="h-8 w-8 rounded-lg object-cover shadow" />
         ) : (
@@ -70,10 +80,7 @@ export function TopNav({
             <Check className="h-4 w-4" strokeWidth={3} />
           </div>
         )}
-        <h1 className="hidden text-sm font-semibold leading-none tracking-tight lg:block">
-          {branding.name}
-        </h1>
-      </div>
+      </button>
 
       {/* The tabs scroll rather than wrap: a nav bar that grows a second row
           when the Requests view appears would shift the whole page down. */}
@@ -135,7 +142,7 @@ export function TopNav({
           aria-label="Settings"
           title="Settings"
           onClick={() =>
-            windows.open({ id: "settings", title: "Settings", width: 640, content: <SettingsPanel /> })
+            windows.open({ id: "settings", ...SETTINGS_WINDOW, content: <SettingsPanel /> })
           }
         >
           <Settings />

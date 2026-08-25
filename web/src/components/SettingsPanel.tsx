@@ -16,6 +16,16 @@ import { AdminPanel } from "@/components/AdminPanel";
 
 declare const __APP_VERSION__: string;
 
+/**
+ * How the settings window opens, in one place so every way in agrees.
+ *
+ * The height matters: the pane keeps its nav column and the rule beside it
+ * still while the section scrolls, and it can only do that if it has a height
+ * to fill. Without one the window sizes to its content and the whole thing —
+ * nav, divider and all — scrolls as a single sheet.
+ */
+export const SETTINGS_WINDOW = { title: "Settings", width: 640, height: 560 };
+
 type Section = "account" | "preferences" | "shortcuts" | "theme" | "admin";
 
 /**

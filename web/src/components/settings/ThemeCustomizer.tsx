@@ -42,6 +42,7 @@ import { ColorField } from "@/components/ui/ColorPicker";
 import { Input } from "@/components/ui/input";
 import { Label } from "@/components/ui/label";
 import { BackgroundImageSection } from "@/components/settings/BackgroundImageSection";
+import { Segmented } from "@/components/ui/Segmented";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { ToggleRow } from "@/components/ui/ToggleRow";
 import { useToast } from "@/components/ui/Toast";
@@ -186,23 +187,31 @@ export function ThemeCustomizer() {
       {/* Light / dark — remembers the theme you had in each mode and swaps. */}
       <section className="space-y-2">
         <Label>Mode</Label>
-        <div className="grid grid-cols-2 gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
-          {(["light", "dark"] as const).map((m) => (
-            <button
-              key={m}
-              type="button"
-              onClick={() => theme.mode !== m && applyTheme(toggledMode(theme))}
-              className={cn(
-                "flex items-center justify-center gap-1.5 rounded-md py-1.5 capitalize transition-colors",
-                theme.mode === m
-                  ? "bg-primary text-primary-foreground"
-                  : "text-muted-foreground hover:text-foreground",
-              )}
-            >
-              {m === "light" ? <Sun className="h-4 w-4" /> : <Moon className="h-4 w-4" />} {m}
-            </button>
-          ))}
-        </div>
+        {/* The same sliding pill as every other choice in the app — these two
+            were hand-rolled before Segmented existed and never caught up. */}
+        <Segmented
+          className="text-sm"
+          value={theme.mode}
+          onChange={(m) => theme.mode !== m && applyTheme(toggledMode(theme))}
+          options={[
+            {
+              value: "light",
+              label: (
+                <>
+                  <Sun className="h-4 w-4" /> Light
+                </>
+              ),
+            },
+            {
+              value: "dark",
+              label: (
+                <>
+                  <Moon className="h-4 w-4" /> Dark
+                </>
+              ),
+            },
+          ]}
+        />
       </section>
 
       {/* Interface shape. Only on an instance that opted in to experimental
@@ -210,29 +219,18 @@ export function ThemeCustomizer() {
       {experimental && (
         <section className="space-y-2">
           <Label>Style</Label>
-          <div className="grid grid-cols-3 gap-1 rounded-lg border bg-muted/40 p-1 text-sm">
-            {(
-              [
-                { value: undefined, label: "Instance" },
-                { value: "soft", label: "Soft" },
-                { value: "flat", label: "Flat" },
-              ] as const satisfies readonly { value: ThemeStyle | undefined; label: string }[]
-            ).map((o) => (
-              <button
-                key={o.label}
-                type="button"
-                onClick={() => patch({ style: o.value })}
-                className={cn(
-                  "rounded-md py-1.5 transition-colors",
-                  theme.style === o.value
-                    ? "bg-primary text-primary-foreground"
-                    : "text-muted-foreground hover:text-foreground",
-                )}
-              >
-                {o.label}
-              </button>
-            ))}
-          </div>
+          {/* "instance" stands in for "no style of my own" — Segmented keys on a
+              string, and undefined is not something a pill can slide to. */}
+          <Segmented
+            className="text-sm"
+            value={theme.style ?? "instance"}
+            onChange={(v) => patch({ style: v === "instance" ? undefined : (v as ThemeStyle) })}
+            options={[
+              { value: "instance", label: "Instance" },
+              { value: "soft", label: "Soft" },
+              { value: "flat", label: "Flat" },
+            ]}
+          />
           <p className="text-[11px] text-muted-foreground">
             Flat squares off the corners and drops the shadows and frosted glass —
             the same colours, without the depth. <strong>Instance</strong> follows

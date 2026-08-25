@@ -21,6 +21,10 @@ export interface WindowDef {
   content: ReactNode;
   /** Optional initial width in px (defaults to the standard panel width). */
   width?: number;
+  /** Optional initial height in px. Worth setting for a window whose content
+   *  manages its own scrolling — without a height to fill, the pane can't tell
+   *  its chrome from its content and the whole thing scrolls as one. */
+  height?: number;
 }
 
 interface WindowManagerCtx {
@@ -144,6 +148,7 @@ export function WindowManagerProvider({ children }: { children: ReactNode }) {
           title={w.title}
           index={i}
           width={w.width}
+          height={w.height}
           savedSize={prefs.windowSizes?.[w.id]}
           onResizeEnd={(size) => rememberSize(w.id, size)}
           z={50 + order.indexOf(w.id)}

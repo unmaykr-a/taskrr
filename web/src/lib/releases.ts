@@ -37,6 +37,28 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.23.2",
+    date: "2026-08-25",
+    changes: [
+      fix(
+        "Settings scrolling as one sheet",
+        "The section scrolls on its own now; the list of sections and the rule beside it stay where they are. Scrolling a long page used to carry the way out of it off the top of the window.",
+      ),
+      fix(
+        "The top bar's tabs sitting out of line with the page",
+        "The name beside the mark pushed the whole row inward, away from the heading and search box directly beneath it. The mark alone stays, at the same margin as everything else, and takes you to All tasks.",
+      ),
+      fix(
+        "Mode and Style not sliding like every other choice",
+        "Both were built before the shared control existed and never caught up. They use it now, so the filled pill glides the way it does everywhere else.",
+      ),
+      fix(
+        "A setting snapping back when changed right after signing in",
+        "Your account's saved preferences arriving a moment later would overwrite the choice you had just made. The change you made wins, and is what gets saved.",
+      ),
+    ],
+  },
+  {
     version: "1.23.1",
     date: "2026-08-25",
     changes: [

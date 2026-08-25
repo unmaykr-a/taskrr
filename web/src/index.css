@@ -156,9 +156,17 @@ body.win-dragging {
 
 /* Settings: stacked by default, side nav only once the panel is wide enough for
    one. Below that the nav becomes a scrolling strip across the top, which is
-   the same shape phones already get. */
+   the same shape phones already get.
+
+   The shell fills the window and the *section* scrolls, not the sheet: the nav
+   is how you get from one section to another, so scrolling a long one shouldn't
+   carry the way out off the top of the screen. The rule between the two stays
+   put for the same reason — it belongs to the frame, not the content. (The
+   window is opened at a height for exactly this; see SETTINGS_WINDOW.) */
 .settings-shell {
   display: flex;
+  height: 100%;
+  min-height: 0;
   flex-direction: column;
   gap: 0.75rem;
 }
@@ -177,7 +185,9 @@ body.win-dragging {
 }
 .settings-body {
   min-width: 0;
+  min-height: 0;
   flex: 1 1 0%;
+  overflow-y: auto;
 }
 @container panel (min-width: 30rem) {
   .settings-shell {
@@ -185,19 +195,16 @@ body.win-dragging {
     gap: 1rem;
   }
   .settings-nav {
-    position: sticky;
-    top: 0;
     width: 9rem;
     flex-direction: column;
-    align-self: flex-start;
-    overflow: visible;
+    /* Stretched, not hugging its items: the version line sits at the foot of
+       the window, and the column scrolls on its own if the sections ever
+       outgrow it. */
+    align-self: stretch;
+    overflow-x: visible;
+    overflow-y: auto;
     border-bottom: 0;
     padding-bottom: 0;
-  }
-  .settings-nav {
-    /* Stretch rather than hug the items, so the version line below can sit at
-       the foot of the window instead of directly under the last tab. */
-    align-self: stretch;
   }
   .settings-nav > button {
     flex: none;
