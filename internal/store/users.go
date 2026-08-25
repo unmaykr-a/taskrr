@@ -26,9 +26,14 @@ type User struct {
 	AllowShares bool `json:"allowShares"`
 	// Protected is set by the API layer (not the DB) for the bootstrap admin, so
 	// the UI can disable controls other admins aren't allowed to use.
-	Protected bool      `json:"protected"`
-	CreatedAt time.Time `json:"createdAt"`
-	UpdatedAt time.Time `json:"updatedAt"`
+	Protected bool `json:"protected"`
+	// InviteExpiresAt is when this account's outstanding invitation stops working;
+	// zero when there isn't one. The secret itself is never serialised — the admin
+	// screen only needs to know whether a link is still good, and an expired
+	// invitation is what tells it to offer a new one.
+	InviteExpiresAt time.Time `json:"inviteExpiresAt,omitzero"`
+	CreatedAt       time.Time `json:"createdAt"`
+	UpdatedAt       time.Time `json:"updatedAt"`
 }
 
 // UserInput carries the fields needed to create a user. Approved defaults to
@@ -42,7 +47,7 @@ type UserInput struct {
 	Approved     *bool
 }
 
-const userSelect = `SELECT id, username, password_hash, role, oidc_subject, approved, allow_shares, created_at, updated_at FROM users`
+const userSelect = `SELECT id, username, password_hash, role, oidc_subject, approved, allow_shares, invite_expires_at, created_at, updated_at FROM users`
 
 func scanUser(sc scanner) (User, error) {
 	var (
@@ -51,11 +56,15 @@ func scanUser(sc scanner) (User, error) {
 		subject     sql.NullString
 		approved    int
 		allowShares int
+		invite      sql.NullString
 		created     string
 		updated     string
 	)
-	if err := sc.Scan(&u.ID, &u.Username, &hash, &u.Role, &subject, &approved, &allowShares, &created, &updated); err != nil {
+	if err := sc.Scan(&u.ID, &u.Username, &hash, &u.Role, &subject, &approved, &allowShares, &invite, &created, &updated); err != nil {
 		return User{}, err
+	}
+	if invite.Valid {
+		u.InviteExpiresAt = parseTime(invite.String)
 	}
 	u.Approved = approved != 0
 	u.AllowShares = allowShares != 0
@@ -189,9 +198,39 @@ func (s *Store) ListPendingUsers(ctx context.Context) ([]User, error) {
 	return users, rows.Err()
 }
 
-// SetUserPassword updates (or clears, with nil) a user's password hash.
+// SetUserPassword updates (or clears, with nil) a user's password hash, and
+// retires any outstanding invitation: whoever the link was for, the account is
+// no longer waiting to be claimed, so the link must stop working.
 func (s *Store) SetUserPassword(ctx context.Context, id int64, hash *string) error {
-	return s.touchUser(ctx, `UPDATE users SET password_hash = ?, updated_at = ? WHERE id = ?`, hash, time.Now().UTC().Format(timeLayout), id)
+	return s.touchUser(ctx,
+		`UPDATE users SET password_hash = ?, invite_hash = NULL, invite_expires_at = NULL, updated_at = ? WHERE id = ?`,
+		hash, time.Now().UTC().Format(timeLayout), id)
+}
+
+// SetUserInvite stores the digest of a fresh invitation and when it lapses,
+// replacing any previous one — issuing a new link invalidates the old.
+func (s *Store) SetUserInvite(ctx context.Context, id int64, hash string, expires time.Time) error {
+	return s.touchUser(ctx,
+		`UPDATE users SET invite_hash = ?, invite_expires_at = ?, updated_at = ? WHERE id = ?`,
+		hash, expires.UTC().Format(timeLayout), time.Now().UTC().Format(timeLayout), id)
+}
+
+// UserByInvite resolves an invitation digest to the account it opens, and
+// returns ErrNotFound for one that has lapsed, been used, or never existed —
+// the caller can't tell those apart, which is the point.
+//
+// The lookup is by digest, so a wrong secret is not compared byte by byte
+// against a right one anywhere.
+func (s *Store) UserByInvite(ctx context.Context, hash string, now time.Time) (User, error) {
+	if hash == "" {
+		return User{}, ErrNotFound
+	}
+	u, err := scanUser(s.db.QueryRowContext(ctx,
+		userSelect+` WHERE invite_hash = ? AND invite_expires_at > ?`, hash, now.UTC().Format(timeLayout)))
+	if errors.Is(err, sql.ErrNoRows) {
+		return User{}, ErrNotFound
+	}
+	return u, err
 }
 
 // LinkOIDCSubject attaches an OIDC subject to an existing local account.

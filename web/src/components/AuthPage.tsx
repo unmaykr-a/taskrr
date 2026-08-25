@@ -38,12 +38,43 @@ export function AuthPage() {
   const [password, setPassword] = useState("");
   const [claiming, setClaiming] = useState(false); // "set your first password" mode
   const [pending, setPending] = useState(false); // registration awaiting approval
+  // The invitation from the link, if this page was opened by following one, and
+  // the account that signing in said is still waiting for its link.
+  const [inviteToken, setInviteToken] = useState<string | null>(null);
+  const [needsInvite, setNeedsInvite] = useState<string | null>(null);
 
   const canRegister = config?.localRegistration ?? false;
   const active = tab === "register" && canRegister ? "register" : "login";
   // OIDC-only: the local username/password form is hidden entirely; the server
   // also refuses local sign-in (except the primary admin's break-glass path).
   const oidcOnly = !!config?.oidcOnly;
+
+  // An invitation arrives in the URL's fragment, which the browser keeps to
+  // itself — so the secret never reaches a proxy's access log or a Referer
+  // header on the way here. Take it out of the address bar straight away, so a
+  // bookmark or a shared screenshot of this page doesn't carry it either.
+  useEffect(() => {
+    const found = /(?:^|&)invite=([^&]*)/.exec(window.location.hash.replace(/^#/, ""));
+    if (!found) return;
+    window.history.replaceState({}, "", window.location.pathname + window.location.search);
+    setInviteToken(decodeURIComponent(found[1]));
+  }, []);
+
+  // Ask whose account the link opens, so the person following it doesn't have
+  // to have been told a username as well.
+  const invite = useQuery({
+    queryKey: ["invite", inviteToken],
+    queryFn: () => api.inviteInfo(inviteToken as string),
+    enabled: !!inviteToken,
+    retry: false,
+  });
+  const invitedUsername = invite.data?.username;
+  useEffect(() => {
+    if (!invitedUsername) return;
+    setUsername(invitedUsername);
+    setNeedsInvite(null);
+    setClaiming(true);
+  }, [invitedUsername]);
 
   // Apply the admin's site-wide default theme on the signed-out screen.
   const defaultTheme = config?.defaultTheme;
@@ -63,7 +94,7 @@ export function AuthPage() {
   const submit = useMutation({
     mutationFn: async (): Promise<LoginResult | PendingRegistration> => {
       const name = username.trim();
-      if (claiming) return api.claim(name, password);
+      if (claiming) return api.claim(name, password, inviteToken ?? "");
       if (active === "register") return api.register(name, password);
       return api.login(name, password);
     },
@@ -73,9 +104,10 @@ export function AuthPage() {
         setPending(true);
         return;
       }
-      // The login endpoint may ask us to set a first password instead.
+      // The account exists but has never been set up, and setting it up takes
+      // the invitation the admin was given — a password alone won't do it.
       if (isClaimChallenge(res)) {
-        setClaiming(true);
+        setNeedsInvite(res.username);
         setPassword("");
         return;
       }
@@ -85,6 +117,8 @@ export function AuthPage() {
 
   const cancelClaim = () => {
     setClaiming(false);
+    setNeedsInvite(null);
+    setInviteToken(null);
     setPassword("");
     submit.reset();
   };
@@ -179,8 +213,8 @@ export function AuthPage() {
           <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-muted-foreground">
             <p className="font-medium text-foreground">Set your password</p>
             <p className="mt-0.5">
-              The account <span className="font-medium text-foreground">{username.trim()}</span> doesn't
-              have a password yet. Choose one (min 8 characters) to finish setting it up.
+              The account <span className="font-medium text-foreground">{username.trim()}</span> is
+              waiting for you. Choose a password (min 8 characters) to finish setting it up.
             </p>
           </div>
         ) : (
@@ -209,6 +243,31 @@ export function AuthPage() {
           )
         )}
 
+        {/* Followed a link that has been used, has lapsed, or was mistyped. */}
+        {invite.isError && !claiming && (
+          <div className="mb-4 rounded-lg border border-destructive/40 bg-destructive/10 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">That invitation isn't valid any more</p>
+            <p className="mt-0.5">
+              It may have been used already or run out. Ask an admin for a new link.
+            </p>
+          </div>
+        )}
+
+        {/* Signed in as an account nobody has set up yet. Setting a password
+            takes the invitation, so point at it rather than offering a form
+            that would only be refused. */}
+        {needsInvite && (
+          <div className="mb-4 rounded-lg border border-primary/40 bg-primary/10 p-3 text-xs text-muted-foreground">
+            <p className="font-medium text-foreground">
+              {needsInvite} hasn't been set up yet
+            </p>
+            <p className="mt-0.5">
+              Open the invitation link an admin sent you to choose a password. If you don't have
+              one, or it has run out, ask them for a new link.
+            </p>
+          </div>
+        )}
+
         <form
           onSubmit={(e) => {
             e.preventDefault();
@@ -224,7 +283,7 @@ export function AuthPage() {
               value={username}
               onChange={(e) => setUsername(e.target.value)}
               autoComplete="username"
-              autoFocus
+              autoFocus={!claiming}
               readOnly={claiming}
               className={cn(claiming && "opacity-70")}
             />
@@ -237,6 +296,9 @@ export function AuthPage() {
               type="password"
               value={password}
               onChange={(e) => setPassword(e.target.value)}
+              // Following an invitation, the username is already filled in and
+              // read-only, so the only thing left to do is the one to land on.
+              autoFocus={claiming}
               autoComplete={active === "register" || claiming ? "new-password" : "current-password"}
             />
           </div>

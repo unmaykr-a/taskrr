@@ -86,8 +86,19 @@ Run the full set before opening a pull request.
 CI runs Go vet/build/test, the frontend typecheck/test/build, and a multi-arch
 (`amd64`, `arm64`) Docker build. Keep changes green.
 
-Two workflows publish on a push to `main`: the demo to GitHub Pages, and these
-wiki pages to the repository wiki. The wiki is a separate git repository, so a
+Three workflows publish on a push to `main`: the demo to GitHub Pages, these
+wiki pages to the repository wiki, and the container image to GHCR.
+
+Releasing is merging. When a push to `main` carries a version in
+`web/package.json` that has no `v<version>` tag yet, the release workflow tags
+that commit, cross-compiles binaries for Linux (`amd64`, `arm64`, `armv7`),
+macOS and Windows, and publishes a GitHub release with checksums. Its notes come
+from the in-app changelog - `scripts/release-notes.mjs` reads
+`web/src/lib/releases.ts` directly - so the release page and the app's
+"what's new" dialog cannot drift, and a version with no changelog entry fails
+the build rather than shipping empty notes. There is no separate tagging step.
+
+The wiki is a separate git repository, so a
 page only reaches it once the change lands on `main` - editing `wiki/*.md` in a
 branch is enough, no manual step. `bash wiki/publish.sh` does the same thing by
 hand if you ever need it, and the workflow runs that same script rather than a

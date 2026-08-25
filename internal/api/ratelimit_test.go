@@ -45,18 +45,30 @@ func TestRateLimiterNilSafe(t *testing.T) {
 func TestClientIP(t *testing.T) {
 	cases := []struct {
 		name    string
-		trust   bool
+		trust   ProxyTrust
 		headers map[string]string
 		remote  string
 		want    string
 	}{
-		{"cf-connecting-ip wins", true, map[string]string{"CF-Connecting-IP": "1.2.3.4"}, "10.0.0.1:5555", "1.2.3.4"},
-		{"xff leftmost", true, map[string]string{"X-Forwarded-For": "9.9.9.9, 10.0.0.1"}, "10.0.0.1:5555", "9.9.9.9"},
-		{"xff single", true, map[string]string{"X-Forwarded-For": "8.8.8.8"}, "10.0.0.1:5555", "8.8.8.8"},
-		{"remoteaddr fallback", true, nil, "172.16.0.9:4444", "172.16.0.9"},
+		{"cf-connecting-ip wins", ProxyTrustAlways, map[string]string{"CF-Connecting-IP": "1.2.3.4"}, "10.0.0.1:5555", "1.2.3.4"},
+		{"xff leftmost", ProxyTrustAlways, map[string]string{"X-Forwarded-For": "9.9.9.9, 10.0.0.1"}, "10.0.0.1:5555", "9.9.9.9"},
+		{"xff single", ProxyTrustAlways, map[string]string{"X-Forwarded-For": "8.8.8.8"}, "10.0.0.1:5555", "8.8.8.8"},
+		{"remoteaddr fallback", ProxyTrustAlways, nil, "172.16.0.9:4444", "172.16.0.9"},
 		// With proxy headers untrusted, a spoofed header can't move the IP.
-		{"untrusted ignores cf header", false, map[string]string{"CF-Connecting-IP": "1.2.3.4"}, "10.0.0.1:5555", "10.0.0.1"},
-		{"untrusted ignores xff", false, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "10.0.0.1:5555", "10.0.0.1"},
+		{"untrusted ignores cf header", ProxyTrustNever, map[string]string{"CF-Connecting-IP": "1.2.3.4"}, "10.0.0.1:5555", "10.0.0.1"},
+		{"untrusted ignores xff", ProxyTrustNever, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "10.0.0.1:5555", "10.0.0.1"},
+		{"never ignores a loopback proxy too", ProxyTrustNever, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "127.0.0.1:5555", "127.0.0.1"},
+		// Auto is the default, and decides by who is connecting: a proxy next to
+		// the app is believed, a stranger on the internet is not.
+		{"auto believes a loopback proxy", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "127.0.0.1:5555", "9.9.9.9"},
+		{"auto believes a docker-network proxy", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "172.18.0.2:5555", "9.9.9.9"},
+		{"auto believes an IPv6 loopback proxy", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "[::1]:5555", "9.9.9.9"},
+		{"auto believes a unique-local proxy", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "[fd00::2]:5555", "9.9.9.9"},
+		{"auto believes a tailscale peer", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "100.101.102.103:5555", "9.9.9.9"},
+		{"auto refuses a public peer", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "203.0.113.7:5555", "203.0.113.7"},
+		{"auto refuses a public peer's cf header", ProxyTrustAuto, map[string]string{"CF-Connecting-IP": "1.2.3.4"}, "203.0.113.7:5555", "203.0.113.7"},
+		{"auto refuses a public IPv6 peer", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "[2001:db8::5]:5555", "2001:db8::5"},
+		{"auto trusts a unix socket", ProxyTrustAuto, map[string]string{"X-Forwarded-For": "9.9.9.9"}, "@", "9.9.9.9"},
 	}
 	for _, c := range cases {
 		t.Run(c.name, func(t *testing.T) {
@@ -70,6 +82,28 @@ func TestClientIP(t *testing.T) {
 				t.Fatalf("clientIP = %q, want %q", got, c.want)
 			}
 		})
+	}
+}
+
+// The option used to be a plain boolean, and an operator who set it stays set.
+func TestParseProxyTrust(t *testing.T) {
+	cases := map[string]ProxyTrust{
+		"":         ProxyTrustAuto,
+		"auto":     ProxyTrustAuto,
+		"true":     ProxyTrustAlways,
+		"1":        ProxyTrustAlways,
+		"on":       ProxyTrustAlways,
+		" Always":  ProxyTrustAlways,
+		"false":    ProxyTrustNever,
+		"0":        ProxyTrustNever,
+		"off":      ProxyTrustNever,
+		"NEVER":    ProxyTrustNever,
+		"nonsense": ProxyTrustAuto,
+	}
+	for in, want := range cases {
+		if got := ParseProxyTrust(in); got != want {
+			t.Errorf("ParseProxyTrust(%q) = %q, want %q", in, got, want)
+		}
 	}
 }
 

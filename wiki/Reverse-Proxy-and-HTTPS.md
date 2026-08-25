@@ -8,10 +8,18 @@ forwards requests to it.
 
 - **`TASKRR_COOKIE_SECURE=true`** - set this whenever users reach Taskrr over
   HTTPS, so the session cookie is marked `Secure`.
-- **`TASKRR_TRUST_PROXY_HEADERS`** - leave it `true` behind a proxy so the real
-  client IP is read from `X-Forwarded-For` / `CF-Connecting-IP` for rate
-  limiting and logs. Set it to `false` only if Taskrr is exposed directly to the
-  internet, where those headers could be spoofed.
+- **`TASKRR_TRUST_PROXY_HEADERS`** - leave it at its default, `auto`. Taskrr
+  then reads the real client IP from `X-Forwarded-For` / `CF-Connecting-IP` when
+  the connection came from a loopback or private address, which is where a
+  reverse proxy runs, and ignores those headers when it came from anywhere else.
+  That covers both common setups without configuration: a proxy beside the app
+  is believed, and an instance published directly to the internet cannot be fed
+  a spoofed address to dodge the per-IP rate limiter.
+
+  Set it to `always` only if your proxy reaches Taskrr from a **public** address
+  - a hosted load balancer, say - and nothing else can connect to it directly.
+  Set it to `never` to always use the socket address. The old `true` and `false`
+  values still mean `always` and `never`.
 
 When the connection is HTTPS - either directly (`TASKRR_COOKIE_SECURE=true`) or
 via a trusted proxy that sends `X-Forwarded-Proto: https` - Taskrr emits an HSTS
@@ -46,7 +54,6 @@ Set in Taskrr's environment:
 
 ```
 TASKRR_COOKIE_SECURE=true
-TASKRR_TRUST_PROXY_HEADERS=true
 ```
 
 Caddy forwards `X-Forwarded-Proto` and `X-Forwarded-For` by default.
@@ -84,7 +91,7 @@ labels:
 ## Cloudflare Tunnel
 
 A tunnel terminates TLS at Cloudflare and sends `CF-Connecting-IP`. Keep
-`TASKRR_TRUST_PROXY_HEADERS=true` and `TASKRR_COOKIE_SECURE=true`. Point the
+`TASKRR_COOKIE_SECURE=true`. Point the
 tunnel's service at `http://127.0.0.1:8787`.
 
 ## OIDC redirect URL behind a proxy

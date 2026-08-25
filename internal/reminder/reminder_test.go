@@ -5,6 +5,7 @@ import (
 	"net"
 	"net/http"
 	"net/http/httptest"
+	"strings"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -162,18 +163,50 @@ func TestTickIgnoresASnoozeBeforeTheDueTime(t *testing.T) {
 }
 
 func TestBlockInternalIP(t *testing.T) {
-	blocked := []string{"127.0.0.1", "::1", "169.254.169.254", "0.0.0.0", "224.0.0.1", "fe80::1"}
+	blocked := []string{
+		"127.0.0.1", "::1", "169.254.169.254", "0.0.0.0", "224.0.0.1", "fe80::1",
+		// The same addresses written the ways an IPv6 network can reach them:
+		// v4-mapped, and through a NAT64 gateway's well-known prefix.
+		"::ffff:127.0.0.1", "64:ff9b::7f00:1", "64:ff9b::a9fe:a9fe",
+	}
 	for _, s := range blocked {
 		if !blockInternalIP(net.ParseIP(s)) {
 			t.Errorf("%s should be blocked", s)
 		}
 	}
 	// Public and private-LAN addresses are allowed (LAN reach is the feature).
-	allowed := []string{"8.8.8.8", "192.168.1.10", "10.0.0.5", "172.16.0.9"}
+	allowed := []string{"8.8.8.8", "192.168.1.10", "10.0.0.5", "172.16.0.9", "2606:4700::1111", "64:ff9b::808:808"}
 	for _, s := range allowed {
 		if blockInternalIP(net.ParseIP(s)) {
 			t.Errorf("%s should be allowed", s)
 		}
+	}
+}
+
+// With the LAN closed off, a webhook can't be used to reach anything on the
+// network the server sits in — including the halves of it the IPv4 checks miss.
+func TestBlockerWithoutPrivateTargets(t *testing.T) {
+	block := blocker(false)
+	for _, s := range []string{
+		"192.168.1.10", "10.0.0.5", "172.16.0.9", // RFC 1918
+		"fd00::1", "fdff:ffff::abcd", // IPv6 unique-local
+		"100.64.0.1", "100.127.255.254", // carrier-grade / Tailscale space
+		"::ffff:192.168.1.10", "64:ff9b::c0a8:10a", // the same, v4-mapped and via NAT64
+		"127.0.0.1", "169.254.169.254", // still blocked, as always
+	} {
+		if !block(net.ParseIP(s)) {
+			t.Errorf("%s should be blocked when private targets are off", s)
+		}
+	}
+	// The internet is still reachable — that is the point of a webhook.
+	for _, s := range []string{"8.8.8.8", "1.1.1.1", "2606:4700::1111", "99.86.4.1", "100.128.0.1", "100.63.255.255"} {
+		if block(net.ParseIP(s)) {
+			t.Errorf("%s should still be allowed", s)
+		}
+	}
+	// And the default keeps the LAN reachable.
+	if blocker(true)(net.ParseIP("192.168.1.10")) {
+		t.Error("192.168.1.10 should be reachable by default")
 	}
 }
 
@@ -189,7 +222,7 @@ func TestSendRejectsLoopback(t *testing.T) {
 		TaskID: 9, IntervalSecs: 3600, WebhookURL: srv.URL, LeadSeconds: 0,
 		LastCompleted: time.Now().Add(-2 * time.Hour).UTC(),
 	}}}
-	New(fs).Tick(context.Background()) // real guard blocks the loopback dial
+	New(fs, true).Tick(context.Background()) // real guard blocks the loopback dial
 	if got := atomic.LoadInt32(&hits); got != 0 {
 		t.Fatalf("loopback webhook should have been blocked, but server was hit %d time(s)", got)
 	}
@@ -200,7 +233,19 @@ func TestSendRejectsLoopback(t *testing.T) {
 }
 
 func TestSendTestRejectsLoopback(t *testing.T) {
-	if err := SendTest(context.Background(), "http://127.0.0.1:9/"); err == nil {
+	if err := SendTest(context.Background(), "http://127.0.0.1:9/", true); err == nil {
 		t.Fatal("SendTest to loopback should fail")
+	}
+}
+
+// The button that tests a webhook has to obey the same setting the loop does,
+// or it reports success for a delivery that will never actually be made.
+func TestSendTestHonoursThePrivateSetting(t *testing.T) {
+	// Refused by the guard before a connection is attempted, so this costs
+	// nothing — where hard-coding the old policy would let it dial out and hang
+	// until the timeout, which is the failure this is here to catch.
+	err := SendTest(context.Background(), "http://192.168.0.1:9/", false)
+	if err == nil || !strings.Contains(err.Error(), "not allowed") {
+		t.Fatalf("SendTest with private targets off = %v, want a refusal by the guard", err)
 	}
 }

@@ -146,12 +146,26 @@ export interface User {
   protected: boolean;
   /** Whether this user accepts having tasks shared with them (opt-out). */
   allowShares: boolean;
+  /** When this account's outstanding invitation lapses; absent when it has none. */
+  inviteExpiresAt?: string;
   createdAt: string;
   updatedAt: string;
 }
 
-/** Login can return either the user (success) or a prompt to claim the account
- *  by setting a first password (admin-created account with no password yet). */
+/** An invitation to set an account's first password. The token is readable only
+ *  in the response that mints it — afterwards the server keeps its digest. */
+export interface Invite {
+  token: string;
+  url: string;
+  expiresAt: string;
+}
+
+/** A newly created account, with the invitation to pass on when it needs one
+ *  (an account created with a password doesn't). */
+export type CreatedUser = User & { invite?: Invite };
+
+/** Login can return either the user (success) or word that the account is still
+ *  waiting to be set up — which needs the invitation link, not just a password. */
 export interface ClaimChallenge {
   claim: true;
   username: string;
@@ -556,9 +570,16 @@ const httpApi = {
       body: JSON.stringify({ username, password }),
     }),
 
-  /** Set the first password on an admin-created (unclaimed) account and sign in. */
-  claim: (username: string, password: string) =>
-    request<User>("/api/auth/claim", { method: "POST", body: JSON.stringify({ username, password }) }),
+  /** Whose account an invitation link opens, so the page can say so. */
+  inviteInfo: (token: string) =>
+    request<{ username: string; expiresAt: string }>(`/api/auth/invite?token=${encodeURIComponent(token)}`),
+
+  /** Set the first password on an invited account and sign in. */
+  claim: (username: string, password: string, token: string) =>
+    request<User>("/api/auth/claim", {
+      method: "POST",
+      body: JSON.stringify({ username, password, token }),
+    }),
 
   logout: () => request<void>("/api/auth/logout", { method: "POST" }),
 
@@ -655,7 +676,12 @@ const httpApi = {
   listUsers: () => request<User[]>("/api/admin/users"),
 
   adminCreateUser: (input: { username: string; password?: string; role?: "admin" | "user" }) =>
-    request<User>("/api/admin/users", { method: "POST", body: JSON.stringify(input) }),
+    request<CreatedUser>("/api/admin/users", { method: "POST", body: JSON.stringify(input) }),
+
+  /** Mint a fresh invitation for an account still waiting to be claimed, which
+   *  retires whatever link was issued before. */
+  adminInviteUser: (id: number) =>
+    request<Invite>(`/api/admin/users/${id}/invite`, { method: "POST" }),
 
   adminUpdateUser: (id: number, input: { role?: "admin" | "user"; password?: string }) =>
     request<User>(`/api/admin/users/${id}`, { method: "PATCH", body: JSON.stringify(input) }),

@@ -30,7 +30,7 @@ On first start, a single admin account is created so you can sign in.
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `TASKRR_ADMIN_USERNAME` | `admin` | Username of the bootstrap admin created on first start. |
-| `TASKRR_ADMIN_PASSWORD` | - | Its password. Leave unset to choose one in the browser on the first sign-in. |
+| `TASKRR_ADMIN_PASSWORD` | - | Its password. Leave it unset and the first start prints a one-time setup link in the log instead; open it to choose a password. |
 | `TASKRR_ADMIN_PASSWORD_HASH` | - | A pre-computed hash, used instead of the plaintext password (the hash wins if both are set). |
 
 The bootstrap admin is **protected**: other admins cannot edit or delete it, and
@@ -53,7 +53,8 @@ The format is `pbkdf2-sha256$<iterations>$<salt>$<key>`.
 | Variable | Default | What it does |
 | --- | --- | --- |
 | `TASKRR_COOKIE_SECURE` | `false` | Set `true` when served over HTTPS so the session cookie is marked Secure. |
-| `TASKRR_TRUST_PROXY_HEADERS` | `true` | Read the client IP from reverse-proxy headers (`CF-Connecting-IP`, `X-Forwarded-For`) for rate limiting and logs. Set `false` if Taskrr is exposed directly, so those headers cannot be spoofed to dodge the per-IP rate limiter. |
+| `TASKRR_TRUST_PROXY_HEADERS` | `auto` | When to read the client IP from reverse-proxy headers (`CF-Connecting-IP`, `X-Forwarded-For`) for rate limiting, logs and links Taskrr writes back to itself. `auto` believes them only when the connection came from a loopback, private, link-local or carrier-NAT address - where a reverse proxy lives - and ignores them otherwise, so an instance published directly cannot be fed a spoofed address to dodge the per-IP rate limiter. `true`/`always` believes them whatever the peer (needed when your proxy reaches Taskrr from a public address); `false`/`never` always uses the socket address. |
+| `TASKRR_WEBHOOK_ALLOW_PRIVATE` | `true` | Whether reminder webhooks may reach private addresses - your LAN, an IPv6 unique-local network, or carrier-NAT space. On by default, because posting to a local ntfy or Home Assistant is the usual reason to set one up. Set `false` on an instance whose accounts are not all trusted, so a webhook cannot be used to make the server reach into the network it sits in. Loopback, link-local and the cloud metadata address are refused either way. See [Reminders](Reminders). |
 | `TASKRR_SECRET_KEY` | - | Encrypts the OIDC client secret at rest, so it is never stored - or included in downloadable backups - in plaintext. Any string; keep it secret and stable. Changing it makes an existing stored secret unreadable, so you would re-enter it. |
 
 See [Reverse Proxy and HTTPS](Reverse-Proxy-and-HTTPS) for how these fit

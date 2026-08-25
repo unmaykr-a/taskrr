@@ -2,6 +2,7 @@ import { useEffect, useId, useRef, useState } from "react";
 import { useMutation, useQuery, useQueryClient } from "@tanstack/react-query";
 import {
   CheckCircle2,
+  Copy,
   ExternalLink,
   Link2,
   MonitorSmartphone,
@@ -17,7 +18,7 @@ import {
   X,
 } from "lucide-react";
 
-import { api, type LoginLayout, type SettingsPatch, type User } from "@/lib/api";
+import { api, type Invite, type LoginLayout, type SettingsPatch, type User } from "@/lib/api";
 import { clearStoredPreferences } from "@/lib/prefs";
 import { timeSince } from "@/lib/time";
 import { cn } from "@/lib/utils";
@@ -32,6 +33,11 @@ import { Label } from "@/components/ui/label";
 import { APP_LAYOUTS } from "@/lib/layout";
 import { SettingsGroup } from "@/components/settings/SettingsGroup";
 import { ToggleRow } from "@/components/ui/ToggleRow";
+
+/** Whether an account still has an invitation someone could actually use. */
+function inviteLive(u: User): boolean {
+  return !!u.inviteExpiresAt && new Date(u.inviteExpiresAt).getTime() > Date.now();
+}
 
 /**
  * AdminPanel is the admin-only window body: registration controls + user
@@ -1222,10 +1228,14 @@ function Users() {
   const [name, setName] = useState("");
   const [pw, setPw] = useState("");
   const [role, setRole] = useState<"admin" | "user">("user");
+  // The invitation to hand over, shown once. The token is only readable in the
+  // response that created it, so it lives here until it's been passed on.
+  const [invite, setInvite] = useState<{ username: string; link: Invite } | null>(null);
 
   const create = useMutation({
     mutationFn: () => api.adminCreateUser({ username: name.trim(), password: pw, role }),
-    onSuccess: () => {
+    onSuccess: (u) => {
+      setInvite(u.invite ? { username: u.username, link: u.invite } : null);
       setName("");
       setPw("");
       setRole("user");
@@ -1240,6 +1250,28 @@ function Users() {
       toast("Saved", { tone: "success" });
     },
   });
+  // A link that lapsed, never arrived, or belongs to an account made before
+  // invitations existed. Issuing a new one retires the old.
+  const reinvite = useMutation({
+    mutationFn: async (u: User) => ({ username: u.username, link: await api.adminInviteUser(u.id) }),
+    onSuccess: (v) => {
+      setInvite(v);
+      invalidate();
+    },
+    onError: (e) => toast((e as Error).message, { tone: "error" }),
+  });
+
+  const copyInvite = async (link: string) => {
+    try {
+      await navigator.clipboard.writeText(link);
+      toast("Invitation link copied", { tone: "success" });
+    } catch {
+      // Clipboard access needs a secure context, which a LAN instance on plain
+      // HTTP won't have — the link stays selectable on screen either way.
+      toast("Copy failed — select the link and copy it manually", { tone: "error" });
+    }
+  };
+
   const remove = useMutation({
     mutationFn: (id: number) => api.adminDeleteUser(id),
     onSuccess: () => {
@@ -1284,7 +1316,8 @@ function Users() {
           </div>
         </div>
         <p className="text-[11px] text-muted-foreground">
-          Leave the password blank to let the user set their own on first sign-in.
+          Leave the password blank to get an invitation link instead — whoever opens it chooses
+          their own password.
         </p>
         <div className="flex flex-wrap items-center gap-2">
           <Select
@@ -1302,6 +1335,35 @@ function Users() {
         {create.isError && <p className="text-xs text-destructive">{(create.error as Error).message}</p>}
       </form>
 
+      {invite && (
+        <div className="space-y-1.5 rounded-lg border border-primary/40 bg-primary/10 p-2">
+          <p className="text-xs font-medium">
+            Send this to {invite.username} — it isn't shown again.
+          </p>
+          <div className="flex items-center gap-1.5">
+            <code className="min-w-0 flex-1 select-all break-all rounded bg-background/60 px-1.5 py-1 text-[11px]">
+              {invite.link.url}
+            </code>
+            <Button
+              size="icon"
+              variant="outline"
+              className="h-7 w-7 shrink-0"
+              aria-label="Copy invitation link"
+              onClick={() => copyInvite(invite.link.url)}
+            >
+              <Copy className="h-3.5 w-3.5" />
+            </Button>
+          </div>
+          <p className="text-[11px] text-muted-foreground">
+            Works once, and only until {new Date(invite.link.expiresAt).toLocaleDateString()}. You
+            can issue a new one from the list below at any time.
+          </p>
+          <Button size="sm" variant="ghost" className="h-7" onClick={() => setInvite(null)}>
+            Done
+          </Button>
+        </div>
+      )}
+
       <div className="space-y-1.5">
         {users?.map((u) => {
           // The primary admin's controls are locked for *other* admins.
@@ -1313,8 +1375,10 @@ function Users() {
               className="flex flex-wrap items-center gap-x-2 gap-y-1.5 rounded-md border px-2.5 py-1.5 text-sm"
             >
               {/* Name + badges grow and share the first line; the controls cluster
-                  stays together and wraps to its own line on narrow widths. */}
-              <div className="flex min-w-0 flex-1 items-center gap-1.5">
+                  stays together and wraps to its own line on narrow widths. The
+                  name keeps a floor of its own, so a row with every control on it
+                  wraps rather than truncating someone down to three letters. */}
+              <div className="flex min-w-[7rem] flex-1 items-center gap-1.5">
                 <span className="min-w-0 flex-1 truncate font-medium">{u.username}</span>
                 {u.protected && (
                   <span
@@ -1325,8 +1389,15 @@ function Users() {
                   </span>
                 )}
                 {!u.passwordSet && !u.oidcLinked && (
-                  <span className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500" title="No password set yet — the user sets it on first sign-in">
-                    unclaimed
+                  <span
+                    className="shrink-0 rounded bg-amber-500/15 px-1.5 py-0.5 text-[10px] text-amber-500"
+                    title={
+                      inviteLive(u)
+                        ? `Invited — the link works until ${new Date(u.inviteExpiresAt as string).toLocaleString()}`
+                        : "Waiting to be set up, with no usable invitation — send a new link"
+                    }
+                  >
+                    {inviteLive(u) ? "invited" : "needs a link"}
                   </span>
                 )}
                 {u.oidcLinked && (
@@ -1345,6 +1416,18 @@ function Users() {
                   <option value="user">user</option>
                   <option value="admin">admin</option>
                 </Select>
+                {!u.passwordSet && !u.oidcLinked && (
+                  <button
+                    type="button"
+                    onClick={() => reinvite.mutate(u)}
+                    disabled={locked || reinvite.isPending}
+                    title="Create a new invitation link (retires the previous one)"
+                    aria-label={`New invitation link for ${u.username}`}
+                    className="whitespace-nowrap text-xs text-muted-foreground hover:text-foreground disabled:opacity-40 disabled:hover:text-muted-foreground"
+                  >
+                    invite link
+                  </button>
+                )}
                 <button
                   type="button"
                   onClick={() => resetPassword(u)}

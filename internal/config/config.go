@@ -39,15 +39,24 @@ type Config struct {
 	CookieSecure bool
 	// TrustProxyHeaders controls whether the client IP (used for per-IP login
 	// rate limiting and access logs) may be read from CF-Connecting-IP /
-	// X-Forwarded-For. Keep it on behind a reverse proxy; turn it OFF when the
-	// server is reachable directly, or anyone can spoof those headers to bypass
-	// the per-IP limiter.
-	TrustProxyHeaders bool
+	// X-Forwarded-For. "auto" (the default) believes them only when the
+	// connection came from a loopback or private address, which is where a
+	// reverse proxy runs; "always" and "never" decide it outright. It is passed
+	// through verbatim and parsed by the api package, which also still accepts
+	// the true/false this option used to take.
+	TrustProxyHeaders string
 	// SecretKey, when set, encrypts at-rest secrets (the OIDC client secret) so
 	// they aren't stored in plaintext in the database or in downloadable backups.
 	// The key stays in the environment, never in the DB/backup.
 	SecretKey string
 
+	// WebhookAllowPrivate lets reminder webhooks reach RFC-1918, IPv6
+	// unique-local and carrier-NAT addresses — on by default, because a webhook
+	// to a local ntfy or Home Assistant is the usual reason to have one. Turn it
+	// off on an instance whose accounts aren't all trusted, so a webhook can't be
+	// used to reach into the network the server sits in. Loopback, link-local and
+	// the cloud metadata address are refused either way.
+	WebhookAllowPrivate bool
 	// ReminderInterval is how often the background loop checks for due tasks to
 	// send reminder webhooks (Phase 4).
 	ReminderInterval time.Duration
@@ -94,16 +103,17 @@ func Load() Config {
 		Addr:   env("TASKRR_ADDR", ":8787"),
 		DBPath: env("TASKRR_DB_PATH", "./data/taskrr.db"),
 
-		AdminUsername:     env("TASKRR_ADMIN_USERNAME", "admin"),
-		AdminPassword:     env("TASKRR_ADMIN_PASSWORD", ""),
-		AdminPasswordHash: env("TASKRR_ADMIN_PASSWORD_HASH", ""),
-		SessionTTL:        envDuration("TASKRR_SESSION_TTL", 30*24*time.Hour),
-		CookieSecure:      envBool("TASKRR_COOKIE_SECURE", false),
-		TrustProxyHeaders: envBool("TASKRR_TRUST_PROXY_HEADERS", true),
-		SecretKey:         env("TASKRR_SECRET_KEY", ""),
-		ReminderInterval:  envDuration("TASKRR_REMINDER_INTERVAL", time.Minute),
-		Lite:              envBool("TASKRR_LITE", false),
-		Experimental:      envBool("TASKRR_EXPERIMENTAL", false),
+		AdminUsername:       env("TASKRR_ADMIN_USERNAME", "admin"),
+		AdminPassword:       env("TASKRR_ADMIN_PASSWORD", ""),
+		AdminPasswordHash:   env("TASKRR_ADMIN_PASSWORD_HASH", ""),
+		SessionTTL:          envDuration("TASKRR_SESSION_TTL", 30*24*time.Hour),
+		CookieSecure:        envBool("TASKRR_COOKIE_SECURE", false),
+		TrustProxyHeaders:   env("TASKRR_TRUST_PROXY_HEADERS", "auto"),
+		SecretKey:           env("TASKRR_SECRET_KEY", ""),
+		ReminderInterval:    envDuration("TASKRR_REMINDER_INTERVAL", time.Minute),
+		WebhookAllowPrivate: envBool("TASKRR_WEBHOOK_ALLOW_PRIVATE", true),
+		Lite:                envBool("TASKRR_LITE", false),
+		Experimental:        envBool("TASKRR_EXPERIMENTAL", false),
 
 		SafetyBackupOnRestore: envBool("TASKRR_SAFETY_BACKUP", true),
 		UpdateCheckURL: envAllowEmpty("TASKRR_UPDATE_CHECK_URL",

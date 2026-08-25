@@ -7,6 +7,11 @@ topics have their own dedicated pages.
 ## Users
 
 - List, create, edit, and delete users; change roles (admin / user).
+- Creating a user without a password produces an **invitation link**, shown once.
+  Send it to them; opening it lets them pick their own password. The **invite
+  link** button beside an account issues a fresh one (retiring the old) when a
+  link runs out or never arrives. See
+  [Users and Authentication](Users-and-Authentication#adding-an-account-invitations).
 - The bootstrap admin is protected - it cannot be edited or deleted by other
   admins.
 - **Merge** two accounts into one (optionally moving data), useful when migrating

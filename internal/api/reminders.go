@@ -93,7 +93,7 @@ func (s *Server) handleTestReminder(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadRequest, "enter a valid http(s) webhook URL")
 		return
 	}
-	if err := reminder.SendTest(r.Context(), target); err != nil {
+	if err := reminder.SendTest(r.Context(), target, s.opts.WebhookAllowPrivate); err != nil {
 		writeError(w, http.StatusBadGateway, "webhook test failed: "+err.Error())
 		return
 	}

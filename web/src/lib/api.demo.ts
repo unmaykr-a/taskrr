@@ -1298,6 +1298,8 @@ export const demoApi: Api = {
     return tick(demoUser());
   },
   claim: (username: string) => demoApi.login(username, "") as Promise<User>,
+  // Nothing to claim in the demo — every visitor is already signed in.
+  inviteInfo: notAvailable,
   logout: () => {
     setSession(false);
     return tick(undefined);
@@ -1487,6 +1489,7 @@ export const demoApi: Api = {
   // --- admin (hidden in the demo: the account is a plain user) ---
   listUsers: notAvailable,
   adminCreateUser: notAvailable,
+  adminInviteUser: notAvailable,
   adminUpdateUser: notAvailable,
   adminDeleteUser: notAvailable,
   getSettings: notAvailable,

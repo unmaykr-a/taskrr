@@ -45,23 +45,73 @@ type Service struct {
 
 // New builds a Service whose HTTP client refuses to connect to the server's own
 // loopback, link-local / cloud-metadata, and other non-routable addresses.
-func New(st Store) *Service {
-	return &Service{store: st, client: newHTTPClient(blockInternalIP)}
+//
+// allowPrivate decides the one range that is a judgement call rather than a
+// rule. Reaching a local ntfy or Home Assistant is why webhooks exist here, so
+// the LAN is reachable by default — but on an instance where the accounts
+// aren't all trusted, a webhook is a way to ask the server to make requests
+// into a network the person holding the account can't reach themselves. Setting
+// it false closes the whole private side of the network to webhooks.
+func New(st Store, allowPrivate bool) *Service {
+	return &Service{store: st, client: newHTTPClient(blocker(allowPrivate))}
 }
 
-// blockInternalIP reports whether an address must never be a webhook target:
-// loopback (the server's own internal ports), link-local incl. 169.254.169.254
-// cloud metadata, multicast, and the unspecified address. RFC-1918 private LAN
-// ranges are intentionally allowed — reaching a local ntfy / Home Assistant is
-// the feature. The check runs at dial time on the *resolved* IP, so a hostname
-// that resolves (or redirects/rebinds) to a blocked IP is still refused.
+// blocker returns the dial-time predicate for this instance's setting.
+func blocker(allowPrivate bool) func(net.IP) bool {
+	if allowPrivate {
+		return blockInternalIP
+	}
+	return func(ip net.IP) bool { return blockInternalIP(ip) || isPrivateIP(ip) }
+}
+
+// blockInternalIP reports whether an address must never be a webhook target
+// whatever the settings say: loopback (the server's own internal ports),
+// link-local incl. the 169.254.169.254 cloud metadata service, multicast, and
+// the unspecified address. The check runs at dial time on the *resolved* IP, so
+// a hostname that resolves (or rebinds) to a blocked IP is still refused.
 func blockInternalIP(ip net.IP) bool {
+	ip = unwrapNAT64(ip)
 	return ip.IsLoopback() ||
 		ip.IsLinkLocalUnicast() ||
 		ip.IsLinkLocalMulticast() ||
 		ip.IsInterfaceLocalMulticast() ||
 		ip.IsMulticast() ||
 		ip.IsUnspecified()
+}
+
+// isPrivateIP covers the ranges that are someone's own network rather than the
+// internet: RFC 1918, IPv6 unique-local (fc00::/7, which net.IP.IsPrivate
+// reports), and the 100.64.0.0/10 shared space that Tailscale and ISP-side NAT
+// use.
+func isPrivateIP(ip net.IP) bool {
+	ip = unwrapNAT64(ip)
+	if ip.IsPrivate() {
+		return true
+	}
+	v4 := ip.To4()
+	return v4 != nil && v4[0] == 100 && v4[1] >= 64 && v4[1] <= 127
+}
+
+// nat64Prefix is 64:ff9b::/96, the well-known prefix an IPv6-only network uses
+// to address the IPv4 internet through a translating gateway.
+var nat64Prefix = []byte{0x00, 0x64, 0xff, 0x9b, 0, 0, 0, 0, 0, 0, 0, 0}
+
+// unwrapNAT64 returns the IPv4 address embedded in a NAT64 address, or the
+// address unchanged. Without this the checks above read 64:ff9b::a9fe:a9fe as
+// an ordinary public IPv6 address and let it through — while the gateway
+// dutifully translates it to 169.254.169.254.
+//
+// (The IPv4-mapped form, ::ffff:10.0.0.1, needs no such help: To4 already
+// resolves it, so every predicate here sees the IPv4 address.)
+func unwrapNAT64(ip net.IP) net.IP {
+	v6 := ip.To16()
+	if v6 == nil || ip.To4() != nil {
+		return ip
+	}
+	if !bytes.Equal(v6[:12], nat64Prefix) {
+		return ip
+	}
+	return net.IP(v6[12:16])
 }
 
 // newHTTPClient builds a webhook client: a 10s timeout, no redirect-following
@@ -159,8 +209,13 @@ func (s *Service) SendTest(ctx context.Context, rawURL string) error {
 
 // SendTest posts a sample payload using the same guarded client as the loop (for
 // callers without a Service, e.g. the API handler).
-func SendTest(ctx context.Context, rawURL string) error {
-	return (&Service{client: newHTTPClient(blockInternalIP)}).SendTest(ctx, rawURL)
+//
+// allowPrivate has to be passed in and match what the loop was built with: a
+// "test webhook" button that can reach addresses a real reminder can't would
+// tell people their webhook works when it never will — and would make the
+// setting a way to reach the LAN rather than a way to close it off.
+func SendTest(ctx context.Context, rawURL string, allowPrivate bool) error {
+	return (&Service{client: newHTTPClient(blocker(allowPrivate))}).SendTest(ctx, rawURL)
 }
 
 func reminderPayload(name string, id int64, due, now time.Time) map[string]any {

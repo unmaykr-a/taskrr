@@ -72,9 +72,11 @@ value applies. You can also generate a fresh hash and set it (see
 ### Sign-in keeps getting rejected / rate limited.
 
 Sign-in is rate limited per username and per source IP (to blunt brute force and
-password-spraying). Wait a few minutes and try again. Behind a proxy, make sure
-`TASKRR_TRUST_PROXY_HEADERS=true` so the limiter sees the real client IP rather
-than the proxy's.
+password-spraying). Wait a few minutes and try again. Behind a proxy, the limiter
+needs to see the real client IP rather than the proxy's - which it does by
+default. If your proxy reaches Taskrr from a public address, set
+`TASKRR_TRUST_PROXY_HEADERS=always`; see
+[Reverse Proxy and HTTPS](Reverse-Proxy-and-HTTPS).
 
 ### My session keeps dropping / cookie not sticking.
 
@@ -154,3 +156,17 @@ need a real server, so they are not in the demo.
 ## Still stuck?
 
 Open an issue on [GitHub](https://github.com/unmaykr-a/taskrr/issues).
+
+### Someone I added can't sign in.
+
+An account created without a password needs its **invitation link** before a
+password can be set - knowing the username is not enough. In the admin area,
+press **invite link** beside their name for a fresh one; it works once and lasts
+seven days. See [Users and Authentication](Users-and-Authentication#adding-an-account-invitations).
+
+### A reminder webhook to my LAN stopped working.
+
+Check `TASKRR_WEBHOOK_ALLOW_PRIVATE`. When it is `false`, webhooks may only
+reach the public internet - a deliberate setting for instances whose accounts
+are not all trusted. Loopback and the cloud metadata address are refused
+whatever it is set to. See [Reminders](Reminders).
