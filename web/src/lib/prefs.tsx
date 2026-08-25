@@ -172,6 +172,21 @@ export function localeHour12(): boolean {
   return true;
 }
 
+/**
+ * The preferences a stored blob actually means: defaults first, then whatever
+ * was saved.
+ *
+ * Pulled out as a function because the *absence* of a key is the interesting
+ * case. Applying a stored copy on top of the current state left the browser's
+ * value in place for anything the copy didn't mention, so a preference could
+ * outlive the account it belonged to — most visibly after restoring a backup
+ * from before a setting existed, where the app went on using a value the
+ * server had never heard of.
+ */
+export function storedPrefs(stored: Partial<Prefs>): Prefs {
+  return { ...defaults(), ...stored };
+}
+
 function defaults(): Prefs {
   return {
     clock: "auto",
@@ -247,7 +262,11 @@ function resolveHour12(clock: ClockChoice): boolean {
   return clock === "12";
 }
 
-const Ctx = createContext<{ prefs: Prefs; setPrefs: (p: Partial<Prefs>) => void } | null>(null);
+const Ctx = createContext<{
+  prefs: Prefs;
+  setPrefs: (p: Partial<Prefs>) => void;
+  replacePrefs: (p: Partial<Prefs>) => void;
+} | null>(null);
 
 export function PrefsProvider({ children }: { children: ReactNode }) {
   const [prefs, setState] = useState<Prefs>(load);
@@ -275,14 +294,16 @@ export function PrefsProvider({ children }: { children: ReactNode }) {
   }, [prefs.smoothScroll]);
 
   const setPrefs = useCallback((p: Partial<Prefs>) => setState((cur) => ({ ...cur, ...p })), []);
+  /** Adopt a stored set of preferences wholesale — see storedPrefs. */
+  const replacePrefs = useCallback((p: Partial<Prefs>) => setState(storedPrefs(p)), []);
   const value = useMemo(() => {
     const hour12 = resolveHour12(prefs.clock);
     // Push the format choices into the pure time helpers *during* render, so
     // formatDateTime/formatTime read the new format on the same pass the
     // consumers re-render (an effect would lag one frame behind).
     setTimeFormat({ dateOrder: prefs.dateFormat, hour12: prefs.clock === "auto" ? undefined : hour12 });
-    return { prefs: { ...prefs, hour12 }, setPrefs };
-  }, [prefs, setPrefs]);
+    return { prefs: { ...prefs, hour12 }, setPrefs, replacePrefs };
+  }, [prefs, setPrefs, replacePrefs]);
 
   return <Ctx.Provider value={value}>{children}</Ctx.Provider>;
 }

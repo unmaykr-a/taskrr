@@ -16,7 +16,7 @@ import {
 
 import { api, type Task } from "@/lib/api";
 import { type Filter, FILTERS, matchesFilter, SHARE_FILTERS } from "@/lib/filters";
-import { resolveLayout } from "@/lib/layout";
+import { useAppLayout } from "@/lib/useAppLayout";
 import { type SortKey, SORT_OPTIONS, sortTasks } from "@/lib/sort";
 import { taskStaleness } from "@/lib/staleness";
 import { usePrefs } from "@/lib/prefs";
@@ -305,11 +305,7 @@ export default function App() {
   // silently became something else on the device you actually carry would be a
   // strange thing to offer. Only the full sidebar is too wide to sit beside the
   // list, which is why that one (and only that one) is a drawer when compact.
-  const layout = resolveLayout(
-    prefs.appLayout,
-    authConfig?.branding.layout,
-    authConfig?.experimental ?? false,
-  );
+  const layout = useAppLayout();
   const railNav = layout === "rail";
   const topNav = layout === "topbar";
   const drawerNav = compact && !railNav && !topNav;

@@ -1,7 +1,10 @@
 import { useRef, useState } from "react";
 import { Keyboard, Palette, Shield, SlidersHorizontal, User } from "lucide-react";
 
+import { currentRelease, formatReleaseDate } from "@/lib/releases";
+import { useAppLayout } from "@/lib/useAppLayout";
 import { cn } from "@/lib/utils";
+import { ChangelogDialog } from "@/components/ChangelogDialog";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { usePrefs } from "@/lib/prefs";
 import { useAuth } from "@/components/AuthProvider";
@@ -10,6 +13,8 @@ import { PreferencesSection } from "@/components/settings/PreferencesSection";
 import { ShortcutsSection } from "@/components/settings/ShortcutsSection";
 import { ThemeCustomizer } from "@/components/settings/ThemeCustomizer";
 import { AdminPanel } from "@/components/AdminPanel";
+
+declare const __APP_VERSION__: string;
 
 type Section = "account" | "preferences" | "shortcuts" | "theme" | "admin";
 
@@ -22,7 +27,13 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
   const { user } = useAuth();
   const { prefs } = usePrefs();
   const [section, setSection] = useState<Section>(initial);
+  const [changelogOpen, setChangelogOpen] = useState(false);
   const navRef = useRef<HTMLElement>(null);
+  const release = currentRelease();
+  // The version (and the changelog behind it) normally lives in the sidebar's
+  // footer. The layouts without one need it somewhere, and the foot of this
+  // window's nav is where you'd look for an "about" line.
+  const layout = useAppLayout();
 
   const items: {
     id: Section;
@@ -72,7 +83,18 @@ export function SettingsPanel({ initial = "account" }: { initial?: Section }) {
             </button>
           );
         })}
+        {layout !== "sidebar" && (
+          <button
+            type="button"
+            onClick={() => setChangelogOpen(true)}
+            title={release ? `Released ${formatReleaseDate(release.date)}` : undefined}
+            className="settings-version shrink-0 px-2.5 py-2 text-left text-[11px] text-muted-foreground transition-colors hover:text-foreground"
+          >
+            v{__APP_VERSION__}
+          </button>
+        )}
       </nav>
+      <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />
 
       <div className="settings-body">
         {active === "account" && <AccountSection />}

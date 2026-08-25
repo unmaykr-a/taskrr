@@ -194,9 +194,17 @@ body.win-dragging {
     border-bottom: 0;
     padding-bottom: 0;
   }
+  .settings-nav {
+    /* Stretch rather than hug the items, so the version line below can sit at
+       the foot of the window instead of directly under the last tab. */
+    align-self: stretch;
+  }
   .settings-nav > button {
     flex: none;
     justify-content: flex-start;
+  }
+  .settings-version {
+    margin-top: auto;
   }
   .settings-body {
     border-left: 1px solid hsl(var(--border));
@@ -251,12 +259,18 @@ body.win-dragging {
  *
  * rounded-full is left alone because it is load-bearing: the calendar's dots,
  * the colour-wheel handle, the clock face and the sidebar's active tick are
- * circles, not decisions about corner style. The two places it means "pill"
- * rather than "circle" opt in through .pill-surface below.
+ * circles, not decisions about corner style. Where it means "pill" rather than
+ * "circle" at every width, the element opts in through .pill-surface below.
  *
  * rounded-none is left alone too — an element asking for square corners is
- * already agreeing with us. */
-.style-flat [class*="rounded"]:not([class*="rounded-full"]):not([class*="rounded-none"]),
+ * already agreeing with us.
+ *
+ * Both exclusions match whole class tokens (`~=`), not substrings. A substring
+ * match reads a *variant* as the class itself: the sign-in card is
+ * `rounded-2xl sm:rounded-none`, which contains "rounded-none" and so was
+ * skipped entirely — leaving the card round on a phone, where the sm: variant
+ * doesn't apply and the 2xl corner is the one being drawn. */
+.style-flat [class*="rounded"]:not([class~="rounded-full"]):not([class~="rounded-none"]),
 .style-flat .pill-surface {
   border-radius: var(--radius);
 }

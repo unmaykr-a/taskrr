@@ -1,24 +1,20 @@
-import { useRef, useState } from "react";
+import { useRef } from "react";
 import { useMutation, useQueryClient } from "@tanstack/react-query";
 import { Check, LogOut, Plus, Settings } from "lucide-react";
 
 import { api } from "@/lib/api";
 import { type Filter, FILTERS, SHARE_FILTERS } from "@/lib/filters";
 import { clearStoredPreferences, usePrefs } from "@/lib/prefs";
-import { currentRelease, formatReleaseDate } from "@/lib/releases";
 import { DEFAULT_THEME } from "@/lib/theme";
 import { cn } from "@/lib/utils";
 import { useAuth } from "@/components/AuthProvider";
 import { useBranding } from "@/components/Branding";
-import { ChangelogDialog } from "@/components/ChangelogDialog";
 import { CreateTaskDialog } from "@/components/CreateTaskDialog";
 import { SettingsPanel } from "@/components/SettingsPanel";
 import { useTheme } from "@/components/ThemeProvider";
 import { Button } from "@/components/ui/button";
 import { SlidingHighlight } from "@/components/ui/SlidingHighlight";
 import { useWindows } from "@/components/windows/WindowManager";
-
-declare const __APP_VERSION__: string;
 
 /**
  * The top-bar layout's navigation: brand on the left, the views as tabs across
@@ -48,8 +44,6 @@ export function TopNav({
   const { prefs } = usePrefs();
   const branding = useBranding();
   const navRef = useRef<HTMLElement>(null);
-  const [changelogOpen, setChangelogOpen] = useState(false);
-  const release = currentRelease();
 
   // Same teardown as the sidebar's sign-out: close windows, drop the cache so
   // the next account never sees the previous one's list, reset the theme.
@@ -135,14 +129,6 @@ export function TopNav({
         <span className="hidden sm:inline">
           <CreateTaskDialog />
         </span>
-        <button
-          type="button"
-          onClick={() => setChangelogOpen(true)}
-          title={release ? `Released ${formatReleaseDate(release.date)}` : undefined}
-          className="hidden text-[11px] text-muted-foreground transition-colors hover:text-foreground xl:inline"
-        >
-          v{__APP_VERSION__}
-        </button>
         <Button
           variant="ghost"
           size="icon"
@@ -165,7 +151,6 @@ export function TopNav({
           <LogOut />
         </Button>
       </div>
-      <ChangelogDialog open={changelogOpen} onOpenChange={setChangelogOpen} />
     </div>
   );
 }

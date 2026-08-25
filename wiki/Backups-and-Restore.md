@@ -31,6 +31,19 @@ A restore is **staged and then applied on restart**: Taskrr swaps the database i
 and restarts the process. Under Docker, the container's restart policy brings it
 straight back up. While a restore is staged, the instance is briefly busy.
 
+### What a restore takes with it
+
+The database is the whole state, so a restore rewinds everything in it: tasks
+and history, accounts, settings, per-user preferences, and any uploaded
+background images. Anything added after the backup was taken is gone, including
+pictures - a background someone picked in the meantime falls back to the
+instance one (or none), rather than pointing at an image that no longer exists.
+
+Preferences follow the same rule. What an account has stored in the restored
+database is the whole truth about it: a setting it has never heard of goes back
+to its default rather than lingering from the browser you happen to be sitting
+at.
+
 ### The safety snapshot
 
 By default (`TASKRR_SAFETY_BACKUP=true`) Taskrr takes an automatic backup of the
