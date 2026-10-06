@@ -10,7 +10,9 @@
     <link rel="manifest" href="/manifest.webmanifest" />
     <meta name="mobile-web-app-capable" content="yes" />
     <meta name="apple-mobile-web-app-title" content="Taskrr" />
-    <link rel="apple-touch-icon" href="/favicon.svg" />
+    <!-- A real PNG: iOS draws nothing for an SVG here, and falls back to a
+         screenshot of the page. -->
+    <link rel="apple-touch-icon" sizes="180x180" href="/apple-touch-icon.png" />
     <meta
       name="description"
       content="Taskrr — a lightweight, self-hosted tracker for when you last did things."

@@ -37,6 +37,16 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.24.2",
+    date: "2026-10-06",
+    changes: [
+      fix(
+        "Adding Taskrr to an iPhone's home screen showing a screenshot instead of the mark",
+        "The home-screen icon was pointed at the SVG the browser tab uses, which iOS can't draw, and the file describing what to install was served as plain text. Both are fixed, so adding Taskrr to a home screen gives you the mark and the name rather than a picture of whatever page you were on.",
+      ),
+    ],
+  },
+  {
     version: "1.24.1",
     date: "2026-08-25",
     changes: [

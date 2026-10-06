@@ -3,11 +3,21 @@ package api
 import (
 	"io"
 	"log"
+	"mime"
 	"net/http"
 	"strings"
 
 	"github.com/unmaykr-a/taskrr/internal/web"
 )
+
+// Go's table has no entry for .webmanifest, so the file server fell back to
+// sniffing the bytes and served the web app manifest as text/plain. Browsers
+// are mostly forgiving about that, but the spec names a type and some
+// installers check it — which decides whether "add to home screen" offers the
+// app's own name and icon or the page's.
+func init() {
+	_ = mime.AddExtensionType(".webmanifest", "application/manifest+json")
+}
 
 // placeholderHTML is shown when the frontend has not been built yet (e.g. when
 // running the backend alone with `go run`). The API is still fully functional.

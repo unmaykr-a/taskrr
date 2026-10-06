@@ -1,6 +1,9 @@
 package api
 
-import "testing"
+import (
+	"mime"
+	"testing"
+)
 
 // TestCacheControl pins the caching policy for the embedded SPA: hashed assets
 // are immutable, index.html always revalidates (deploys show up immediately),
@@ -16,5 +19,17 @@ func TestCacheControl(t *testing.T) {
 		if got := cacheControl(c.path); got != c.want {
 			t.Errorf("cacheControl(%q) = %q, want %q", c.path, got, c.want)
 		}
+	}
+}
+
+// The manifest is what a phone reads to decide the name and icon it installs
+// under, and it is served from the embedded bundle by extension alone.
+func TestManifestContentType(t *testing.T) {
+	got, _, err := mime.ParseMediaType(mime.TypeByExtension(".webmanifest"))
+	if err != nil {
+		t.Fatalf("TypeByExtension(.webmanifest) = %q: %v", mime.TypeByExtension(".webmanifest"), err)
+	}
+	if got != "application/manifest+json" {
+		t.Errorf("manifest served as %q, want application/manifest+json", got)
 	}
 }
