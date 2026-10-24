@@ -41,7 +41,12 @@ const (
 // permanently overdue, and its reminder fires immediately after each
 // completion instead of never. The interval box has no upper stop, so this was
 // reachable by typing a long enough number into it.
-const maxIntervalSeconds = 100 * 365 * 24 * 60 * 60
+//
+// Typed int64 deliberately. Left untyped, it is an int wherever it is used as
+// one — and 3,153,600,000 does not fit in the 32-bit int of a Raspberry Pi
+// build, so handing it to Sprintf failed to compile for linux/arm while being
+// perfectly fine on the amd64 machine it was written on.
+const maxIntervalSeconds int64 = 100 * 365 * 24 * 60 * 60
 
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})

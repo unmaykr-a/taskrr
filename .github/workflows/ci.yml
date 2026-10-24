@@ -21,6 +21,13 @@ jobs:
       - run: go vet ./...
       - run: go build ./...
       - run: go test ./...
+      # A release ships a 32-bit Raspberry Pi binary, where int is half the
+      # width it is here. Compiling for it is the only way to find out, and
+      # finding out at release time means finding out after the merge: a
+      # constant too large for a 32-bit int once broke the release build while
+      # every check above stayed green.
+      - name: Build for 32-bit ARM (a release target)
+        run: CGO_ENABLED=0 GOOS=linux GOARCH=arm GOARM=7 go build ./...
 
   frontend:
     name: Frontend (Vite)
