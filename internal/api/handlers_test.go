@@ -184,3 +184,61 @@ func TestSessionRenewalOnPageLoad(t *testing.T) {
 		t.Fatalf("a fresh session should not be re-issued, got expiry %v", c.Expires)
 	}
 }
+
+// A cadence has to stay inside what a Duration can hold. Past roughly 292 years
+// the seconds-to-nanoseconds conversion overflows and comes back negative, so a
+// task set to repeat in several lifetimes became permanently overdue instead —
+// and reminded right after every completion. Reachable by typing, since the
+// interval box has no upper stop of its own.
+func TestIntervalBounds(t *testing.T) {
+	secs := func(n int64) *int64 { return &n }
+	cases := []struct {
+		name     string
+		interval *int64
+		lead     *int64
+		ok       bool
+	}{
+		{"an hour", secs(3600), nil, true},
+		{"no routine at all", nil, nil, true},
+		{"a hundred years exactly", secs(maxIntervalSeconds), nil, true},
+		{"zero", secs(0), nil, false},
+		{"negative", secs(-1), nil, false},
+		{"one past the cap", secs(maxIntervalSeconds + 1), nil, false},
+		// The values that overflow: a negative duration, and one that wraps to
+		// exactly zero. Both read as "due now, forever".
+		{"overflows to a negative duration", secs(9_300_000_000), nil, false},
+		{"overflows to zero", secs(1 << 62), nil, false},
+		{"lead past the cap", secs(3600), secs(maxIntervalSeconds + 1), false},
+		{"lead that overflows", secs(3600), secs(1 << 62), false},
+		{"a sane lead", secs(86_400), secs(3600), true},
+	}
+	for _, c := range cases {
+		t.Run(c.name, func(t *testing.T) {
+			_, msg := taskRequest{
+				Name:                "t",
+				IntervalSeconds:     c.interval,
+				ReminderLeadSeconds: c.lead,
+			}.toInput()
+			if c.ok && msg != "" {
+				t.Fatalf("rejected a legitimate interval: %s", msg)
+			}
+			if !c.ok && msg == "" {
+				t.Fatal("accepted an interval that cannot be turned into a duration")
+			}
+		})
+	}
+}
+
+// Whatever the cap is, it must stay inside the range where seconds survive the
+// conversion to a Duration — the bound and the reason for it must not drift.
+func TestIntervalCapCannotOverflow(t *testing.T) {
+	for _, secs := range []int64{maxIntervalSeconds, maxIntervalSeconds - 1, 1} {
+		d := time.Duration(secs) * time.Second
+		if d <= 0 {
+			t.Fatalf("%d seconds becomes %s — the cap is past the overflow point", secs, d)
+		}
+		if got := int64(d / time.Second); got != secs {
+			t.Fatalf("%d seconds round-tripped as %d", secs, got)
+		}
+	}
+}

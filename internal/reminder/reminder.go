@@ -25,6 +25,7 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"sync"
 	"syscall"
 	"time"
 
@@ -162,6 +163,16 @@ func (s *Service) Run(ctx context.Context, interval time.Duration) {
 	}
 }
 
+// deliveryWorkers bounds how many webhooks are in flight at once.
+//
+// Deliveries used to go out one after another, and a webhook that doesn't
+// answer costs the full 10s timeout. One dead URL therefore held up everyone
+// else's reminders behind it, every tick, for as long as it stayed dead — and a
+// failed delivery is deliberately never marked, so it is retried forever. Eight
+// at a time keeps that from turning into a queue while staying far short of
+// anything a self-hosted box would notice.
+const deliveryWorkers = 8
+
 // Tick evaluates all candidates once and delivers any that are due and not yet
 // reminded for their current cycle. A failed delivery is logged and left
 // un-marked, so it retries on the next tick.
@@ -172,29 +183,67 @@ func (s *Service) Tick(ctx context.Context) {
 		log.Printf("reminder: list candidates: %v", err)
 		return
 	}
+
+	// Decide everything first, then deliver. The decisions are pure and cheap;
+	// it is the sending that is slow, and keeping them apart means the slow part
+	// is a plain list of independent jobs.
+	type delivery struct {
+		cand store.ReminderCandidate
+		due  time.Time
+	}
+	var due []delivery
 	for _, c := range cands {
-		due := c.LastCompleted.Add(time.Duration(c.IntervalSecs) * time.Second)
+		at := c.LastCompleted.Add(time.Duration(c.IntervalSecs) * time.Second)
 		// A snooze pushes the effective due time out, so a task someone has
 		// deliberately put off doesn't keep nagging them — the whole point of
 		// snoozing. Skipping a cycle lands here the same way.
-		if !c.SnoozedUntil.IsZero() && c.SnoozedUntil.After(due) {
-			due = c.SnoozedUntil
+		if !c.SnoozedUntil.IsZero() && c.SnoozedUntil.After(at) {
+			at = c.SnoozedUntil
 		}
-		fireAt := due.Add(-time.Duration(c.LeadSeconds) * time.Second)
+		fireAt := at.Add(-time.Duration(c.LeadSeconds) * time.Second)
 		if now.Before(fireAt) {
 			continue // not due yet
 		}
-		if c.LastRemindedDue == due.UTC().Format(time.RFC3339) {
+		if c.LastRemindedDue == at.UTC().Format(time.RFC3339) {
 			continue // already reminded for this cycle
 		}
-		if err := s.send(ctx, c.WebhookURL, reminderPayload(c.TaskName, c.TaskID, due, now)); err != nil {
-			log.Printf("reminder: task %d webhook failed: %v", c.TaskID, err)
-			continue // leave un-marked so it retries next tick
-		}
-		if err := s.store.MarkReminded(ctx, c.TaskID, c.UserID, due); err != nil {
-			log.Printf("reminder: mark task %d reminded: %v", c.TaskID, err)
+		due = append(due, delivery{cand: c, due: at})
+	}
+	if len(due) == 0 {
+		return
+	}
+
+	workers := min(deliveryWorkers, len(due))
+	jobs := make(chan delivery)
+	var wg sync.WaitGroup
+	for range workers {
+		wg.Add(1)
+		go func() {
+			defer wg.Done()
+			for d := range jobs {
+				c := d.cand
+				if err := s.send(ctx, c.WebhookURL, reminderPayload(c.TaskName, c.TaskID, d.due, now)); err != nil {
+					log.Printf("reminder: task %d webhook failed: %v", c.TaskID, err)
+					continue // leave un-marked so it retries next tick
+				}
+				// The store serialises its own writes, so marking from several
+				// workers is safe; each row is touched by exactly one of them.
+				if err := s.store.MarkReminded(ctx, c.TaskID, c.UserID, d.due); err != nil {
+					log.Printf("reminder: mark task %d reminded: %v", c.TaskID, err)
+				}
+			}
+		}()
+	}
+	for _, d := range due {
+		select {
+		case jobs <- d:
+		case <-ctx.Done():
+			// Shutting down: stop handing out work and let the in-flight
+			// deliveries finish or be cancelled with the context.
 		}
 	}
+	close(jobs)
+	wg.Wait()
 }
 
 // SendTest posts a sample payload to a URL so a user can verify their webhook.

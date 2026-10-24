@@ -37,6 +37,28 @@ const fix = (text: string, note?: string): Change => ({ text, kind: "fix", note 
 // Newest first. Keep the headline short; put the explanation in the note.
 export const RELEASES: Release[] = [
   {
+    version: "1.24.3",
+    date: "2026-10-24",
+    changes: [
+      fix(
+        "A routine set far enough ahead reading as overdue",
+        "There was no upper stop on the interval box, and past about 292 years the arithmetic behind the scenes wrapped around: a task meant to come round in several lifetimes sat permanently overdue instead, and reminded right after every completion. Routines are now capped at a hundred years, in the box and on the server.",
+      ),
+      fix(
+        "An import that failed partway leaving half the data behind",
+        "Importing wrote each task and each logged occurrence separately, so a failure in the middle left an account holding part of a file — and when replacing, the old tasks were already gone. The whole import is now one operation: it either all lands or none of it does.",
+      ),
+      feat(
+        "Much faster imports",
+        "Restoring a large history took a commit per row. Doing it in one go made it around forty times quicker — a file with twenty thousand logged occurrences now restores in well under a second instead of a long wait.",
+      ),
+      fix(
+        "One unreachable reminder webhook holding up everyone else's",
+        "Reminders went out one at a time, and a webhook that never answers costs ten seconds, every time the loop comes round. They are now delivered in parallel, so a dead endpoint delays only itself.",
+      ),
+    ],
+  },
+  {
     version: "1.24.2",
     date: "2026-10-06",
     changes: [

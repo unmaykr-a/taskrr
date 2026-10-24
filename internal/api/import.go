@@ -6,6 +6,8 @@ import (
 	"net/http"
 	"strings"
 	"time"
+
+	"github.com/unmaykr-a/taskrr/internal/store"
 )
 
 // Data import — the other half of the export.
@@ -155,15 +157,11 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 	ctx := r.Context()
 	result := importResult{Mode: string(mode), Skipped: []string{}}
 
-	if mode == importReplace {
-		deleted, err := s.store.DeleteTasksByOwner(ctx, u.ID)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "could not clear existing tasks")
-			return
-		}
-		result.TasksDeleted = deleted
-	}
-
+	// Validate the whole document before touching anything. What cannot be
+	// restored is reported, and what can is handed over as one unit — so a file
+	// that goes wrong halfway cannot leave the account holding half an import,
+	// least of all in replace mode, where the old tasks are gone by then.
+	items := make([]store.ImportTask, 0, len(doc.Tasks))
 	for i, in := range doc.Tasks {
 		// Reuse the ordinary create-task validation verbatim, so imported data
 		// is held to exactly the same standard as typed-in data.
@@ -184,23 +182,7 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			continue
 		}
 
-		task, err := s.store.CreateTask(ctx, u.ID, input)
-		if err != nil {
-			writeError(w, http.StatusInternalServerError, "could not create an imported task")
-			return
-		}
-		result.TasksCreated++
-
-		// Carry a snooze over, but only if it is still in the future — an old
-		// backup shouldn't restore a task into a hold that expired months ago.
-		if in.SnoozedUntil != nil && in.SnoozedUntil.After(time.Now().UTC()) {
-			until := in.SnoozedUntil.UTC()
-			if _, err := s.store.SetTaskSnoozed(ctx, u.ID, task.ID, &until); err != nil {
-				result.Skipped = append(result.Skipped,
-					fmt.Sprintf("could not restore the snooze on %s", short(in.Name)))
-			}
-		}
-
+		item := store.ImportTask{Input: input, SnoozedUntil: in.SnoozedUntil}
 		for _, c := range in.Completions {
 			if c.CompletedAt.IsZero() {
 				result.Skipped = append(result.Skipped,
@@ -211,13 +193,20 @@ func (s *Server) handleImport(w http.ResponseWriter, r *http.Request) {
 			if len([]rune(note)) > maxTextLen {
 				note = string([]rune(note)[:maxTextLen])
 			}
-			if _, err := s.store.AddCompletion(ctx, u.ID, task.ID, c.CompletedAt.UTC(), note); err != nil {
-				writeError(w, http.StatusInternalServerError, "could not restore a completion")
-				return
-			}
-			result.CompletionsAdded++
+			item.Completions = append(item.Completions,
+				store.ImportCompletion{CompletedAt: c.CompletedAt.UTC(), Note: note})
 		}
+		items = append(items, item)
 	}
+
+	counts, err := s.store.ImportTasks(ctx, u.ID, items, mode == importReplace)
+	if err != nil {
+		writeError(w, http.StatusInternalServerError, "could not import that file — nothing was changed")
+		return
+	}
+	result.TasksCreated = counts.TasksCreated
+	result.CompletionsAdded = counts.CompletionsAdded
+	result.TasksDeleted = counts.TasksDeleted
 
 	writeJSON(w, http.StatusOK, result)
 }
