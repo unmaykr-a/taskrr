@@ -5,6 +5,11 @@ import { Input } from "@/components/ui/input";
 
 // The units the user can pick from. Everything is stored as seconds in the DB;
 // these are just convenient multiples for the UI.
+/** The longest cadence the server will store, and so the longest this offers.
+ *  A hundred years: past that, seconds stop fitting in the duration the backend
+ *  schedules with, and a routine meant for the far future reads as overdue. */
+export const MAX_INTERVAL_SECONDS = 100 * 365 * 24 * 60 * 60;
+
 const UNITS = [
   { label: "hours", seconds: 3_600 },
   { label: "days", seconds: 86_400 },
@@ -72,7 +77,9 @@ export function IntervalField({
   // (NaN serialises to null and silently dropped the cadence) — treat it as 1.
   useEffect(() => {
     const n = Number.isFinite(amount) ? Math.max(1, Math.round(amount)) : 1;
-    const resolved = enabled ? n * unitSeconds : null;
+    // Clamp rather than let the server refuse it: the stop on the input keeps
+    // the arrows in range, but a number can still be typed or pasted straight in.
+    const resolved = enabled ? Math.min(n * unitSeconds, MAX_INTERVAL_SECONDS) : null;
     reported.current = resolved;
     onChange(resolved);
     // We intentionally exclude onChange from deps; it may be a new function each
@@ -98,6 +105,7 @@ export function IntervalField({
         <Input
           type="number"
           min={1}
+          max={Math.floor(MAX_INTERVAL_SECONDS / unitSeconds)}
           value={amount}
           onChange={(e) => setAmount(Number(e.target.value))}
           className="w-20"

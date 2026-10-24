@@ -65,6 +65,7 @@ type ShareStore interface {
 // admin-editable settings.
 type AuthStore interface {
 	CreateUser(ctx context.Context, in store.UserInput) (store.User, error)
+	ImportTasks(ctx context.Context, ownerID int64, items []store.ImportTask, replace bool) (store.ImportCounts, error)
 	GetUserByID(ctx context.Context, id int64) (store.User, error)
 	GetUserByUsername(ctx context.Context, username string) (store.User, error)
 	GetUserByOIDCSubject(ctx context.Context, subject string) (store.User, error)

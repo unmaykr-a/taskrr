@@ -30,6 +30,19 @@ const (
 	maxFolderLen = 60
 )
 
+// maxIntervalSeconds bounds a routine's cadence, and the lead time on its
+// reminder.
+//
+// A hundred years is far past anything a "when did I last do this" tracker is
+// for, and — the actual reason there is a limit — comfortably short of where
+// seconds stop fitting in a Duration. Past roughly 292 years the nanosecond
+// conversion overflows int64 and comes back *negative*, which turns "due in
+// several lifetimes" into "overdue since the eighteenth century": the task sits
+// permanently overdue, and its reminder fires immediately after each
+// completion instead of never. The interval box has no upper stop, so this was
+// reachable by typing a long enough number into it.
+const maxIntervalSeconds = 100 * 365 * 24 * 60 * 60
+
 func (s *Server) handleHealth(w http.ResponseWriter, _ *http.Request) {
 	writeJSON(w, http.StatusOK, map[string]string{"status": "ok"})
 }
@@ -104,8 +117,9 @@ func (req taskRequest) toInput() (store.TaskInput, string) {
 	if utf8.RuneCountInString(req.Description) > maxTextLen {
 		return store.TaskInput{}, fmt.Sprintf("description must be at most %d characters", maxTextLen)
 	}
-	if req.IntervalSeconds != nil && *req.IntervalSeconds <= 0 {
-		return store.TaskInput{}, "intervalSeconds must be a positive number of seconds, or null"
+	if req.IntervalSeconds != nil && (*req.IntervalSeconds <= 0 || *req.IntervalSeconds > maxIntervalSeconds) {
+		return store.TaskInput{}, fmt.Sprintf(
+			"intervalSeconds must be between 1 and %d (about a hundred years), or null", maxIntervalSeconds)
 	}
 	for _, c := range []*string{req.ColorFresh, req.ColorOverdue} {
 		if c != nil && !hexColor.MatchString(*c) {
@@ -122,8 +136,10 @@ func (req taskRequest) toInput() (store.TaskInput, string) {
 	}
 	// A negative lead would schedule the reminder *after* the due time, which is
 	// not a reminder. Zero is legitimate — "tell me exactly when it's due".
-	if req.ReminderLeadSeconds != nil && *req.ReminderLeadSeconds < 0 {
-		return store.TaskInput{}, "reminderLeadSeconds must be zero or more, or null"
+	if req.ReminderLeadSeconds != nil &&
+		(*req.ReminderLeadSeconds < 0 || *req.ReminderLeadSeconds > maxIntervalSeconds) {
+		return store.TaskInput{}, fmt.Sprintf(
+			"reminderLeadSeconds must be between 0 and %d, or null", maxIntervalSeconds)
 	}
 	return store.TaskInput{
 		Name:                name,

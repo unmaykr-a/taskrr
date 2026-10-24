@@ -6,6 +6,7 @@ import (
 	"net/http"
 	"net/http/httptest"
 	"strings"
+	"sync"
 	"sync/atomic"
 	"testing"
 	"time"
@@ -26,12 +27,19 @@ type markKey struct {
 }
 
 // fakeStore is an in-memory Store for exercising Tick without a database.
+//
+// Guarded, because deliveries go out in parallel and so MarkReminded is called
+// from several goroutines at once. The real store is safe for that — one
+// connection, and database/sql serialises — and this stands in for it.
 type fakeStore struct {
+	mu     sync.Mutex
 	cands  []store.ReminderCandidate
 	marked map[markKey]time.Time
 }
 
 func (f *fakeStore) ListReminderCandidates(context.Context) ([]store.ReminderCandidate, error) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	out := make([]store.ReminderCandidate, len(f.cands))
 	copy(out, f.cands)
 	for i := range out {
@@ -43,6 +51,8 @@ func (f *fakeStore) ListReminderCandidates(context.Context) ([]store.ReminderCan
 }
 
 func (f *fakeStore) MarkReminded(_ context.Context, taskID, userID int64, dueAt time.Time) error {
+	f.mu.Lock()
+	defer f.mu.Unlock()
 	if f.marked == nil {
 		f.marked = map[markKey]time.Time{}
 	}
@@ -247,5 +257,63 @@ func TestSendTestHonoursThePrivateSetting(t *testing.T) {
 	err := SendTest(context.Background(), "http://192.168.0.1:9/", false)
 	if err == nil || !strings.Contains(err.Error(), "not allowed") {
 		t.Fatalf("SendTest with private targets off = %v, want a refusal by the guard", err)
+	}
+}
+
+// A webhook that never answers costs the full timeout. Sent one after another,
+// a single dead URL held up every reminder behind it — on every tick, for as
+// long as it stayed dead, since a failed delivery is deliberately retried
+// rather than marked. Deliveries go out in parallel now, so a stalled one
+// delays itself and nothing else.
+func TestTickIsNotHeldUpByOneStalledWebhook(t *testing.T) {
+	var delivered int32
+	blocked := make(chan struct{})
+
+	stall := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		<-blocked // never answers until the test releases it
+	}))
+	defer stall.Close()
+	quick := httptest.NewServer(http.HandlerFunc(func(w http.ResponseWriter, _ *http.Request) {
+		atomic.AddInt32(&delivered, 1)
+		w.WriteHeader(http.StatusOK)
+	}))
+	defer quick.Close()
+	// Registered after the servers so it runs before them: Close waits for its
+	// handlers to return, and the stalled one only returns once this is closed.
+	defer close(blocked)
+
+	const others = 6
+	cands := []store.ReminderCandidate{{
+		TaskID: 1, UserID: 1, IntervalSecs: 3600, WebhookURL: stall.URL,
+		LastCompleted: time.Now().Add(-2 * time.Hour).UTC(),
+	}}
+	for i := 0; i < others; i++ {
+		cands = append(cands, store.ReminderCandidate{
+			TaskID: int64(i + 2), UserID: 1, IntervalSecs: 3600, WebhookURL: quick.URL,
+			LastCompleted: time.Now().Add(-2 * time.Hour).UTC(),
+		})
+	}
+
+	// The guard has to allow loopback for this one: the point is the timing
+	// between deliveries, not the SSRF policy, which has its own tests.
+	svc := &Service{store: &fakeStore{cands: cands}, client: newHTTPClient(func(net.IP) bool { return false })}
+
+	done := make(chan struct{})
+	go func() {
+		svc.Tick(context.Background())
+		close(done)
+	}()
+
+	// The quick ones should all land while the stalled one is still hanging.
+	deadline := time.After(10 * time.Second)
+	for atomic.LoadInt32(&delivered) < others {
+		select {
+		case <-deadline:
+			t.Fatalf("only %d of %d reminders got through while one webhook stalled",
+				atomic.LoadInt32(&delivered), others)
+		case <-done:
+			t.Fatal("the tick finished early — the stalled webhook should still be hanging")
+		case <-time.After(10 * time.Millisecond):
+		}
 	}
 }
